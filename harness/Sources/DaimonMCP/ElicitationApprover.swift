@@ -40,16 +40,26 @@ struct ElicitationApprover: Approver {
         // elicitation (title, message, field titles, descriptions), so the command appears in all of them.
         let level = request.assessment.level.rawValue
         let reasons = request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n")
-        let summary = "Run `\(request.command)` in \(request.workingDirectory)?"
-        let text = "\(summary)\nRisk: \(level)\n\(reasons)\nAccept to run it, Decline to refuse."
+        // The title is short because clients trim it; the full command leads the description, which
+        // renders before the options, and the message repeats it for clients that show only that.
+        let text = """
+            Command:
+            \(request.command)
+
+            Directory: \(request.workingDirectory)
+            Risk: \(level)
+            \(reasons)
+
+            Accept runs it (once, or for this session). Decline refuses.
+            """
         let schema = Elicitation.RequestSchema(
-            title: "daimon (\(level) risk): \(request.command)",
+            title: "daimon: approve command? (\(level) risk)",
             description: text,
             properties: [
                 "scope": .object([
                     "type": .string("string"),
-                    "title": .string("Approve: \(request.command)"),
-                    "description": .string("Run it once, or also for the rest of this session"),
+                    "title": .string("Approve"),
+                    "description": .string("Once, or for the rest of this session"),
                     "enum": .array([.string("once"), .string("session")]),
                     "enumNames": .array([.string("Approve once"), .string("Approve for this session")]),
                     "default": .string("once"),

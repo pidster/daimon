@@ -54,7 +54,8 @@ disable policy and sandbox, or `--yes` to skip approval.
 Risky commands (by default `moderate` and above) need approval. If the client advertised elicitation at
 initialize, daimon asks the client's user through the protocol. The command, directory, risk level, and
 reasons appear in the title, the message, and the field descriptions, because clients render different
-parts. **Accept runs the command; Decline or Cancel refuses it.** The form has one optional choice,
+parts; the full command leads the description so it is never trimmed. **Accept runs the command; Decline
+or Cancel refuses it.** The form has one optional choice,
 `scope`: "Approve once" (default) or "Approve for this session", the latter caching that exact command
 for the rest of the session. Verified with Claude Code's dialog. Otherwise the call returns
 `command not approved: … this client does not support elicitation …` with `isError: true`, and the calling

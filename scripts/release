@@ -85,4 +85,4 @@ TAP_DIR="$OUT/tap"
 remote sh -c "rm -rf '$TAP_DIR' && gh repo clone $TAP_REPO '$TAP_DIR' && mkdir -p '$TAP_DIR/Formula' && cp '$FORMULA' '$TAP_DIR/Formula/daimon.rb' && cd '$TAP_DIR' && git add Formula/daimon.rb && git commit -m 'daimon $VERSION' && git push"
 
 echo "==> done"
-echo "verify: brew update && brew install $TAP_REPO/daimon && daimon doctor"
+echo "verify: brew update && brew install pidster/tap/daimon && daimon doctor"
