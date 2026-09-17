@@ -57,6 +57,14 @@ so it can try something else.
 
 `--unsafe` on `respond`, `chat`, and `mcp` turns both layers off with a warning on stderr.
 
+### Risk classification and approval
+
+Commands that pass the policy are classified `safe`, `moderate`, or `dangerous` by rules plus the on-device
+model, and at `moderate` or above a human is asked: on the terminal in `chat`, through MCP elicitation in
+`mcp`, and refused in non-interactive `respond` unless `--yes`. Denials come back as
+`error: command not approved: …`. Configure with `approval.threshold` and `approval.useModel`. See
+[approval.md](../approval.md).
+
 ### Symlinks
 
 Seatbelt matches real paths, so daimon resolves every profile path with `realpath(3)` before generating the

@@ -15,6 +15,7 @@ One prompt in, one reply out. The prompt is read from stdin when omitted.
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
+| `-y, --yes` | Approve risky commands without asking. Without it, `respond` refuses commands at or above the approval threshold. |
 
 ```
 daimon "What is the date in Tokyo?"
@@ -42,6 +43,9 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, Ctrl-D | Exit, saving if a name is set. |
+
+When the model wants to run a risky command, chat prints it with the reasons and asks `[y]es / [n]o /
+[a]lways this session` on stderr before continuing.
 
 Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes cleanly.
 
@@ -71,6 +75,7 @@ Serves the Model Context Protocol over stdio until the client closes the pipe. S
 | --- | --- |
 | `-i, --instructions <text>` | Default instructions for `respond` threads that supply none. |
 | `--unsafe` | Disable the `run_command` policy and sandbox for every call. |
+| `-y, --yes` | Approve risky commands without asking the client's user. |
 
 ## Home directory and configuration
 
@@ -93,6 +98,7 @@ subcommands only read from it.
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
 | `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
 | `audit` | `{ "enabled": true, "maxFileBytes": 10485760, "keepFiles": 5 }` | Audit log switch and rotation. |
+| `approval` | `{ "threshold": "moderate", "useModel": true }` | When to ask a human before `run_command`; see [approval.md](approval.md). |
 
 Environment: `DAIMON_HOME` relocates the directory; `DAIMON_LOG=debug|info|error` mirrors diagnostics to
 stderr.

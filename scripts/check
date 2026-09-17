@@ -55,6 +55,11 @@ coverage() {
     )
 }
 
+eval_() {
+    echo "==> eval (on-device model; not part of the gate)"
+    (cd harness && DAIMON_MODEL_TESTS=1 swift test --filter ModelEvalTests 2>&1 | grep -E 'model classifier:|✔|✘|Test run')
+}
+
 format() {
     (cd harness && swift format --in-place --recursive $SWIFT_PATHS)
     if have_crates; then (cd tools && cargo fmt --all); fi
@@ -104,8 +109,9 @@ case "${1:-all}" in
     test) test_ ;;
     format) format ;;
     coverage) coverage ;;
+    eval) eval_ ;;
     hygiene) hygiene ;;
     all) hygiene; lint; build; test_ ;;
     install-hooks) install_hooks ;;
-    *) echo "usage: scripts/check [lint|build|test|format|coverage|hygiene|all|install-hooks]" >&2; exit 64 ;;
+    *) echo "usage: scripts/check [lint|build|test|format|coverage|eval|hygiene|all|install-hooks]" >&2; exit 64 ;;
 esac

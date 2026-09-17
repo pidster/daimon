@@ -47,7 +47,9 @@ sensitive; it is why it is user-only.
 | `mcp.request` | `tool`, `arguments` | `DaimonServer` |
 | `mcp.result` | `tool`, `isError`, `text`, `seconds` | `DaimonServer` |
 | `error` | `message`, `context` | anywhere |
-| `classifier.verdict`, `approval.requested`, `approval.decided` | reserved for the risk classifier | (next) |
+| `classifier.verdict` | `command`, `level`, `reasons`, `sources`, `seconds` | `ApprovalGate` |
+| `approval.requested` | `command`, `level` | `ApprovalGate` |
+| `approval.decided` | `command`, `decision` (`approved`, `approvedForSession`, `denied`, `cached`), `reason` | `ApprovalGate` |
 
 Every tool the model can call is wrapped by `AuditedTool`, so a new tool is audited without doing anything.
 

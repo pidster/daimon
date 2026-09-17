@@ -63,6 +63,8 @@ public struct CommandRunner: Sendable {
         case launchFailed(String)
         /// The policy's patterns rejected the command.
         case denied(String)
+        /// The command needed approval and did not get it.
+        case disapproved(String)
 
         /// Human-readable explanation suitable for printing to stderr.
         public var description: String {
@@ -70,6 +72,7 @@ public struct CommandRunner: Sendable {
             case .invalidWorkingDirectory(let path): "working directory does not exist: \(path)"
             case .launchFailed(let reason): "could not launch /bin/sh: \(reason)"
             case .denied(let reason): "command denied by policy: \(reason)"
+            case .disapproved(let reason): "command not approved: \(reason)"
             }
         }
     }
@@ -78,11 +81,14 @@ public struct CommandRunner: Sendable {
     public var options: Options
     /// Where policy decisions and outcomes are recorded, if anywhere.
     public var audit: AuditLog?
+    /// Classifies commands and asks for approval when they are risky; nil never asks.
+    public var approval: ApprovalGate?
 
     /// Creates a runner with the given limits.
-    public init(options: Options = Options(), audit: AuditLog? = nil) {
+    public init(options: Options = Options(), audit: AuditLog? = nil, approval: ApprovalGate? = nil) {
         self.options = options
         self.audit = audit
+        self.approval = approval
     }
 
     /// Runs `command` through `/bin/sh -c` and waits for it to finish or time out.
@@ -106,6 +112,7 @@ public struct CommandRunner: Sendable {
         }
         decision["verdict"] = "allowed"
         audit?.record(.policyDecision, details: decision)
+        try await approval?.clear(command: command, workingDirectory: workingDirectory)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
         else { throw Failure.invalidWorkingDirectory(workingDirectory) }

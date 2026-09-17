@@ -34,6 +34,8 @@ harness/.build/debug/daimon "What is the date in Tokyo?"   # live model smoke te
 harness/.build/debug/daimon chat               # REPL; /help lists commands; --resume/--save use ~/.daimon/transcripts
 harness/.build/debug/daimon mcp               # MCP server on stdio (stdout is the protocol channel)
 harness/.build/debug/daimon logs --last 20    # audit log summaries; --json for raw events
+harness/.build/debug/daimon --yes "…"         # non-interactive: approve risky commands (else they are refused)
+scripts/check eval                            # on-device model classifier evaluation (slow; not in the gate)
 DAIMON_LOG=debug harness/.build/debug/daimon "…"   # mirror diagnostics to stderr
 scripts/check coverage                        # per-file line coverage (not in the gate)
 ```
@@ -59,7 +61,10 @@ CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform 
 (Rust under `tools/`) that the harness describes to the model (ADR 0005).
 
 `run_command` runs under a `CommandPolicy` (deny/allow regexes plus a `sandbox-exec` Seatbelt profile,
-ADR 0009), configured in `config.json`, bypassed by `--unsafe`. Inside the sandbox, SwiftPM needs
+ADR 0009), configured in `config.json`, bypassed by `--unsafe`, and then through an `ApprovalGate` (rules +
+on-device model classifier, ask at `moderate` and above; `--yes` skips, `chat` asks on the terminal, MCP uses
+elicitation; ADR 0011, `docs/approval.md`). Model-dependent tests live in `ModelEvalTests` and run only via
+`scripts/check eval`. Inside the sandbox, SwiftPM needs
 `--disable-sandbox`. Tests drive the real sandbox, so they write only under the working directory and temp. Context overflow is recovered by dropping old
 turns (ADR 0008); `docs/context-management.md` has the rules every tool must follow (bounded output, paging).
 

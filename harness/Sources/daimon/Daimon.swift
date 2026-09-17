@@ -37,11 +37,23 @@ struct Respond: AsyncParsableCommand {
     @Flag(help: "Disable the run_command policy and sandbox.")
     var unsafe = false
 
+    @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking (non-interactive).")
+    var yes = false
+
     mutating func run() async throws {
         let text = try prompt ?? Self.readStdin()
         let config = try Daimon.loadConfig(unsafe: unsafe)
         let audit = try Daimon.openAudit(config: config, entryPoint: "respond", unsafe: unsafe)
-        let tools = try Daimon.selectTools(toolNames, from: ToolRegistry(runner: config.runner, audit: audit))
+        let approver: any Approver =
+            yes
+            ? AutoApprover()
+            : DenyingApprover(
+                reason: "approval required; re-run with --yes, use daimon chat to be asked, or lower approval.threshold"
+            )
+        let gate = ApprovalGate(
+            classifier: config.classifier, approver: approver, threshold: config.approvalThreshold, audit: audit)
+        let tools = try Daimon.selectTools(
+            toolNames, from: ToolRegistry(runner: config.runner, audit: audit, approval: gate))
         let instructions = instructions ?? config.instructions
         audit.record(
             .sessionStart,
@@ -97,6 +109,8 @@ extension Daimon {
             throw ValidationError("Malformed \(home.configFile.path): \(error)")
         } catch let error as CommandPolicy.Failure {
             throw ValidationError("\(home.configFile.path): \(error)")
+        } catch let error as Config.Failure {
+            throw ValidationError("\(home.configFile.path): \(error)")
         }
         if unsafe {
             resolved.runner.policy = .unrestricted
@@ -141,13 +155,16 @@ struct Mcp: AsyncParsableCommand {
     @Flag(help: "Disable the run_command policy and sandbox.")
     var unsafe = false
 
+    @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking the client's user.")
+    var yes = false
+
     func run() async throws {
         var config = try Daimon.loadConfig(unsafe: unsafe)
         if let instructions { config.instructions = instructions }
         let audit = try Daimon.openAudit(config: config, entryPoint: "mcp", unsafe: unsafe)
-        audit.record(.sessionStart, details: ["entryPoint": "mcp", "unsafe": .bool(unsafe)])
+        audit.record(.sessionStart, details: ["entryPoint": "mcp", "unsafe": .bool(unsafe), "autoApprove": .bool(yes)])
         defer { audit.record(.sessionEnd) }
-        try await DaimonServer(config: config, audit: audit).run()
+        try await DaimonServer(config: config, audit: audit, autoApprove: yes).run()
     }
 }
 
@@ -179,7 +196,11 @@ struct Chat: AsyncParsableCommand {
         try Daimon.home.ensure()
         let store = TranscriptStore(directory: Daimon.home.transcripts)
         let audit = try Daimon.openAudit(config: config, entryPoint: "chat", unsafe: unsafe)
-        let tools = try Daimon.selectTools(toolNames, from: ToolRegistry(runner: config.runner, audit: audit))
+        let gate = ApprovalGate(
+            classifier: config.classifier, approver: TerminalApprover(), threshold: config.approvalThreshold,
+            audit: audit)
+        let tools = try Daimon.selectTools(
+            toolNames, from: ToolRegistry(runner: config.runner, audit: audit, approval: gate))
         let instructions = instructions ?? config.instructions
         audit.record(
             .sessionStart,

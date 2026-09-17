@@ -21,6 +21,12 @@ public struct DaimonServer: Sendable {
     private let threads: ThreadStore<ConversationThread>
     /// Audit log for the server session; threads get sibling logs keyed by thread id.
     private let audit: AuditLog
+    /// The MCP server; created up front so approvers can reach the client.
+    private let server: Server
+    /// Set from the initialize hook when the client advertises elicitation.
+    private let client = ClientCapabilityFlags()
+    /// Approve every risky command without asking (`--yes`).
+    private let autoApprove: Bool
 
     /// Creates a server from resolved configuration: default instructions for
     /// `respond`, limits for `run_command`, and the thread capacity.
@@ -28,25 +34,42 @@ public struct DaimonServer: Sendable {
     /// - Parameters:
     ///   - config: Resolved configuration.
     ///   - audit: Where MCP requests and thread activity are recorded; defaults to nothing.
-    public init(config: Config.Resolved = Config().resolved, audit: AuditLog? = nil) {
+    ///   - autoApprove: Approve risky commands without elicitation.
+    public init(config: Config.Resolved = Config().resolved, audit: AuditLog? = nil, autoApprove: Bool = false) {
         self.config = config
         threads = ThreadStore(capacity: config.maxThreads)
         self.audit = audit ?? .disabled(session: "mcp")
+        self.autoApprove = autoApprove
+        server = Server(name: Self.name, version: Self.version, capabilities: .init(tools: .init(listChanged: false)))
+    }
+
+    /// The approver for this server's connection.
+    private var approver: any Approver {
+        autoApprove
+            ? AutoApprover() : ElicitationApprover(server: server, client: client)
+    }
+
+    /// A gate for one session (thread or direct call), sharing this server's approver.
+    private func gate(audit: AuditLog) -> ApprovalGate {
+        ApprovalGate(
+            classifier: config.classifier, approver: approver, threshold: config.approvalThreshold, audit: audit)
     }
 
     /// Starts serving on stdin/stdout and returns when the client disconnects.
     ///
     /// - Throws: Transport errors from the MCP SDK.
     public func run() async throws {
-        let server = Server(
-            name: Self.name,
-            version: Self.version,
-            capabilities: .init(tools: .init(listChanged: false))
-        )
         await server.withMethodHandler(ListTools.self) { _ in .init(tools: ToolCatalog.all) }
         await server.withMethodHandler(CallTool.self) { params in try await self.call(params) }
         Diagnostics.mcp.info("serving on stdio")
-        try await server.start(transport: StdioTransport(logger: DiagnosticsLogHandler.logger()))
+        let client = client
+        try await server.start(transport: StdioTransport(logger: DiagnosticsLogHandler.logger())) {
+            info, capabilities in
+            let supported = capabilities.elicitation != nil
+            client.elicitation.withLock { $0 = supported }
+            Diagnostics.mcp.info(
+                "client \(info.name) \(info.version); elicitation \(supported ? "supported" : "unsupported")")
+        }
         await server.waitUntilCompleted()
         Diagnostics.mcp.info("client disconnected")
     }
@@ -107,7 +130,7 @@ public struct DaimonServer: Sendable {
         } else {
             let id = request.threadID ?? UUID().uuidString.lowercased()
             let threadAudit = audit.log(forSession: id)
-            let registry = ToolRegistry(runner: config.runner, audit: threadAudit)
+            let registry = ToolRegistry(runner: config.runner, audit: threadAudit, approval: gate(audit: threadAudit))
             let tools: [any FoundationModels.Tool]
             if request.toolNames.isEmpty {
                 tools = registry.all
@@ -165,7 +188,7 @@ public struct DaimonServer: Sendable {
 
     /// Runs a command with the configured limits, without involving the model.
     private func runCommand(_ request: RunCommandRequest) async -> CallTool.Result {
-        var runner = CommandRunner(options: config.runner, audit: audit)
+        var runner = CommandRunner(options: config.runner, audit: audit, approval: gate(audit: audit))
         if let directory = request.workingDirectory {
             runner.options.workingDirectory = directory
         }

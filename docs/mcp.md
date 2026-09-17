@@ -45,8 +45,17 @@ in order; different threads run concurrently.
 
 ### `run_command`
 
-Run a shell command directly, without the model. Same limits, policy, and sandbox as the model-facing tool:
-see [tools/run_command.md](tools/run_command.md). Start the server with `--unsafe` to disable both.
+Run a shell command directly, without the model. Same limits, policy, sandbox, and approval as the
+model-facing tool: see [tools/run_command.md](tools/run_command.md). Start the server with `--unsafe` to
+disable policy and sandbox, or `--yes` to skip approval.
+
+## Approval
+
+Risky commands (by default `moderate` and above) need approval. If the client advertised elicitation at
+initialize, daimon asks the client's user through the protocol with the command and reasons; accept with
+`approve: true` (and optionally `always: true`) runs it. Otherwise the call returns
+`command not approved: … this client does not support elicitation …` with `isError: true`, and the calling
+harness should run the command itself or start daimon with `--yes`. See [approval.md](approval.md).
 
 | Argument | Type | Required |
 | --- | --- | --- |

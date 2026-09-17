@@ -63,6 +63,14 @@ can also start from a saved `Transcript`.
   [context-management.md](context-management.md) and [ADR 0008](decisions/0008-context-condensation.md).
 - `transcript`, `contextTokens()`, and `reset()` support saving, budgeting, and starting over.
 
+### Risk classification and approval
+
+`ApprovalGate` (an actor, one per session) runs a `RiskClassifier` (`CompositeRiskClassifier` over
+`RuleRiskClassifier` and `ModelRiskClassifier`) and, at or above the configured threshold, asks an
+`Approver` (`TerminalApprover`, `DenyingApprover`, `AutoApprover`, or the MCP `ElicitationApprover`).
+`CommandRunner` consults the gate after the policy check. See [approval.md](approval.md) and
+[ADR 0011](decisions/0011-risk-classifier-and-approval.md).
+
 ### Audit and diagnostics
 
 `AuditLog` records `AuditEvent`s for one session through an `AuditSink` (`FileAuditSink` with rotation,

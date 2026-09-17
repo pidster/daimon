@@ -17,6 +17,22 @@ public struct Config: Codable, Equatable, Sendable {
     public var commandPolicy: CommandPolicy?
     /// Audit log settings.
     public var audit: AuditConfig?
+    /// Risk classification and approval for `run_command`.
+    public var approval: ApprovalConfig?
+
+    /// Approval settings in the file.
+    public struct ApprovalConfig: Codable, Equatable, Sendable {
+        /// Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`.
+        public var threshold: String?
+        /// Whether the on-device model classifies alongside the rules.
+        public var useModel: Bool?
+
+        /// Creates settings; nil fields take defaults.
+        public init(threshold: String? = nil, useModel: Bool? = nil) {
+            self.threshold = threshold
+            self.useModel = useModel
+        }
+    }
 
     /// Audit log settings in the file.
     public struct AuditConfig: Codable, Equatable, Sendable {
@@ -42,7 +58,8 @@ public struct Config: Codable, Equatable, Sendable {
     /// Creates a config; nil fields take defaults at resolution.
     public init(
         instructions: String? = nil, commandTimeoutSeconds: Int? = nil, commandMaxOutputBytes: Int? = nil,
-        maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil, audit: AuditConfig? = nil
+        maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil, audit: AuditConfig? = nil,
+        approval: ApprovalConfig? = nil
     ) {
         self.instructions = instructions
         self.commandTimeoutSeconds = commandTimeoutSeconds
@@ -50,6 +67,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.maxThreads = maxThreads
         self.commandPolicy = commandPolicy
         self.audit = audit
+        self.approval = approval
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
@@ -60,6 +78,9 @@ public struct Config: Codable, Equatable, Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else { return Config() }
         let config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
         try config.commandPolicy?.validate()
+        if let threshold = config.approval?.threshold, threshold != "never", RiskLevel(rawValue: threshold) == nil {
+            throw Failure.invalidApprovalThreshold(threshold)
+        }
         return config
     }
 
@@ -84,8 +105,25 @@ public struct Config: Codable, Equatable, Sendable {
             maxThreads: maxThreads ?? 32,
             auditEnabled: audit?.enabled ?? true,
             auditLimits: FileAuditSink.Limits(
-                maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5)
+                maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5),
+            approvalThreshold: approval?.threshold == "never"
+                ? nil : RiskLevel(rawValue: approval?.threshold ?? "") ?? .moderate,
+            approvalUsesModel: approval?.useModel ?? true
         )
+    }
+
+    /// Why a config file is unusable beyond JSON syntax.
+    public enum Failure: Error, CustomStringConvertible, Equatable {
+        /// `approval.threshold` is not a risk level or `never`.
+        case invalidApprovalThreshold(String)
+
+        /// Human-readable explanation.
+        public var description: String {
+            switch self {
+            case .invalidApprovalThreshold(let value):
+                "invalid approval.threshold '\(value)': use safe, moderate, dangerous, or never"
+            }
+        }
     }
 
     /// Configuration with every default filled in.
@@ -100,5 +138,15 @@ public struct Config: Codable, Equatable, Sendable {
         public var auditEnabled: Bool
         /// Rotation limits for the audit file.
         public var auditLimits: FileAuditSink.Limits
+        /// Ask for approval at this level and above; nil never asks.
+        public var approvalThreshold: RiskLevel?
+        /// Whether the on-device model classifies alongside the rules.
+        public var approvalUsesModel: Bool
+
+        /// The classifier this configuration calls for.
+        public var classifier: any RiskClassifier {
+            approvalUsesModel
+                ? CompositeRiskClassifier([RuleRiskClassifier(), ModelRiskClassifier()]) : RuleRiskClassifier()
+        }
     }
 }

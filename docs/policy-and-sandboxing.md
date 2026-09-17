@@ -1,9 +1,10 @@
 # Policy and sandboxing: what is available and what daimon should do
 
-Status: investigated 2026-09-17; layers 1, 2, 4, and the audit half of 5 are implemented (see
-[ADR 0009](decisions/0009-command-policy-and-sandbox.md) and [tools/run_command.md](tools/run_command.md)).
-Layer 3 (confirmation in chat) is not. This page keeps the survey so the next step can be chosen
-deliberately.
+Status: investigated 2026-09-17; all five layers are implemented. Layers 2 and 4:
+[ADR 0009](decisions/0009-command-policy-and-sandbox.md). Layer 3, generalised into risk classification
+plus approval on every entry point: [ADR 0011](decisions/0011-risk-classifier-and-approval.md) and
+[approval.md](approval.md). Layer 5: [ADR 0010](decisions/0010-audit-and-diagnostic-logging.md). This page
+keeps the survey.
 
 ## What the Foundation Models framework offers
 
@@ -54,7 +55,6 @@ disabled) are blocked by the kernel; SwiftPM needs `--disable-sandbox` inside it
 
 Still open:
 
-- Layer 3, confirmation in `chat`, is cheap and not yet done.
 - Network defaults to allowed. The one-field switch is `sandbox.allowNetwork`.
 - MCP `respond` uses the same policy as the CLI. A stricter default for agent callers would be a separate
   `commandPolicy` in config keyed by entry point.

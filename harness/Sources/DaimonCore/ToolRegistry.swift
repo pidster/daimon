@@ -6,12 +6,13 @@ public struct ToolRegistry: Sendable {
     public let all: [any Tool]
 
     /// Builds the registry with the given limits for command execution and file pages.
-    /// With an audit log, every tool is wrapped so its calls and results are recorded.
+    /// With an audit log, every tool is wrapped so its calls and results are recorded;
+    /// with an approval gate, `run_command` classifies and asks before running.
     public init(
         runner: CommandRunner.Options = CommandRunner.Options(), reader: FileReader = FileReader(),
-        audit: AuditLog? = nil
+        audit: AuditLog? = nil, approval: ApprovalGate? = nil
     ) {
-        let commandRunner = CommandRunner(options: runner, audit: audit)
+        let commandRunner = CommandRunner(options: runner, audit: audit, approval: approval)
         if let audit {
             all = [
                 AuditedTool(CurrentDateTool(), audit: audit),

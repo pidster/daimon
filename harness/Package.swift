@@ -43,5 +43,9 @@ let package = Package(
             name: "DaimonMCPTests",
             dependencies: ["DaimonMCP"]
         ),
+        .testTarget(
+            name: "ModelEvalTests",
+            dependencies: ["DaimonCore"]
+        ),
     ]
 )
