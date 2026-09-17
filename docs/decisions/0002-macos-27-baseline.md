@@ -15,4 +15,4 @@ has no `.v27` case. Do not lower the floor for compatibility.
 ## Consequences
 
 - Any macOS 27 API can be used without availability checks.
-- CI must run on a macOS 27 image; the runner label is `macos-latest` until GitHub publishes a 27-specific one.
+- CI must run on a macOS 27 image. None is provisioned yet, so the workflow is manual-only for now.

@@ -40,5 +40,7 @@ work-in-progress commits on a branch that will be squashed.
 
 ## CI
 
-`.github/workflows/ci.yml` runs `scripts/check lint`, `build`, and `test` on every push to `main` and every
-pull request. CI compiles against the framework but does not exercise the model.
+`.github/workflows/ci.yml` runs `scripts/check lint`, `build`, and `test`, but is currently
+`workflow_dispatch` only: it needs a macOS 27 / Xcode 27 runner that has not been provisioned yet. Until
+then the pre-commit hook is the only automated gate, so do not bypass it. Restore the `push` and
+`pull_request` triggers when a runner exists.

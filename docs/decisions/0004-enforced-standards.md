@@ -21,4 +21,5 @@ was rejected for using a private address).
 
 - The hook needs a warm build cache to be fast; a cold run compiles dependencies once.
 - Developers must run `scripts/check install-hooks` after cloning; git does not version hooks.
-- Adding a check means editing one script, and CI picks it up automatically.
+- Adding a check means editing one script, and CI picks it up automatically once it is re-enabled (it is
+  manual-only until a macOS 27 runner is provisioned).

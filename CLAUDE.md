@@ -39,7 +39,8 @@ test its pure helper.
 ## Standards
 
 This project is held to the highest standard of engineering practice; `docs/engineering.md` is the rulebook
-and `scripts/check` enforces it. Before every commit run `scripts/check` (the hook does this). Tests never
+and `scripts/check` enforces it. Before every commit run `scripts/check` (the hook does this). CI is disabled until a macOS 27 runner is
+provisioned, so the hook is the only automated gate. Tests never
 need the model. Errors are typed. No force unwrap, force try, `fatalError` in library code, or concurrency
 escape hatches. Record non-obvious or hard-to-reverse choices as an ADR in `docs/decisions/`.
 

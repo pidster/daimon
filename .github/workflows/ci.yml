@@ -1,15 +1,14 @@
 name: CI
 
+# Disabled for now: this needs a macOS 27 / Xcode 27 runner, which has not
+# been provisioned yet. The job can still be started by hand from the Actions
+# tab. Restore push/pull_request triggers once a runner exists.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
-    # The project baseline is macOS 27 / Xcode 27. The on-device model itself
-    # is not exercised in CI, only compiled against. Pin the runner label to a
-    # macOS 27 image once GitHub publishes one.
+    # The on-device model itself is not exercised in CI, only compiled against.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
