@@ -12,6 +12,14 @@ have_crates() {
     ls tools/*/Cargo.toml >/dev/null 2>&1
 }
 
+# True when this shell already runs inside a Seatbelt sandbox (for example when daimon runs the gate
+# through its own run_command). SwiftPM then needs --disable-sandbox, and nested sandbox tests are moot.
+nested_sandbox() {
+    ! sandbox-exec -p '(version 1) (allow default) (deny file-write* (subpath "/nonexistent/daimon-nesting-probe"))' \
+        /usr/bin/true 2>/dev/null
+}
+if nested_sandbox; then SWIFT_SANDBOX="--disable-sandbox"; else SWIFT_SANDBOX=""; fi
+
 lint() {
     echo "==> lint (swift)"
     (cd harness && swift format lint --recursive --strict $SWIFT_PATHS)
@@ -23,7 +31,7 @@ lint() {
 
 build() {
     echo "==> build (swift, warnings are errors)"
-    (cd harness && swift build -Xswiftc -warnings-as-errors)
+    (cd harness && swift build $SWIFT_SANDBOX -Xswiftc -warnings-as-errors)
     if have_crates; then
         echo "==> build (rust, warnings are errors)"
         (cd tools && RUSTFLAGS="-D warnings" cargo build --workspace)
@@ -32,9 +40,13 @@ build() {
 
 test_() {
     echo "==> test (swift)"
-    (cd harness && swift test)
-    echo "==> test (swift, runner suites inside an outer sandbox)"
-    (cd harness && sandbox-exec -p '(version 1) (allow default)' swift test --disable-sandbox --filter 'CommandRunner|NestedSandbox' 2>&1 | grep -E 'Test run with|✘' | tail -3)
+    (cd harness && swift test $SWIFT_SANDBOX)
+    if nested_sandbox; then
+        echo "==> test (swift, runner suites inside an outer sandbox): already nested, skipped"
+    else
+        echo "==> test (swift, runner suites inside an outer sandbox)"
+        (cd harness && sandbox-exec -p '(version 1) (allow default)' swift test --disable-sandbox --filter 'CommandRunner|NestedSandbox' 2>&1 | grep -E 'Test run with|✘' | tail -3)
+    fi
     if have_crates; then
         echo "==> test (rust)"
         (cd tools && cargo test --workspace)
@@ -45,7 +57,7 @@ coverage() {
     echo "==> coverage (swift)"
     (
         cd harness
-        swift test --enable-code-coverage >/dev/null 2>&1 || swift test --enable-code-coverage
+        swift test $SWIFT_SANDBOX --enable-code-coverage >/dev/null 2>&1 || swift test $SWIFT_SANDBOX --enable-code-coverage
         profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata"
         set -- .build/out/Products/Debug/*.xctest/Contents/MacOS/*
         first="$1"; shift
@@ -59,7 +71,7 @@ coverage() {
 
 eval_() {
     echo "==> eval (on-device model; not part of the gate)"
-    (cd harness && DAIMON_MODEL_TESTS=1 swift test --filter ModelEvalTests 2>&1 | grep -E 'model classifier:|✔|✘|Test run')
+    (cd harness && DAIMON_MODEL_TESTS=1 swift test $SWIFT_SANDBOX --filter ModelEvalTests 2>&1 | grep -E 'model classifier|^  [a-z]+ -> |✔|✘|Test run')
 }
 
 format() {

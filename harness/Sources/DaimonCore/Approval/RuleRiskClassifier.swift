@@ -61,6 +61,9 @@ public struct RuleRiskClassifier: RiskClassifier {
         // Moderate
         Rule(start + #"(curl|wget|ssh|scp|sftp|rsync|nc|telnet)\b"#, .moderate, "uses the network"),
         Rule(
+            #"(-m\s+http\.server|\bhttp-server\b|\bserve\b|\bnc\s+-l|\bngrok\b|\bssh\s+-[LRD]\b|--listen\b|\blisten\s+\d)"#,
+            .moderate, "starts a network service"),
+        Rule(
             start + #"git\s+(push|pull|fetch|clone|remote|commit|merge|rebase|stash|tag|cherry-pick|revert)\b"#,
             .moderate, "changes repository state"),
         Rule(

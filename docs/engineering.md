@@ -14,7 +14,7 @@ recorded as [decisions](decisions/).
 | `scripts/check build` | `swift build -Xswiftc -warnings-as-errors`; `cargo build` with `RUSTFLAGS=-D warnings` |
 | `scripts/check test` | `swift test`; then the `CommandRunner` suites again inside an outer Seatbelt sandbox to exercise the nested-sandbox fallback; `cargo test --workspace` |
 | `scripts/check format` | Auto-fix formatting with swift-format and rustfmt |
-| `scripts/check eval` | Runs the on-device model evaluation (`ModelEvalTests`, gated by `DAIMON_MODEL_TESTS=1`); reports classifier accuracy, asserts no dangerous command rated safe (not in the gate) |
+| `scripts/check eval` | Runs the on-device model evaluation (`ModelEvalTests`, gated by `DAIMON_MODEL_TESTS=1`); reports classifier accuracy and every miss, asserts no dangerous command rated safe (not in the gate) |
 | `scripts/check coverage` | `swift test --enable-code-coverage` plus an `llvm-cov` per-file line report for the harness sources (not in the gate) |
 | `scripts/check hygiene` | Staged-file checks: conflict markers, trailing whitespace, files over 1 MiB, commit author uses a GitHub noreply address |
 | `scripts/check all` | Everything above, in that order |
@@ -25,7 +25,9 @@ and `test`; on a warm build cache this takes a few seconds. Bypass with `git com
 work-in-progress commits on a branch that will be squashed.
 
 `scripts/check format` fixes most lint findings automatically. Rust checks are skipped until the workspace has
-its first crate.
+its first crate. When the gate itself runs inside a Seatbelt sandbox (daimon running its own hook through
+`run_command`), the script detects it, passes `--disable-sandbox` to SwiftPM, and skips the nested-sandbox
+test step.
 
 ## Definition of done
 

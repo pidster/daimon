@@ -92,6 +92,13 @@ and `close_thread`. Details: `docs/design.md`.
 
 ## MCP servers (`.mcp.json`)
 
+**Run every git command through daimon** (`mcp__daimon__run_command` with the repository as
+`working_directory`), never through Bash: status, log, diff, add, commit, push. This is deliberate
+dogfooding. Expect an approval dialog for commands that change repository state; choose "Approve for this
+session" for repeated shapes. The pre-commit hook then runs inside daimon's sandbox, which `scripts/check`
+detects (SwiftPM gets `--disable-sandbox`, the nested-sandbox test step is skipped). If daimon is not
+connected, say so and ask the user to run `/mcp` rather than falling back to Bash.
+
 - `daimon`: this repository's own release build, for dogfooding, launched through `scripts/daimon-mcp`.
   **If the session starts with the `daimon` server failed to connect, the cause is almost always a missing
   release build.** Do not treat the tools as unavailable: tell the user to run
