@@ -35,26 +35,31 @@ struct ElicitationApprover: Approver {
                     + "elicitation; run the command from the calling harness, or start daimon mcp with --yes to "
                     + "auto-approve, or lower approval.threshold in config.json")
         }
+        // Accept means run; Decline or Cancel means do not. The only field is optional, so a client
+        // that submits an empty form on Accept still approves. Clients render different parts of an
+        // elicitation (title, message, field titles, descriptions), so the command appears in all of them.
+        let level = request.assessment.level.rawValue
+        let reasons = request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n")
+        let summary = "Run `\(request.command)` in \(request.workingDirectory)?"
+        let text = "\(summary)\nRisk: \(level)\n\(reasons)\nAccept to run it, Decline to refuse."
         let schema = Elicitation.RequestSchema(
-            title: "daimon: approve command?",
-            description: request.assessment.reasons.joined(separator: "\n"),
+            title: "daimon (\(level) risk): \(request.command)",
+            description: text,
             properties: [
-                "approve": .object(["type": .string("boolean"), "description": .string("Run this command")]),
                 "always": .object([
                     "type": .string("boolean"),
-                    "description": .string("Also approve this exact command for the rest of the session"),
-                ]),
+                    "title": .string("Always this session"),
+                    "description": .string("Also approve `\(request.command)` for the rest of this session"),
+                    "default": .bool(false),
+                ])
             ],
-            required: ["approve"]
+            required: []
         )
-        let message =
-            "Run `\(request.command)` in \(request.workingDirectory)? Risk: \(request.assessment.level.rawValue)."
         do {
-            let result = try await server.requestElicitation(message: message, requestedSchema: schema)
+            let result = try await server.requestElicitation(message: text, requestedSchema: schema)
             switch result.action {
             case .accept:
-                guard result.content?["approve"]?.boolValue == true else { return .denied("not approved by the user") }
-                return result.content?["always"]?.boolValue == true ? .approvedForSession : .approved
+                return Self.wantsAlways(result.content?["always"]) ? .approvedForSession : .approved
             case .decline:
                 return .denied("declined by the user")
             case .cancel:
@@ -64,5 +69,12 @@ struct ElicitationApprover: Approver {
             Diagnostics.mcp.error("elicitation failed: \(error)")
             return .denied("approval request failed: \(error)")
         }
+    }
+
+    /// Reads the optional `always` field leniently: booleans, or the strings clients tend to send.
+    static func wantsAlways(_ value: Value?) -> Bool {
+        if let flag = value?.boolValue { return flag }
+        if let text = value?.stringValue { return ["true", "yes", "y", "1", "on"].contains(text.lowercased()) }
+        return false
     }
 }
