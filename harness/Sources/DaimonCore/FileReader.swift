@@ -121,6 +121,7 @@ public struct FileReader: Sendable {
 
 /// Splits a byte stream into newline-terminated lines across chunk boundaries.
 struct LineScanner {
+    /// Bytes after the last newline seen, carried into the next feed.
     private var pending = Data()
 
     /// Feeds a chunk and returns the complete lines it closed, without their newlines.

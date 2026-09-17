@@ -1,0 +1,101 @@
+# daimon command reference
+
+`daimon` runs Apple's on-device Foundation Model with tools. It has four subcommands; `respond` is the
+default, so `daimon "<prompt>"` works.
+
+## Subcommands
+
+### `daimon respond [<prompt>]` (default)
+
+One prompt in, one reply out. The prompt is read from stdin when omitted.
+
+| Flag | Meaning |
+| --- | --- |
+| `-i, --instructions <text>` | System instructions for the session. Default: `config.json`, else the built-in default. |
+| `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
+| `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
+
+```
+daimon "What is the date in Tokyo?"
+echo "Summarise this" | daimon --tool current_date
+daimon --no-stream --instructions "Answer in French" "How are you?"
+```
+
+### `daimon chat`
+
+Interactive session. Lines starting with `/` are commands; anything else goes to the model. Replies stream.
+
+| Flag | Meaning |
+| --- | --- |
+| `-i, --instructions <text>` | As for `respond`. |
+| `--tool <name>` (repeatable) | As for `respond`. |
+| `-r, --resume <name>` | Continue a transcript saved under `~/.daimon/transcripts/<name>.json`. |
+| `--save <name>` | Save the transcript under this name on exit. Defaults to the resumed name. |
+
+| Command | Effect |
+| --- | --- |
+| `/help` | List commands. |
+| `/tools` | List the tools the model can call. |
+| `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
+| `/save [name]` | Save now; the name is remembered for exit. |
+| `/new` | Start over with the same instructions and tools. |
+| `/quit`, `/exit`, Ctrl-D | Exit, saving if a name is set. |
+
+Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes cleanly.
+
+### `daimon tools`
+
+Prints each registered tool as `name<TAB>description`. See [tools/](tools/README.md).
+
+### `daimon mcp`
+
+Serves the Model Context Protocol over stdio until the client closes the pipe. See [mcp.md](mcp.md).
+
+| Flag | Meaning |
+| --- | --- |
+| `-i, --instructions <text>` | Default instructions for `respond` threads that supply none. |
+
+## Home directory and configuration
+
+State lives in `~/.daimon`, or `$DAIMON_HOME` when set. It is created on first use by `chat`; other
+subcommands only read from it.
+
+| Path | Contents |
+| --- | --- |
+| `config.json` | Optional settings, below. |
+| `transcripts/<name>.json` | Saved conversations. |
+| `logs/` | Reserved for log files. |
+
+`config.json` fields, all optional:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `instructions` | built-in | Default system instructions for new sessions. |
+| `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
+| `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |
+| `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
+
+```json
+{ "instructions": "You are terse.", "commandTimeoutSeconds": 120 }
+```
+
+A malformed file is an error; a missing file is fine. Unknown fields are ignored.
+
+## Context window
+
+The model's window is about 4k tokens. When a prompt no longer fits, daimon drops older turns (keeping the
+instructions and the last four turns) and retries once. `chat` prints a note when this happens; MCP results
+carry `condensed: true`. See [context-management.md](context-management.md).
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Success. |
+| 1 | Runtime failure, such as the model being unavailable or a malformed `config.json`. |
+| 64 | Usage error: bad flags, unknown `--tool`, empty stdin prompt. |
+
+## Requirements
+
+macOS 27 or later. The on-device model must be enabled in System Settings (Apple Intelligence); `fm available`
+reports its state.

@@ -9,6 +9,7 @@ import FoundationModels
 public actor ConversationThread {
     /// The identifier clients pass as `thread_id`.
     public nonisolated let id: String
+    /// The conversation; isolated to this actor because it is not `Sendable`.
     private let agent: Agent
 
     /// Creates a thread with its own model session.
@@ -49,8 +50,11 @@ public actor ThreadStore<Thread: Sendable> {
         }
     }
 
+    /// Maximum live threads before eviction.
     private let capacity: Int
+    /// Live threads by id.
     private var threads: [String: Thread] = [:]
+    /// Ids ordered least recently used first.
     private var recency: [String] = []
 
     /// Creates a store that keeps at most `capacity` threads, evicting the least recently used.

@@ -153,12 +153,15 @@ public struct CommandRunner: Sendable {
 private final class OutputBuffer: Sendable {
     private let storage = Mutex(Data())
 
+    /// A snapshot of everything captured so far.
     var contents: Data { storage.withLock { $0 } }
 
+    /// Appends bytes; safe to call from the pipe's handler queue and the caller concurrently.
     func append(_ data: Data) {
         storage.withLock { $0.append(data) }
     }
 
+    /// Installs a readability handler that appends every chunk until end of file.
     func capture(_ handle: FileHandle) {
         handle.readabilityHandler = { [self] handle in
             let chunk = handle.availableData

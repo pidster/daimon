@@ -27,7 +27,9 @@ public struct ReadFileTool: Tool {
         public var limit: Int?
     }
 
+    /// Supplies the per-page byte budget.
     private let reader: FileReader
+    /// Lines per page when the model does not ask for a limit.
     private let defaultLimit: Int
 
     /// Creates the tool over a reader that supplies the byte budget.

@@ -29,6 +29,7 @@ public struct CurrentDateTool: Tool {
         return Self.format(Date(), in: zone)
     }
 
+    /// ISO 8601 with offset, then the zone identifier in parentheses. Pure, for tests.
     static func format(_ date: Date, in zone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.timeZone = zone

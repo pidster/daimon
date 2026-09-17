@@ -14,8 +14,11 @@ public struct DaimonServer: Sendable {
     /// Server version reported during the MCP handshake.
     public static let version = "0.1.0"
 
+    /// Default instructions, `run_command` limits, and thread capacity.
     private let config: Config.Resolved
+    /// The model-facing tools built from `config`, shared by every thread.
     private let registry: ToolRegistry
+    /// Live conversations by `thread_id`.
     private let threads: ThreadStore<ConversationThread>
 
     /// Creates a server from resolved configuration: default instructions for
@@ -59,6 +62,7 @@ public struct DaimonServer: Sendable {
         }
     }
 
+    /// Finds or creates the thread, runs the prompt, and reports the thread id and whether it was condensed.
     private func respond(_ request: RespondRequest) async -> CallTool.Result {
         let thread: ConversationThread
         var created = false
@@ -107,6 +111,7 @@ public struct DaimonServer: Sendable {
         }
     }
 
+    /// Frees a thread; unknown ids are tool errors.
     private func closeThread(_ request: CloseThreadRequest) async -> CallTool.Result {
         do {
             try await threads.close(request.threadID)
@@ -116,6 +121,7 @@ public struct DaimonServer: Sendable {
         }
     }
 
+    /// Runs a command with the configured limits, without involving the model.
     private func runCommand(_ request: RunCommandRequest) async -> CallTool.Result {
         var runner = CommandRunner(options: config.runner)
         if let directory = request.workingDirectory {
@@ -128,10 +134,12 @@ public struct DaimonServer: Sendable {
         }
     }
 
+    /// A text result with `isError: false`.
     private func success(_ text: String) -> CallTool.Result {
         .init(content: [.text(text: text, annotations: nil, _meta: nil)], isError: false)
     }
 
+    /// A text result with `isError: true`, the MCP shape for execution failures.
     private func failure(_ message: String) -> CallTool.Result {
         .init(content: [.text(text: message, annotations: nil, _meta: nil)], isError: true)
     }

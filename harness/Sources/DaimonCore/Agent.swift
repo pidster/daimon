@@ -3,6 +3,7 @@ import FoundationModels
 
 /// Errors raised by the harness before the model is involved.
 public enum AgentError: Error, CustomStringConvertible {
+    /// The on-device model cannot be used, with the framework's reason (not enabled, not ready, unsupported device).
     case modelUnavailable(SystemLanguageModel.Availability.UnavailableReason)
 
     /// Human-readable explanation suitable for printing to stderr.
@@ -22,8 +23,11 @@ public enum AgentError: Error, CustomStringConvertible {
 /// When the context window overflows, `contextPolicy` decides whether the
 /// session is rebuilt from a condensed transcript and the prompt retried.
 public final class Agent {
+    /// The model every session is created on; kept so sessions can be rebuilt.
     private let model: SystemLanguageModel
+    /// Tools bound to every session, in registration order.
     private let tools: [any Tool]
+    /// The live session. Replaced, never mutated, when the conversation is condensed or reset.
     private var session: LanguageModelSession
 
     /// What happens when a prompt no longer fits the context window.
@@ -92,6 +96,7 @@ public final class Agent {
         }
     }
 
+    /// The default system model, or `AgentError.modelUnavailable` if it cannot serve requests.
     private static func availableModel() throws -> SystemLanguageModel {
         let model = SystemLanguageModel.default
         if case .unavailable(let reason) = model.availability {

@@ -24,6 +24,7 @@ public struct RunCommandTool: Tool {
         public var workingDirectory: String?
     }
 
+    /// Supplies the timeout, output cap, and default working directory.
     private let runner: CommandRunner
 
     /// Creates the tool over a runner that supplies timeout and output limits.

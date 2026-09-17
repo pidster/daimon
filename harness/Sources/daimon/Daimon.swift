@@ -5,6 +5,7 @@ import Foundation
 import FoundationModels
 
 @main
+/// The `daimon` command: `respond` by default, plus `chat`, `tools`, and `mcp`.
 struct Daimon: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "daimon",
@@ -14,6 +15,7 @@ struct Daimon: AsyncParsableCommand {
     )
 }
 
+/// One prompt in, one reply out, in the shape of `fm respond`.
 struct Respond: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Generate a response to a prompt, calling tools as needed.")
@@ -48,6 +50,7 @@ struct Respond: AsyncParsableCommand {
         }
     }
 
+    /// The whole of stdin, trimmed; a usage error if empty.
     private static func readStdin() throws -> String {
         let data = FileHandle.standardInput.readDataToEndOfFile()
         let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -56,6 +59,7 @@ struct Respond: AsyncParsableCommand {
     }
 }
 
+/// Prints the registered tools as `name<TAB>description`.
 struct Tools: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List the tools available to the model.")
 
@@ -90,6 +94,7 @@ extension Daimon {
     }
 }
 
+/// Serves MCP over stdio until the client closes the pipe.
 struct Mcp: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Serve daimon's tools to an MCP client over stdio.",
@@ -108,6 +113,7 @@ struct Mcp: AsyncParsableCommand {
     }
 }
 
+/// A line-oriented REPL: messages go to the model, `/` lines are commands.
 struct Chat: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Start an interactive chat session.",
@@ -213,6 +219,7 @@ struct Chat: AsyncParsableCommand {
         }
     }
 
+    /// Writes a status line to stderr so stdout stays clean for replies.
     private static func note(_ text: String) {
         FileHandle.standardError.write(Data((text + "\n").utf8))
     }

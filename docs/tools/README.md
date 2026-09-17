@@ -1,0 +1,24 @@
+# Tools
+
+Tools the on-device model can call. Each page gives the model-facing contract (name, description, arguments,
+result format) and the limits that protect the context window. `daimon tools` prints the live list.
+
+| Tool | Purpose |
+| --- | --- |
+| [current_date](current_date.md) | The date and time; the model has no clock. |
+| [run_command](run_command.md) | Run a shell command with a timeout and bounded output. |
+| [read_file](read_file.md) | Read a text file one page at a time. |
+
+Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
+registered tool's schema is in the prompt on every turn, so enable only what a task needs.
+
+The MCP tools daimon offers to *other* harnesses are documented in [../mcp.md](../mcp.md).
+
+## Adding a tool
+
+1. Add a `struct` conforming to `FoundationModels.Tool` under `harness/Sources/DaimonCore/Tools/`, with an
+   `@Generable` `Arguments` type and `@Guide` descriptions on each property.
+2. Keep the work in a pure helper (like `CurrentDateTool.format` or `FileReader`) and test that.
+3. Bound the result: 4 KiB or page it. See [../context-management.md](../context-management.md).
+4. Append it to `ToolRegistry.init`.
+5. Add a page here and a row above. The description is prompt text; write it for the model.
