@@ -29,11 +29,30 @@ public final class Agent {
     ///   - tools: Tools the model may call; each must have a unique `name`.
     /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
     public init(instructions: String, tools: [any Tool]) throws {
+        let model = try Self.availableModel()
+        session = LanguageModelSession(model: model, tools: tools, instructions: instructions)
+    }
+
+    /// Creates an agent that continues a saved conversation.
+    ///
+    /// - Parameters:
+    ///   - transcript: A transcript previously read from `Agent.transcript`.
+    ///   - tools: Tools the model may call; they must match the names the transcript refers to.
+    /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
+    public init(transcript: Transcript, tools: [any Tool]) throws {
+        let model = try Self.availableModel()
+        session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
+    }
+
+    /// The conversation so far, suitable for saving and resuming.
+    public var transcript: Transcript { session.transcript }
+
+    private static func availableModel() throws -> SystemLanguageModel {
         let model = SystemLanguageModel.default
         if case .unavailable(let reason) = model.availability {
             throw AgentError.modelUnavailable(reason)
         }
-        session = LanguageModelSession(model: model, tools: tools, instructions: instructions)
+        return model
     }
 
     /// Sends one user turn and returns the final assistant text.

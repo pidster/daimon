@@ -1,0 +1,44 @@
+import Foundation
+
+/// The per-user daimon directory: `$DAIMON_HOME`, or `~/.daimon` by default.
+///
+/// Holds `config.json`, `logs/`, and `transcripts/`. Nothing is created until
+/// `ensure()` is called, so read-only commands never touch the file system.
+public struct Home: Sendable, Equatable {
+    /// Environment variable that overrides the default location.
+    public static let environmentKey = "DAIMON_HOME"
+
+    /// The directory itself.
+    public let root: URL
+
+    /// Creates a home rooted at `root`.
+    public init(root: URL) {
+        self.root = root
+    }
+
+    /// Resolves the home from `environment`, falling back to `~/.daimon`.
+    public static func resolve(environment: [String: String] = ProcessInfo.processInfo.environment) -> Home {
+        if let override = environment[environmentKey], !override.isEmpty {
+            return Home(root: URL(fileURLWithPath: override, isDirectory: true))
+        }
+        return Home(
+            root: FileManager.default.homeDirectoryForCurrentUser.appending(
+                path: ".daimon", directoryHint: .isDirectory))
+    }
+
+    /// The JSON configuration file.
+    public var configFile: URL { root.appending(path: "config.json") }
+    /// Where log files go.
+    public var logs: URL { root.appending(path: "logs", directoryHint: .isDirectory) }
+    /// Where saved conversation transcripts go.
+    public var transcripts: URL { root.appending(path: "transcripts", directoryHint: .isDirectory) }
+
+    /// Creates the directory tree if it does not exist.
+    ///
+    /// - Throws: File-system errors from `FileManager`.
+    public func ensure() throws {
+        for directory in [root, logs, transcripts] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+    }
+}

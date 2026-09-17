@@ -14,20 +14,16 @@ public struct DaimonServer: Sendable {
     /// Server version reported during the MCP handshake.
     public static let version = "0.1.0"
 
-    private let defaultInstructions: String
-    private let runner: CommandRunner
+    private let config: Config.Resolved
+    private let registry: ToolRegistry
     private let threads: ThreadStore<ConversationThread>
 
-    /// Creates a server.
-    ///
-    /// - Parameters:
-    ///   - defaultInstructions: Instructions used by `respond` when the caller supplies none.
-    ///   - runner: Limits applied to `run_command` and to the model's own `run_command` tool.
-    ///   - maxThreads: Live conversation threads kept before the least recently used is evicted.
-    public init(defaultInstructions: String, runner: CommandRunner = CommandRunner(), maxThreads: Int = 32) {
-        self.defaultInstructions = defaultInstructions
-        self.runner = runner
-        threads = ThreadStore(capacity: maxThreads)
+    /// Creates a server from resolved configuration: default instructions for
+    /// `respond`, limits for `run_command`, and the thread capacity.
+    public init(config: Config.Resolved = Config().resolved) {
+        self.config = config
+        registry = ToolRegistry(runner: config.runner)
+        threads = ThreadStore(capacity: config.maxThreads)
     }
 
     /// Starts serving on stdin/stdout and returns when the client disconnects.
@@ -74,16 +70,16 @@ public struct DaimonServer: Sendable {
         } else {
             let tools: [any FoundationModels.Tool]
             if request.toolNames.isEmpty {
-                tools = ToolRegistry.all
+                tools = registry.all
             } else {
-                let selection = ToolRegistry.select(request.toolNames)
+                let selection = registry.select(request.toolNames)
                 guard selection.unknown.isEmpty else {
                     return failure("Unknown tool(s): \(selection.unknown.joined(separator: ", "))")
                 }
                 tools = selection.tools
             }
             let id = request.threadID ?? UUID().uuidString.lowercased()
-            let instructions = request.instructions ?? defaultInstructions
+            let instructions = request.instructions ?? config.instructions
             do {
                 thread = try await threads.create(id: id) {
                     try ConversationThread(id: id, instructions: instructions, tools: tools)
@@ -120,7 +116,7 @@ public struct DaimonServer: Sendable {
     }
 
     private func runCommand(_ request: RunCommandRequest) async -> CallTool.Result {
-        var runner = runner
+        var runner = CommandRunner(options: config.runner)
         if let directory = request.workingDirectory {
             runner.options.workingDirectory = directory
         }

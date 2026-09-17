@@ -4,7 +4,7 @@ import Testing
 @testable import DaimonMCP
 
 @Suite struct DaimonServerTests {
-    let server = DaimonServer(defaultInstructions: "test")
+    let server = DaimonServer()
 
     @Test func runCommandReturnsRenderedOutcome() async throws {
         let result = try await server.call(.init(name: "run_command", arguments: ["command": .string("printf ok")]))

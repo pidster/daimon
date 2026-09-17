@@ -11,7 +11,7 @@ import Testing
     }
 
     @Test func registrySelectsKnownAndReportsUnknown() {
-        let result = ToolRegistry.select(["current_date", "nope"])
+        let result = ToolRegistry().select(["current_date", "nope"])
         #expect(result.tools.map(\.name) == ["current_date"])
         #expect(result.unknown == ["nope"])
     }
