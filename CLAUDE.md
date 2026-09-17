@@ -8,7 +8,7 @@ Build a single binary, `daimon`: an on-device, tool-using AI microharness on top
 
 ## Language decision: Swift, linking FoundationModels.framework directly
 
-Swift is the only viable choice for a tool-using harness, verified on this machine (macOS 27.0, Swift 6.4):
+Swift is the only viable choice for a tool-using harness, verified on this machine (macOS 27.0, the project baseline; Swift 6.4):
 
 - The `fm` CLI cannot drive user-defined tools. `fm respond` and `fm chat` accept `--tool` only for the built-ins `barcode` and `ocr`.
 - `fm serve` (Chat Completions API on `/v1/chat/completions`) silently ignores the `tools` parameter. The model narrates wanting to call the tool instead of returning `tool_calls`. It also streams SSE even without `"stream": true`.
@@ -20,7 +20,7 @@ So `daimon` must link `FoundationModels` and implement the agent loop with `Lang
 
 Xcode 27.0 is the active developer directory (`xcode-select -p` shows `/Applications/Xcode.app/Contents/Developer`) and its license is accepted. Plain `swiftc`/`swift build` work, including the `@Generable` macro. Do not switch to the Command Line Tools: they ship `FoundationModels.framework` but not the `FoundationModelsMacros` plugin, so `@Generable` fails to compile there.
 
-`@Generable` and `LanguageModelSession` require `macOS 26.0` availability; set the package platform accordingly.
+The package platform floor is `macOS 27` (the project baseline), written as `.macOS("27.0")` because `PackageDescription` has no `.v27` case yet; do not lower it for compatibility.
 
 ## Build and test
 
@@ -43,6 +43,17 @@ Tests must not need the model. Keep model-dependent behaviour behind pure helper
   - `ToolRegistry.all` is the single list of tools the model can see. Add a tool by conforming to `FoundationModels.Tool` under `Tools/` with an `@Generable` `Arguments` type and appending it here; the CLI `--tool` flag selects from this list by `name`.
 - `Sources/daimon` is a thin swift-argument-parser CLI. `respond` is the default subcommand and mirrors `fm respond` flags (`--instructions`, `--[no-]stream`, `--tool`, stdin prompt); `tools` lists the registry.
 - Swift 6 strict concurrency is on. Do not wrap the session in a detached `Task` or `AsyncThrowingStream` closure; the session is not `Sendable`, so keep streaming as a callback on the calling task.
+
+## Engineering standards
+
+This project is held to the highest standard of coding and software-engineering practice. Concretely:
+
+- `swift format lint --recursive --strict Sources Tests Package.swift` must pass. Run `swift format --in-place --recursive Sources Tests Package.swift` before committing. Config is in `.swift-format`: 4-space indent, 120 columns, every public declaration documented, no force unwrap, force try, or implicitly unwrapped optionals.
+- `swift build -Xswiftc -warnings-as-errors` must pass. Swift 6 strict concurrency is on and stays on; fix data-race diagnostics by restructuring, never with `@unchecked Sendable` or `nonisolated(unsafe)`.
+- Every behaviour change ships with tests. Keep logic in pure, model-independent functions so it is testable without the on-device model.
+- Errors are typed (`enum ... : Error`) with `CustomStringConvertible` descriptions; no `fatalError` or `print`-and-continue in library code.
+- Public API lives in `DaimonCore` and is documented with `///`. The executable target holds only argument parsing and I/O.
+- Commits are small and single-purpose with messages that explain why. CI (`.github/workflows/ci.yml`) runs lint, warnings-as-errors build, and tests on every push and PR.
 
 ## MCP servers
 

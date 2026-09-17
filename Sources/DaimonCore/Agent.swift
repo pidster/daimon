@@ -5,6 +5,7 @@ import FoundationModels
 public enum AgentError: Error, CustomStringConvertible {
     case modelUnavailable(SystemLanguageModel.Availability.UnavailableReason)
 
+    /// Human-readable explanation suitable for printing to stderr.
     public var description: String {
         switch self {
         case .modelUnavailable(let reason):
@@ -21,6 +22,12 @@ public enum AgentError: Error, CustomStringConvertible {
 public final class Agent {
     private let session: LanguageModelSession
 
+    /// Creates an agent bound to the default system model.
+    ///
+    /// - Parameters:
+    ///   - instructions: System-level guidance the model follows for the whole session.
+    ///   - tools: Tools the model may call; each must have a unique `name`.
+    /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
     public init(instructions: String, tools: [any Tool]) throws {
         let model = SystemLanguageModel.default
         if case .unavailable(let reason) = model.availability {

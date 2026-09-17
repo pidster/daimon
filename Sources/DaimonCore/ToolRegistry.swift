@@ -4,7 +4,7 @@ import FoundationModels
 public enum ToolRegistry {
     /// All tools available in this build.
     public static let all: [any Tool] = [
-        CurrentDateTool(),
+        CurrentDateTool()
     ]
 
     /// Tools whose names appear in `names`; unknown names are reported back.

@@ -4,18 +4,27 @@ import FoundationModels
 /// Reports the current date and time. The on-device model has no clock, so
 /// this is the smallest useful example of a tool the harness can offer.
 public struct CurrentDateTool: Tool {
+    /// The identifier the model uses to request this tool.
     public let name = "current_date"
+    /// What the model is told this tool does.
     public let description = "Returns the current local date and time."
 
+    /// Arguments the model may supply when calling the tool.
     @Generable
     public struct Arguments {
+        /// Optional IANA zone identifier; nil means the process-local zone.
         @Guide(description: "IANA time zone identifier such as Europe/London. Defaults to the local zone.")
         public var timeZone: String?
     }
 
+    /// Creates the tool.
     public init() {}
 
-    public func call(arguments: Arguments) async throws -> String {
+    /// Formats the current instant in the requested zone.
+    ///
+    /// - Parameter arguments: The zone to report in.
+    /// - Returns: An ISO 8601 timestamp with offset, followed by the zone identifier.
+    public func call(arguments: Arguments) async -> String {
         let zone = arguments.timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
         return Self.format(Date(), in: zone)
     }

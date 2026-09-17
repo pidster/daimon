@@ -8,4 +8,4 @@ swift build
 .build/debug/daimon "What is the date in Tokyo?"
 ```
 
-Requires macOS 26 or later and Xcode 27 (the Command Line Tools alone lack the `@Generable` macro plugin).
+Requires macOS 27 or later and Xcode 27 (the Command Line Tools alone lack the `@Generable` macro plugin).

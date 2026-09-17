@@ -14,13 +14,15 @@ struct Daimon: AsyncParsableCommand {
 }
 
 struct Respond: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Generate a response to a prompt, calling tools as needed.")
+    static let configuration = CommandConfiguration(
+        abstract: "Generate a response to a prompt, calling tools as needed.")
 
     @Argument(help: "Prompt for the model. Read from stdin when omitted.")
     var prompt: String?
 
     @Option(name: [.short, .customLong("instructions")], help: "Instructions for the model to follow.")
-    var instructions: String = "You are daimon, a concise assistant. Use the available tools when they help answer accurately."
+    var instructions: String =
+        "You are daimon, a concise assistant. Use the available tools when they help answer accurately."
 
     @Option(name: .customLong("tool"), help: "Tool to enable (repeatable). All tools are enabled when omitted.")
     var toolNames: [String] = []

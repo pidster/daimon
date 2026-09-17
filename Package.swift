@@ -3,13 +3,13 @@ import PackageDescription
 
 let package = Package(
     name: "daimon",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS("27.0")],
     products: [
         .executable(name: "daimon", targets: ["daimon"]),
         .library(name: "DaimonCore", targets: ["DaimonCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0")
     ],
     targets: [
         .target(
