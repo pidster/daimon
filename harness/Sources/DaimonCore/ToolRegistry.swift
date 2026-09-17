@@ -5,11 +5,12 @@ public struct ToolRegistry: Sendable {
     /// All tools available in this build, in registration order.
     public let all: [any Tool]
 
-    /// Builds the registry with the given limits for command execution.
-    public init(runner: CommandRunner.Options = CommandRunner.Options()) {
+    /// Builds the registry with the given limits for command execution and file pages.
+    public init(runner: CommandRunner.Options = CommandRunner.Options(), reader: FileReader = FileReader()) {
         all = [
             CurrentDateTool(),
             RunCommandTool(runner: CommandRunner(options: runner)),
+            ReadFileTool(reader: reader),
         ]
     }
 
