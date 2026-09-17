@@ -6,12 +6,25 @@ public struct ToolRegistry: Sendable {
     public let all: [any Tool]
 
     /// Builds the registry with the given limits for command execution and file pages.
-    public init(runner: CommandRunner.Options = CommandRunner.Options(), reader: FileReader = FileReader()) {
-        all = [
-            CurrentDateTool(),
-            RunCommandTool(runner: CommandRunner(options: runner)),
-            ReadFileTool(reader: reader),
-        ]
+    /// With an audit log, every tool is wrapped so its calls and results are recorded.
+    public init(
+        runner: CommandRunner.Options = CommandRunner.Options(), reader: FileReader = FileReader(),
+        audit: AuditLog? = nil
+    ) {
+        let commandRunner = CommandRunner(options: runner, audit: audit)
+        if let audit {
+            all = [
+                AuditedTool(CurrentDateTool(), audit: audit),
+                AuditedTool(RunCommandTool(runner: commandRunner), audit: audit),
+                AuditedTool(ReadFileTool(reader: reader), audit: audit),
+            ]
+        } else {
+            all = [
+                CurrentDateTool(),
+                RunCommandTool(runner: commandRunner),
+                ReadFileTool(reader: reader),
+            ]
+        }
     }
 
     /// Tools whose names appear in `names`; unknown names are reported back.

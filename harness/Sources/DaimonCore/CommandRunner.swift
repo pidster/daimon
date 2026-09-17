@@ -76,10 +76,13 @@ public struct CommandRunner: Sendable {
 
     /// Limits applied to every command.
     public var options: Options
+    /// Where policy decisions and outcomes are recorded, if anywhere.
+    public var audit: AuditLog?
 
     /// Creates a runner with the given limits.
-    public init(options: Options = Options()) {
+    public init(options: Options = Options(), audit: AuditLog? = nil) {
         self.options = options
+        self.audit = audit
     }
 
     /// Runs `command` through `/bin/sh -c` and waits for it to finish or time out.
@@ -88,13 +91,25 @@ public struct CommandRunner: Sendable {
     /// - Returns: The exit status and bounded output.
     /// - Throws: `Failure` if the policy rejects the command or it cannot be started.
     public func run(_ command: String) async throws -> Outcome {
-        if case .denied(let reason) = options.policy.check(command) {
+        let workingDirectory = options.workingDirectory ?? FileManager.default.currentDirectoryPath
+        let verdict = options.policy.check(command)
+        var decision: [String: JSONValue] = [
+            "command": .string(command), "workingDirectory": .string(workingDirectory),
+            "sandbox": .bool(options.policy.sandbox.enabled), "network": .bool(options.policy.sandbox.allowNetwork),
+        ]
+        if case .denied(let reason) = verdict {
+            decision["verdict"] = "denied"
+            decision["reason"] = .string(reason)
+            audit?.record(.policyDecision, details: decision)
+            Diagnostics.policy.info("denied: \(reason): \(command)")
             throw Failure.denied(reason)
         }
-        let workingDirectory = options.workingDirectory ?? FileManager.default.currentDirectoryPath
+        decision["verdict"] = "allowed"
+        audit?.record(.policyDecision, details: decision)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
         else { throw Failure.invalidWorkingDirectory(workingDirectory) }
+        let started = Date()
 
         let process = Process()
         if options.policy.sandbox.enabled {
@@ -154,13 +169,23 @@ public struct CommandRunner: Sendable {
         let err = Self.tail(stderrBuffer.contents, maxBytes: options.maxOutputBytes)
         let status: Int32 =
             process.terminationReason == .uncaughtSignal ? -process.terminationStatus : process.terminationStatus
-        return Outcome(
+        let outcome = Outcome(
             exitStatus: status,
             stdout: out.text,
             stderr: err.text,
             timedOut: timedOut.withLock { $0 },
             truncated: out.truncated || err.truncated
         )
+        audit?.record(
+            .commandOutcome,
+            details: [
+                "command": .string(command), "exitStatus": .int(Int(status)), "timedOut": .bool(outcome.timedOut),
+                "truncated": .bool(outcome.truncated), "stdout": .string(outcome.stdout),
+                "stderr": .string(outcome.stderr),
+                "seconds": .double(Date().timeIntervalSince(started)),
+            ])
+        Diagnostics.policy.debug("exit \(status) after \(Date().timeIntervalSince(started))s: \(command)")
+        return outcome
     }
 
     /// Keeps at most `maxBytes` from the end of `data`, decoded as UTF-8 with replacement.

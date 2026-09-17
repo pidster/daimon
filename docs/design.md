@@ -43,7 +43,7 @@ availability and shapes the API.
 | --- | --- | --- |
 | `DaimonCore` | library | `Agent`, `ToolRegistry`, `CommandRunner`, tool implementations, typed errors. All model-facing logic lives here. |
 | `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
-| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `mcp`. |
+| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `mcp`, `logs`. |
 | `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic. |
 
 ## Components
@@ -62,6 +62,14 @@ can also start from a saved `Transcript`.
   condensed transcript and retries once; `condensations` counts recoveries. See
   [context-management.md](context-management.md) and [ADR 0008](decisions/0008-context-condensation.md).
 - `transcript`, `contextTokens()`, and `reset()` support saving, budgeting, and starting over.
+
+### Audit and diagnostics
+
+`AuditLog` records `AuditEvent`s for one session through an `AuditSink` (`FileAuditSink` with rotation,
+`MemoryAuditSink` for tests). `AuditedTool` wraps every registered tool; `Agent`, `CommandRunner`, and
+`DaimonServer` record at their boundaries; the CLI records session start and end. `Diagnostics` wraps
+`os.Logger` per category with optional stderr mirroring. See [logging.md](logging.md) and
+[ADR 0010](decisions/0010-audit-and-diagnostic-logging.md).
 
 ### Home, config, transcripts
 

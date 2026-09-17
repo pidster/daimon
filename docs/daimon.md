@@ -49,6 +49,20 @@ Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes
 
 Prints each registered tool as `name<TAB>description`. See [tools/](tools/README.md).
 
+### `daimon logs`
+
+Shows the audit log (`~/.daimon/logs/audit.jsonl` and rotated files) as one-line summaries, oldest first.
+
+| Flag | Meaning |
+| --- | --- |
+| `--session <id>` | Only this session. |
+| `--kind <kind>` (repeatable) | Only these kinds, e.g. `tool.call`, `policy.decision`. |
+| `--tool <name>` | Only tool events for this tool. |
+| `-l, --last <n>` | Only the last n matching events. |
+| `--json` | Raw JSON Lines instead of summaries. |
+
+See [logging.md](logging.md) for the event catalogue.
+
 ### `daimon mcp`
 
 Serves the Model Context Protocol over stdio until the client closes the pipe. See [mcp.md](mcp.md).
@@ -67,7 +81,7 @@ subcommands only read from it.
 | --- | --- |
 | `config.json` | Optional settings, below. |
 | `transcripts/<name>.json` | Saved conversations. |
-| `logs/` | Reserved for log files. |
+| `logs/audit.jsonl` | The audit log, user-only, rotated by size. See [logging.md](logging.md). |
 
 `config.json` fields, all optional:
 
@@ -78,6 +92,10 @@ subcommands only read from it.
 | `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
 | `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
+| `audit` | `{ "enabled": true, "maxFileBytes": 10485760, "keepFiles": 5 }` | Audit log switch and rotation. |
+
+Environment: `DAIMON_HOME` relocates the directory; `DAIMON_LOG=debug|info|error` mirrors diagnostics to
+stderr.
 
 ```json
 { "instructions": "You are terse.", "commandTimeoutSeconds": 120 }

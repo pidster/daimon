@@ -15,6 +15,25 @@ public struct Config: Codable, Equatable, Sendable {
     public var maxThreads: Int?
     /// What `run_command` may execute and how it is confined.
     public var commandPolicy: CommandPolicy?
+    /// Audit log settings.
+    public var audit: AuditConfig?
+
+    /// Audit log settings in the file.
+    public struct AuditConfig: Codable, Equatable, Sendable {
+        /// Whether to write the audit log at all.
+        public var enabled: Bool?
+        /// Rotate when the file would exceed this size.
+        public var maxFileBytes: Int?
+        /// Rotated files to keep.
+        public var keepFiles: Int?
+
+        /// Creates settings; nil fields take defaults.
+        public init(enabled: Bool? = nil, maxFileBytes: Int? = nil, keepFiles: Int? = nil) {
+            self.enabled = enabled
+            self.maxFileBytes = maxFileBytes
+            self.keepFiles = keepFiles
+        }
+    }
 
     /// Instructions used when the file sets none.
     public static let defaultInstructions =
@@ -23,13 +42,14 @@ public struct Config: Codable, Equatable, Sendable {
     /// Creates a config; nil fields take defaults at resolution.
     public init(
         instructions: String? = nil, commandTimeoutSeconds: Int? = nil, commandMaxOutputBytes: Int? = nil,
-        maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil
+        maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil, audit: AuditConfig? = nil
     ) {
         self.instructions = instructions
         self.commandTimeoutSeconds = commandTimeoutSeconds
         self.commandMaxOutputBytes = commandMaxOutputBytes
         self.maxThreads = maxThreads
         self.commandPolicy = commandPolicy
+        self.audit = audit
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
@@ -61,7 +81,10 @@ public struct Config: Codable, Equatable, Sendable {
                 maxOutputBytes: commandMaxOutputBytes ?? 4096,
                 policy: commandPolicy ?? .default
             ),
-            maxThreads: maxThreads ?? 32
+            maxThreads: maxThreads ?? 32,
+            auditEnabled: audit?.enabled ?? true,
+            auditLimits: FileAuditSink.Limits(
+                maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5)
         )
     }
 
@@ -73,5 +96,9 @@ public struct Config: Codable, Equatable, Sendable {
         public var runner: CommandRunner.Options
         /// Live MCP threads kept before eviction.
         public var maxThreads: Int
+        /// Whether the audit log is written.
+        public var auditEnabled: Bool
+        /// Rotation limits for the audit file.
+        public var auditLimits: FileAuditSink.Limits
     }
 }

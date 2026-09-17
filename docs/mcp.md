@@ -61,6 +61,11 @@ Free a thread's model session.
 | --- | --- | --- |
 | `thread_id` | string | yes |
 
+## Audit
+
+Every request and result is recorded in `~/.daimon/logs/audit.jsonl` under the server's session, and each
+thread's turns under the `thread_id` as its own session. See [logging.md](logging.md).
+
 ## Errors
 
 - Malformed arguments (missing `prompt`, bad `thread_id`) are JSON-RPC `invalidParams` errors.

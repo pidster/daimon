@@ -34,6 +34,8 @@ public final class Agent {
     public let contextPolicy: ContextPolicy
     /// How many times the transcript has been condensed to recover from overflow.
     public private(set) var condensations = 0
+    /// Where turns, responses, condensations, and errors are recorded.
+    public let audit: AuditLog?
 
     /// Creates an agent bound to the default system model.
     ///
@@ -41,11 +43,17 @@ public final class Agent {
     ///   - instructions: System-level guidance the model follows for the whole session.
     ///   - tools: Tools the model may call; each must have a unique `name`.
     ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
+    ///   - audit: Where to record turns; nil records nothing.
     /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
-    public init(instructions: String, tools: [any Tool], contextPolicy: ContextPolicy = .default) throws {
+    public init(
+        instructions: String, tools: [any Tool], contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
+    )
+        throws
+    {
         model = try Self.availableModel()
         self.tools = tools
         self.contextPolicy = contextPolicy
+        self.audit = audit
         session = LanguageModelSession(model: model, tools: tools, instructions: instructions)
     }
 
@@ -55,11 +63,17 @@ public final class Agent {
     ///   - transcript: A transcript previously read from `Agent.transcript`.
     ///   - tools: Tools the model may call; they must match the names the transcript refers to.
     ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
+    ///   - audit: Where to record turns; nil records nothing.
     /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
-    public init(transcript: Transcript, tools: [any Tool], contextPolicy: ContextPolicy = .default) throws {
+    public init(
+        transcript: Transcript, tools: [any Tool], contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
+    )
+        throws
+    {
         model = try Self.availableModel()
         self.tools = tools
         self.contextPolicy = contextPolicy
+        self.audit = audit
         session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
     }
 
@@ -107,14 +121,14 @@ public final class Agent {
 
     /// Sends one user turn and returns the final assistant text.
     nonisolated(nonsending) public func respond(to prompt: String) async throws -> String {
-        try await withOverflowRecovery { try await session.respond(to: prompt).content }
+        try await turn(prompt) { try await session.respond(to: prompt).content }
     }
 
     /// Sends one user turn, calling `onDelta` with each new fragment of the
     /// assistant text as it streams, and returns the final text.
     @discardableResult
     nonisolated(nonsending) public func stream(_ prompt: String, onDelta: (String) -> Void) async throws -> String {
-        try await withOverflowRecovery {
+        try await turn(prompt) {
             var emitted = ""
             for try await snapshot in session.streamResponse(to: prompt) {
                 let full = snapshot.content
@@ -122,6 +136,30 @@ public final class Agent {
                 emitted = full
             }
             return emitted
+        }
+    }
+
+    /// Records the prompt, runs `operation` with overflow recovery, and records the response or error.
+    nonisolated(nonsending) private func turn(
+        _ prompt: String, _ operation: () async throws -> String
+    ) async throws -> String {
+        audit?.beginTurn()
+        audit?.record(.prompt, details: ["text": .string(prompt)])
+        let started = Date()
+        let before = condensations
+        do {
+            let text = try await withOverflowRecovery(operation)
+            audit?.record(
+                .response,
+                details: [
+                    "text": .string(text), "condensed": .bool(condensations > before),
+                    "seconds": .double(Date().timeIntervalSince(started)),
+                ])
+            return text
+        } catch {
+            audit?.error(error, context: "turn")
+            Diagnostics.agent.error("turn failed: \(error)")
+            throw error
         }
     }
 }

@@ -33,6 +33,8 @@ harness/.build/debug/daimon tools             # list registered tools
 harness/.build/debug/daimon "What is the date in Tokyo?"   # live model smoke test
 harness/.build/debug/daimon chat               # REPL; /help lists commands; --resume/--save use ~/.daimon/transcripts
 harness/.build/debug/daimon mcp               # MCP server on stdio (stdout is the protocol channel)
+harness/.build/debug/daimon logs --last 20    # audit log summaries; --json for raw events
+DAIMON_LOG=debug harness/.build/debug/daimon "…"   # mirror diagnostics to stderr
 scripts/check coverage                        # per-file line coverage (not in the gate)
 ```
 
@@ -46,7 +48,9 @@ the producing subshell); the server exits on EOF.
 See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one
 `LanguageModelSession`; the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the
 model can see), `CommandRunner` (bounded, timed shell execution), `FileReader` (paged, streamed file reads),
-`Home`/`Config`/`TranscriptStore` (`~/.daimon` state), `ContextPolicy` and `Transcript.condensed` (overflow
+`Home`/`Config`/`TranscriptStore` (`~/.daimon` state), `AuditLog`/`AuditedTool`/`Diagnostics` (verbatim
+JSON Lines audit at `~/.daimon/logs/audit.jsonl` plus unified logging, ADR 0010; new event kinds go in
+`docs/logging.md`), `ContextPolicy` and `Transcript.condensed` (overflow
 recovery, ADR 0008), and tool types under `Tools/` including `run_command` and `read_file`. `harness/Sources/DaimonMCP` exposes `respond`, `run_command`, and `close_thread` over stdio MCP via the
 official Swift SDK; `ToolCatalog` is the contract clients see, and `ThreadStore`/`ConversationThread` (actors)
 keep per-`thread_id` conversations (ADR 0007). `harness/Sources/daimon` is a thin swift-argument-parser

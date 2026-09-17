@@ -30,6 +30,8 @@ public struct Home: Sendable, Equatable {
     public var configFile: URL { root.appending(path: "config.json") }
     /// Where log files go.
     public var logs: URL { root.appending(path: "logs", directoryHint: .isDirectory) }
+    /// The audit log (JSON Lines).
+    public var auditFile: URL { logs.appending(path: "audit.jsonl") }
     /// Where saved conversation transcripts go.
     public var transcripts: URL { root.appending(path: "transcripts", directoryHint: .isDirectory) }
 
