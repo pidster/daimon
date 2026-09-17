@@ -25,9 +25,9 @@ device, such as an iterative build-fix loop, needs conversation continuity.
 - `Agent`'s async methods are `nonisolated(nonsending)` so they execute in the caller's isolation, matching
   the framework's own `LanguageModelSession.respond`. This is what lets an actor own a non-`Sendable` agent
   under strict concurrency without escape hatches.
-- When a thread's context fills, the framework's `LanguageModelError.contextSizeExceeded` is reported as a tool
-  error telling the caller to close the thread and start another. Automatic summarisation or trimming is not
-  attempted.
+- When a thread's context fills, older turns are dropped and the prompt retried (ADR 0008); the result
+  carries `condensed: true`. Only if recovery itself fails does the caller get a tool error telling it to close
+  the thread and start another.
 
 ## Consequences
 

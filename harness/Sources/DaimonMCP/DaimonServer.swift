@@ -90,11 +90,12 @@ public struct DaimonServer: Sendable {
             }
         }
         do {
-            let text = try await thread.respond(to: request.prompt)
+            let reply = try await thread.respond(to: request.prompt)
             return .init(
-                content: [.text(text: text, annotations: nil, _meta: nil)],
+                content: [.text(text: reply.text, annotations: nil, _meta: nil)],
                 structuredContent: .object([
-                    "thread_id": .string(thread.id), "created": .bool(created), "text": .string(text),
+                    "thread_id": .string(thread.id), "created": .bool(created), "condensed": .bool(reply.condensed),
+                    "text": .string(reply.text),
                 ]),
                 isError: false
             )

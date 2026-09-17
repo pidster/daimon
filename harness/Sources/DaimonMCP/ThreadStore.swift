@@ -19,9 +19,13 @@ public actor ConversationThread {
         agent = try Agent(instructions: instructions, tools: tools)
     }
 
-    /// Sends one user turn on this thread's session and returns the reply.
-    public func respond(to prompt: String) async throws -> String {
-        try await agent.respond(to: prompt)
+    /// Sends one user turn on this thread's session.
+    ///
+    /// - Returns: The reply and whether older turns were dropped to fit the context window.
+    public func respond(to prompt: String) async throws -> (text: String, condensed: Bool) {
+        let before = agent.condensations
+        let text = try await agent.respond(to: prompt)
+        return (text, agent.condensations > before)
     }
 }
 
