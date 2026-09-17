@@ -12,7 +12,8 @@ when risky, human approval; everything is written to a verbatim audit log.
 
 `docs/README.md` is the map. Read the page for the area you are touching before changing it; the decision
 records under `docs/decisions/` explain why things are the way they are, and you must not reverse one
-without a new ADR.
+without a new ADR. Language- and area-specific guidance lives in `.claude/rules/` (Swift, Rust, docs,
+shell) and loads when you touch matching files; this file holds only what applies everywhere.
 
 ## Layout
 
@@ -70,15 +71,10 @@ and `close_thread`. Details: `docs/design.md`.
 - **Definition of done.** A change is done when it is tested (without the model), documented in code, and
   documented under `docs/` in the same commit: tool page, `daimon.md`, `mcp.md`, `logging.md`, `design.md`,
   or an ADR as appropriate. If no doc needs changing, say so in the commit message. The hook reminds you.
-- **Gate.** `scripts/check` must pass before every commit; the hook runs it. Strict lint (every public
-  declaration documented, no force unwrap or try), warnings as errors, Swift 6 strict concurrency. Fix
-  concurrency diagnostics by restructuring: no `@unchecked Sendable`, no `nonisolated(unsafe)`. `Agent`'s
-  async methods are `nonisolated(nonsending)` so actors can own one; keep new async APIs consistent.
-- **Tests never need the model.** Keep logic in pure functions and test those; `ModelEvalTests` is the one
-  model-dependent suite and runs only via `scripts/check eval`. Tests drive the real sandbox, so they write
-  only under the working directory and temp.
-- **Errors are typed** enums with `CustomStringConvertible`; no `fatalError` or `print` in library code.
-  Tool failures the model should react to are returned as text, not thrown.
+- **Gate.** `scripts/check` must pass before every commit; the hook runs it. Strict lint, warnings as
+  errors, strict concurrency, no escape hatches. Language rules are in `.claude/rules/`.
+- **Tests never need the model.** `ModelEvalTests` is the one model-dependent suite and runs only via
+  `scripts/check eval`.
 - **Bound every tool result** (4 KiB or paged); the model's window is about 4k tokens. Keep tool
   descriptions short. See `docs/context-management.md`.
 - **Audit new behaviour.** New event kinds go in `AuditEvent.Kind` and `docs/logging.md`.
@@ -86,15 +82,12 @@ and `close_thread`. Details: `docs/design.md`.
   `user.email` to git; the configured noreply identity is required for pushes.
 - **CI is disabled** until a macOS 27 runner exists; the hook is the only automated gate.
 
-## Gotchas
+## Gotchas that cross languages
 
-- Needs macOS 27 and Xcode 27 as the active developer directory; the Command Line Tools lack the
-  `@Generable` macro plugin. `PackageDescription` has no `.v27`, so the platform is `.macOS("27.0")`.
-- Sandboxes do not nest: inside daimon's sandbox, SwiftPM needs `swift build --disable-sandbox`.
+- Sandboxes do not nest: inside daimon's sandbox, SwiftPM needs `swift build --disable-sandbox`; Cargo is
+  unaffected.
 - Seatbelt matches real paths; profile paths go through `realpath` (`/tmp` and `/var` are symlinks).
-- The `@Generable` macro rejects extra protocol conformances on the same declaration; add them in an
-  extension (see `RiskLevel`).
-- swift-format reflows code; when patching by string replacement, re-read the file after formatting.
+- Stdout is the MCP protocol channel while `daimon mcp` runs; diagnostics go to stderr or unified logging.
 
 ## MCP servers (`.mcp.json`)
 
