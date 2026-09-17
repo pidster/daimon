@@ -8,7 +8,11 @@ swift build
 .build/debug/daimon tools
 .build/debug/daimon "What is the date in Tokyo?"
 .build/debug/daimon "Run the tests in $PWD and tell me if they pass"
+.build/debug/daimon chat --save today        # interactive; /help for commands
 ```
+
+State lives in `~/.daimon` (override with `DAIMON_HOME`): an optional `config.json` for default instructions
+and `run_command` limits, and `transcripts/` for saved chats.
 
 As an MCP server (stdio), for example in Claude Code's `.mcp.json`:
 

@@ -31,8 +31,12 @@ cd harness && swift test --filter CurrentDateToolTests/formatsInRequestedZone   
 cd tools && cargo test -p <crate>             # one Rust crate's tests
 harness/.build/debug/daimon tools             # list registered tools
 harness/.build/debug/daimon "What is the date in Tokyo?"   # live model smoke test
+harness/.build/debug/daimon chat               # REPL; /help lists commands; --resume/--save use ~/.daimon/transcripts
 harness/.build/debug/daimon mcp               # MCP server on stdio (stdout is the protocol channel)
+scripts/check coverage                        # per-file line coverage (not in the gate)
 ```
+
+Set `DAIMON_HOME` to a scratch directory when smoke-testing so nothing lands in the real `~/.daimon`.
 
 To smoke-test MCP by hand, pipe JSON-RPC lines into `daimon mcp` and keep stdin open (append `; sleep 5` in
 the producing subshell); the server exits on EOF.
@@ -41,8 +45,9 @@ the producing subshell); the server exits on EOF.
 
 See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one
 `LanguageModelSession`; the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the
-model can see), `CommandRunner` (bounded, timed shell execution), and tool types under `Tools/` including
-`run_command`. `harness/Sources/DaimonMCP` exposes `respond`, `run_command`, and `close_thread` over stdio MCP via the
+model can see), `CommandRunner` (bounded, timed shell execution), `FileReader` (paged, streamed file reads),
+`Home`/`Config`/`TranscriptStore` (`~/.daimon` state), `ContextPolicy` and `Transcript.condensed` (overflow
+recovery, ADR 0008), and tool types under `Tools/` including `run_command` and `read_file`. `harness/Sources/DaimonMCP` exposes `respond`, `run_command`, and `close_thread` over stdio MCP via the
 official Swift SDK; `ToolCatalog` is the contract clients see, and `ThreadStore`/`ConversationThread` (actors)
 keep per-`thread_id` conversations (ADR 0007). `harness/Sources/daimon` is a thin swift-argument-parser
 CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform to `FoundationModels.Tool` with
@@ -50,6 +55,8 @@ CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform 
 (Rust under `tools/`) that the harness describes to the model (ADR 0005).
 
 `run_command` is unsandboxed by design (ADR 0005); do not add a sandbox or allowlist without an ADR.
+`docs/policy-and-sandboxing.md` holds the investigated options. Context overflow is recovered by dropping old
+turns (ADR 0008); `docs/context-management.md` has the rules every tool must follow (bounded output, paging).
 
 ## Standards
 

@@ -43,20 +43,32 @@ availability and shapes the API.
 | --- | --- | --- |
 | `DaimonCore` | library | `Agent`, `ToolRegistry`, `CommandRunner`, tool implementations, typed errors. All model-facing logic lives here. |
 | `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
-| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `tools`, `mcp`. |
+| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `mcp`. |
 | `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic. |
 
 ## Components
 
 ### `Agent`
 
-Wraps exactly one `LanguageModelSession`. Construction checks `SystemLanguageModel.default.availability` and
-throws `AgentError.modelUnavailable(reason)` rather than letting the first request fail obscurely.
+Owns one `LanguageModelSession` at a time. Construction checks `SystemLanguageModel.default.availability` and
+throws `AgentError.modelUnavailable(reason)` rather than letting the first request fail obscurely. An agent
+can also start from a saved `Transcript`.
 
 - `respond(to:)` returns the complete reply.
 - `stream(_:onDelta:)` invokes a callback with each new fragment and returns the final text. It is a callback
   rather than an `AsyncSequence` for a concurrency reason recorded in
   [ADR 0003](decisions/0003-callback-streaming.md).
+- On context overflow the `ContextPolicy` (default: keep the last four turns) rebuilds the session from a
+  condensed transcript and retries once; `condensations` counts recoveries. See
+  [context-management.md](context-management.md) and [ADR 0008](decisions/0008-context-condensation.md).
+- `transcript`, `contextTokens()`, and `reset()` support saving, budgeting, and starting over.
+
+### Home, config, transcripts
+
+`Home` resolves `$DAIMON_HOME` or `~/.daimon` and lays out `config.json`, `logs/`, and `transcripts/`.
+`Config` is optional JSON (instructions, `run_command` limits, MCP thread capacity) with defaults applied by
+`resolved`. `TranscriptStore` saves and loads transcripts as `<name>.json`. Read-only commands never create
+the directory; `chat` calls `Home.ensure()`.
 
 ### `ToolRegistry`
 
@@ -75,6 +87,10 @@ Each tool is a `struct` conforming to `FoundationModels.Tool` under `harness/Sou
 
 `CurrentDateTool` is the reference implementation: the on-device model has no clock, so this is the smallest
 tool that changes an answer.
+
+`ReadFileTool` pages a text file: `FileReader` streams the file in chunks through a `LineScanner`, skips to
+the requested line, and stops when the page or its byte budget is full, so cost is bounded by the page, not
+the file. The rendering ends with an offset hint the model follows to continue.
 
 `RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which runs `/bin/sh -c` with a
 timeout, captures stdout and stderr separately through pipe readability handlers into `Mutex`-guarded
@@ -103,7 +119,9 @@ MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ T
 ### CLI
 
 `daimon` mirrors `fm respond` where semantics match: positional prompt or stdin, `--instructions`,
-`--[no-]stream`, repeatable `--tool`. `daimon tools` lists the registry. `daimon mcp` serves MCP on stdio.
+`--[no-]stream`, repeatable `--tool`. `daimon chat` is a line-oriented REPL with slash commands parsed by
+`ChatInput` (`/help`, `/tools`, `/tokens`, `/save`, `/new`, `/quit`), `--resume <name>`, and `--save <name>`.
+`daimon tools` lists the registry. `daimon mcp` serves MCP on stdio. Instructions default to `config.json`.
 Exit codes follow swift-argument-parser conventions (64 for usage errors).
 
 ## Error handling
