@@ -57,6 +57,23 @@ so it can try something else.
 
 `--unsafe` on `respond`, `chat`, and `mcp` turns both layers off with a warning on stderr.
 
+### Symlinks
+
+Seatbelt matches real paths, so daimon resolves every profile path with `realpath(3)` before generating the
+profile (`/tmp` and `/var` are symlinks into `/private`; a not-yet-existing path resolves its longest existing
+prefix). At run time the kernel resolves the target of each write, not the name used. Verified on macOS 27:
+
+| Case | Result |
+| --- | --- |
+| Write through a symlink inside the working directory that points outside | Denied; no file created |
+| Create, rename, or delete such a symlink | Allowed (the link itself is inside); following it stays denied |
+| Write through a symlink outside that points inside | Allowed (the target is inside) |
+| Write via `/tmp/…` to a `/private/tmp/…` target | Allowed (resolved by the kernel) |
+
+The invariant: a write succeeds if and only if the real file lands inside the writable set. Hard links are the
+one different mechanism, but creating one needs write access to the destination directory and the same
+volume, so it can only alias files the command could already reach.
+
 Known limitation: tools that apply their own sandbox cannot nest inside daimon's. Run SwiftPM as
 `swift build --disable-sandbox` (and `swift test --disable-sandbox`); Cargo needs nothing. Reads are not
 restricted; omit the tool (`--tool current_date`, or the MCP `tools` argument) where even that is too much.
