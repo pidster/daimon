@@ -1,0 +1,80 @@
+# Design
+
+## Overview
+
+```
+┌────────────┐   prompt    ┌──────────────────┐  respond/stream  ┌──────────────────────┐
+│ daimon CLI │ ──────────▶ │ DaimonCore.Agent │ ───────────────▶ │ LanguageModelSession │
+│ (ArgParser)│ ◀────────── │                  │ ◀─────────────── │  (FoundationModels)  │
+└────────────┘   text      └──────────────────┘                  └──────────┬───────────┘
+                                   │ tools: [any Tool]                      │ tool call
+                                   ▼                                        ▼
+                            ┌──────────────┐        call(arguments:)  ┌───────────┐
+                            │ ToolRegistry │ ───────────────────────▶ │ Tool impl │
+                            └──────────────┘                          └───────────┘
+```
+
+The framework owns the agent loop. When the model emits a tool call, `LanguageModelSession` decodes the
+arguments into the tool's `@Generable` `Arguments` type, invokes `call(arguments:)`, appends the result to the
+transcript, and continues generation. `Agent` therefore contains no loop of its own; it only guards
+availability and shapes the API.
+
+## Targets
+
+| Target | Kind | Responsibility |
+| --- | --- | --- |
+| `DaimonCore` | library | `Agent`, `ToolRegistry`, tool implementations, typed errors. All logic lives here. |
+| `daimon` | executable | Argument parsing and stdin/stdout only. Depends on `DaimonCore` and swift-argument-parser. |
+| `DaimonCoreTests` | tests | swift-testing suites for model-independent logic. |
+
+## Components
+
+### `Agent`
+
+Wraps exactly one `LanguageModelSession`. Construction checks `SystemLanguageModel.default.availability` and
+throws `AgentError.modelUnavailable(reason)` rather than letting the first request fail obscurely.
+
+- `respond(to:)` returns the complete reply.
+- `stream(_:onDelta:)` invokes a callback with each new fragment and returns the final text. It is a callback
+  rather than an `AsyncSequence` for a concurrency reason recorded in
+  [ADR 0003](decisions/0003-callback-streaming.md).
+
+### `ToolRegistry`
+
+A static list, `all`, is the single source of truth for what the model can see. `select(_:)` resolves names
+from the CLI and reports unknown ones so the CLI can fail before touching the model.
+
+### Tools
+
+Each tool is a `struct` conforming to `FoundationModels.Tool` under `Sources/DaimonCore/Tools/`:
+
+- `name` is the identifier the model uses; keep it `snake_case` and stable.
+- `description` is prompt text; write it for the model, not for humans.
+- `Arguments` is `@Generable`; use `@Guide` on each property to constrain what the model produces.
+- `call(arguments:)` does the work. Keep the formatting logic in a `static` helper so it is testable without the
+  model (see `CurrentDateTool.format`).
+
+`CurrentDateTool` is the reference implementation: the on-device model has no clock, so this is the smallest
+tool that changes an answer.
+
+### CLI
+
+`daimon` mirrors `fm respond` where semantics match: positional prompt or stdin, `--instructions`,
+`--[no-]stream`, repeatable `--tool`. `daimon tools` lists the registry. Exit codes follow
+swift-argument-parser conventions (64 for usage errors).
+
+## Error handling
+
+Errors are typed enums conforming to `Error` and `CustomStringConvertible`. Library code never prints or calls
+`fatalError`; the CLI is the only place that renders errors to stderr.
+
+## Concurrency
+
+Swift 6 strict concurrency is enabled. `LanguageModelSession` is not `Sendable`, so `Agent` is a plain
+`final class` used from one task at a time. Do not move session work into detached tasks.
+
+## Extension points
+
+- New tool: add a file under `Tools/`, append to `ToolRegistry.all`, add a test for its pure helper.
+- Session persistence (transcript save/resume, as `fm` does with `~/.fm/sessions/`) would live in `Agent`.
+- Structured output (`fm respond --schema`) would be a `respond(to:generating:)` overload on `Agent`.

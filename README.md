@@ -9,3 +9,5 @@ swift build
 ```
 
 Requires macOS 27 or later and Xcode 27 (the Command Line Tools alone lack the `@Generable` macro plugin).
+
+After cloning, run `scripts/check install-hooks` to enable the pre-commit gate. Documentation is in [docs/](docs/README.md).

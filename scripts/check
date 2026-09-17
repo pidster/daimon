@@ -1,0 +1,65 @@
+#!/bin/sh
+# Single entry point for every quality check. Used by .githooks/pre-commit,
+# .github/workflows/ci.yml, and humans. See docs/engineering.md.
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+SWIFT_PATHS="Sources Tests Package.swift"
+
+lint() {
+    echo "==> lint"
+    swift format lint --recursive --strict $SWIFT_PATHS
+}
+
+build() {
+    echo "==> build (warnings are errors)"
+    swift build -Xswiftc -warnings-as-errors
+}
+
+test_() {
+    echo "==> test"
+    swift test
+}
+
+hygiene() {
+    echo "==> hygiene"
+    status=0
+    staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+    for f in $staged; do
+        case "$f" in *.swift|*.md|*.yml|*.yaml|*.json|*.sh|scripts/*)
+            if grep -nE '^(<<<<<<<|=======|>>>>>>>)( |$)' "$f" >/dev/null 2>&1; then
+                echo "conflict marker: $f"; status=1
+            fi
+            if grep -nE '[[:blank:]]+$' "$f" >/dev/null 2>&1; then
+                echo "trailing whitespace: $f"; status=1
+            fi
+        esac
+        if [ -f "$f" ] && [ "$(wc -c <"$f")" -gt 1048576 ]; then
+            echo "file over 1 MiB: $f"; status=1
+        fi
+    done
+
+    email=$(git config user.email || true)
+    case "$email" in
+        *@users.noreply.github.com) ;;
+        *) echo "git user.email '$email' is not a GitHub noreply address; GitHub will reject the push"; status=1 ;;
+    esac
+
+    return $status
+}
+
+install_hooks() {
+    git config core.hooksPath .githooks
+    echo "core.hooksPath set to .githooks"
+}
+
+case "${1:-all}" in
+    lint) lint ;;
+    build) build ;;
+    test) test_ ;;
+    hygiene) hygiene ;;
+    all) hygiene; lint; build; test_ ;;
+    install-hooks) install_hooks ;;
+    *) echo "usage: scripts/check [lint|build|test|hygiene|all|install-hooks]" >&2; exit 64 ;;
+esac
