@@ -2,90 +2,105 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What this is
+## What daimon is
 
-`daimon` is a single Swift binary: an on-device, tool-using AI microharness over Apple's Foundation Models
-framework, the same system model the `fm` CLI exposes. Full documentation lives in `docs/`; read
-`docs/README.md` first. Key facts:
+An on-device, tool-using AI microharness for macOS, written in Swift on Apple's Foundation Models framework
+(the model behind Apple Intelligence and the `fm` CLI). One binary, `daimon`, with two faces: a CLI
+(`respond`, `chat`, `tools`, `logs`) and an MCP server over stdio (`mcp`) that other harnesses delegate
+local work to. Every command the model runs passes a policy, a Seatbelt sandbox, a risk classifier, and,
+when risky, human approval; everything is written to a verbatim audit log.
 
-- Swift, linking `FoundationModels` directly, because `fm` cannot drive user-defined tools
-  (`docs/decisions/0001-swift-and-foundationmodels.md`).
-- Platform floor is macOS 27, written `.macOS("27.0")` in Package.swift; requires Xcode 27, not just the
-  Command Line Tools, for the `@Generable` macro plugin (`docs/decisions/0002-macos-27-baseline.md`).
-- Swift 6 strict concurrency is on; streaming is a callback, never a detached task
-  (`docs/decisions/0003-callback-streaming.md`). `Agent`'s async methods are `nonisolated(nonsending)` so
-  actors can own an `Agent` (`docs/decisions/0007-conversation-threads.md`).
+`docs/README.md` is the map. Read the page for the area you are touching before changing it; the decision
+records under `docs/decisions/` explain why things are the way they are, and you must not reverse one
+without a new ADR.
+
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `harness/` | Swift package. Targets: `DaimonCore` (all logic), `DaimonMCP` (MCP server), `daimon` (CLI, argument parsing only), tests. |
+| `tools/` | Cargo workspace reserved for Rust tool binaries. Empty; checks activate with the first crate. |
+| `docs/` | Documentation and ADRs. Part of every change (see Definition of done). |
+| `scripts/check` | The quality gate and the pre-commit hook's body. |
 
 ## Commands
 
-Layout: `harness/` is the Swift package (the `daimon` binary); `tools/` is a Cargo workspace for Rust tool
-binaries; `docs/` is the documentation; `scripts/check` is the quality gate. Swift commands run inside
-`harness/`, Rust commands inside `tools/`.
+Swift commands run inside `harness/`; the gate runs from anywhere.
 
 ```
-scripts/check install-hooks                   # once per clone: enables the pre-commit gate
-scripts/check                                 # hygiene + lint + warnings-as-errors build + tests, both toolchains
-scripts/check format                          # auto-fix swift-format and rustfmt findings
-cd harness && swift build                     # -> harness/.build/debug/daimon
-cd harness && swift test --filter CurrentDateToolTests/formatsInRequestedZone   # one Swift test
-cd tools && cargo test -p <crate>             # one Rust crate's tests
-harness/.build/debug/daimon tools             # list registered tools
-harness/.build/debug/daimon "What is the date in Tokyo?"   # live model smoke test
-harness/.build/debug/daimon chat               # REPL; /help lists commands; --resume/--save use ~/.daimon/transcripts
-harness/.build/debug/daimon mcp               # MCP server on stdio (stdout is the protocol channel)
-harness/.build/debug/daimon logs --last 20    # audit log summaries; --json for raw events
-harness/.build/debug/daimon --yes "…"         # non-interactive: approve risky commands (else they are refused)
-scripts/check eval                            # on-device model classifier evaluation (slow; not in the gate)
+scripts/check install-hooks        # once per clone
+scripts/check                      # hygiene + strict lint + warnings-as-errors build + tests (the gate)
+scripts/check format               # swift-format and rustfmt auto-fix
+scripts/check coverage             # per-file line coverage (not in the gate)
+scripts/check eval                 # on-device model classifier evaluation; slow; not in the gate
+
+cd harness && swift build                                        # -> .build/debug/daimon
+cd harness && swift test --filter CommandRunnerTests             # one suite; append /testName for one test
+cd harness && swift build -c release                             # -> .build/release/daimon (what .mcp.json runs)
+```
+
+Smoke-testing against the live model (never in unit tests):
+
+```
+export DAIMON_HOME=/tmp/daimon-scratch     # keep smoke state out of the real ~/.daimon
+harness/.build/debug/daimon tools
+harness/.build/debug/daimon --yes "Use run_command to run: uname -m"
+harness/.build/debug/daimon chat            # /help, /tokens, /save, /new, /quit; answers y/n/a to approvals
+harness/.build/debug/daimon logs --last 20  # audit summaries; --json for raw events
 DAIMON_LOG=debug harness/.build/debug/daimon "…"   # mirror diagnostics to stderr
-scripts/check coverage                        # per-file line coverage (not in the gate)
 ```
 
-Set `DAIMON_HOME` to a scratch directory when smoke-testing so nothing lands in the real `~/.daimon`.
+To drive `daimon mcp` by hand, pipe JSON-RPC lines and keep stdin open (`; sleep 5` in the producing
+subshell); the server exits on EOF. `docs/mcp.md` has a ready-made example.
 
-To smoke-test MCP by hand, pipe JSON-RPC lines into `daimon mcp` and keep stdin open (append `; sleep 5` in
-the producing subshell); the server exits on EOF.
+## Architecture in one paragraph
 
-## Architecture
+`Agent` wraps one `LanguageModelSession`; the framework runs the tool loop. `ToolRegistry` is the single
+list of tools the model sees (`current_date`, `run_command`, `read_file`), each wrapped by `AuditedTool`.
+`CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus on-device
+model classifier, ask at `moderate` and above through an `Approver` per entry point), then runs `/bin/sh -c`
+under `sandbox-exec` with a generated profile, bounded output and a timeout. `FileReader` pages files.
+`Home`, `Config`, and `TranscriptStore` are `~/.daimon`. `AuditLog` writes JSON Lines; `Diagnostics` wraps
+unified logging. `ContextPolicy` recovers from context overflow by dropping old turns. `DaimonMCP` exposes
+`respond` (per-`thread_id` conversations held by `ThreadStore`/`ConversationThread` actors), `run_command`,
+and `close_thread`. Details: `docs/design.md`.
 
-See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one
-`LanguageModelSession`; the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the
-model can see), `CommandRunner` (bounded, timed shell execution), `FileReader` (paged, streamed file reads),
-`Home`/`Config`/`TranscriptStore` (`~/.daimon` state), `AuditLog`/`AuditedTool`/`Diagnostics` (verbatim
-JSON Lines audit at `~/.daimon/logs/audit.jsonl` plus unified logging, ADR 0010; new event kinds go in
-`docs/logging.md`), `ContextPolicy` and `Transcript.condensed` (overflow
-recovery, ADR 0008), and tool types under `Tools/` including `run_command` and `read_file`. `harness/Sources/DaimonMCP` exposes `respond`, `run_command`, and `close_thread` over stdio MCP via the
-official Swift SDK; `ToolCatalog` is the contract clients see, and `ThreadStore`/`ConversationThread` (actors)
-keep per-`thread_id` conversations (ADR 0007). `harness/Sources/daimon` is a thin swift-argument-parser
-CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform to `FoundationModels.Tool` with
-`@Generable` `Arguments`, append to the registry, and test its pure helper. Heavier tools are plain binaries
-(Rust under `tools/`) that the harness describes to the model (ADR 0005).
+## Rules
 
-`run_command` runs under a `CommandPolicy` (deny/allow regexes plus a `sandbox-exec` Seatbelt profile,
-ADR 0009), configured in `config.json`, bypassed by `--unsafe`, and then through an `ApprovalGate` (rules +
-on-device model classifier, ask at `moderate` and above; `--yes` skips, `chat` asks on the terminal, MCP uses
-elicitation; ADR 0011, `docs/approval.md`). Model-dependent tests live in `ModelEvalTests` and run only via
-`scripts/check eval`. Inside the sandbox, SwiftPM needs
-`--disable-sandbox`. Tests drive the real sandbox, so they write only under the working directory and temp. Context overflow is recovered by dropping old
-turns (ADR 0008); `docs/context-management.md` has the rules every tool must follow (bounded output, paging).
+- **Definition of done.** A change is done when it is tested (without the model), documented in code, and
+  documented under `docs/` in the same commit: tool page, `daimon.md`, `mcp.md`, `logging.md`, `design.md`,
+  or an ADR as appropriate. If no doc needs changing, say so in the commit message. The hook reminds you.
+- **Gate.** `scripts/check` must pass before every commit; the hook runs it. Strict lint (every public
+  declaration documented, no force unwrap or try), warnings as errors, Swift 6 strict concurrency. Fix
+  concurrency diagnostics by restructuring: no `@unchecked Sendable`, no `nonisolated(unsafe)`. `Agent`'s
+  async methods are `nonisolated(nonsending)` so actors can own one; keep new async APIs consistent.
+- **Tests never need the model.** Keep logic in pure functions and test those; `ModelEvalTests` is the one
+  model-dependent suite and runs only via `scripts/check eval`. Tests drive the real sandbox, so they write
+  only under the working directory and temp.
+- **Errors are typed** enums with `CustomStringConvertible`; no `fatalError` or `print` in library code.
+  Tool failures the model should react to are returned as text, not thrown.
+- **Bound every tool result** (4 KiB or paged); the model's window is about 4k tokens. Keep tool
+  descriptions short. See `docs/context-management.md`.
+- **Audit new behaviour.** New event kinds go in `AuditEvent.Kind` and `docs/logging.md`.
+- **Commits** are small and single-purpose; subject says what, body says why. Do not pass an explicit
+  `user.email` to git; the configured noreply identity is required for pushes.
+- **CI is disabled** until a macOS 27 runner exists; the hook is the only automated gate.
 
-## Standards
+## Gotchas
 
-This project is held to the highest standard of engineering practice; `docs/engineering.md` is the rulebook
-and `scripts/check` enforces it. **Definition of done: a change is not done until it is tested, documented
-in code, and documented in `docs/`** (tool page, `daimon.md`, `mcp.md`, `design.md`, or an ADR as
-appropriate). Update docs in the same commit as the code, not afterwards; if no doc needs changing, say so in
-the commit message. Before every commit run `scripts/check` (the hook does this). CI is disabled until a macOS 27 runner is
-provisioned, so the hook is the only automated gate. Tests never
-need the model. Errors are typed. No force unwrap, force try, `fatalError` in library code, or concurrency
-escape hatches. Record non-obvious or hard-to-reverse choices as an ADR in `docs/decisions/`.
+- Needs macOS 27 and Xcode 27 as the active developer directory; the Command Line Tools lack the
+  `@Generable` macro plugin. `PackageDescription` has no `.v27`, so the platform is `.macOS("27.0")`.
+- Sandboxes do not nest: inside daimon's sandbox, SwiftPM needs `swift build --disable-sandbox`.
+- Seatbelt matches real paths; profile paths go through `realpath` (`/tmp` and `/var` are symlinks).
+- The `@Generable` macro rejects extra protocol conformances on the same declaration; add them in an
+  extension (see `RiskLevel`).
+- swift-format reflows code; when patching by string replacement, re-read the file after formatting.
 
-Do not pass an explicit `user.email` to git; the configured noreply identity is required for GitHub to accept
-pushes.
+## MCP servers (`.mcp.json`)
 
-## MCP servers
-
-`.mcp.json` registers two servers. `codex` (`codex mcp-server`) exposes the OpenAI Codex CLI and needs the
-`codex` CLI on `PATH`. `daimon` is this repository's own release build (`harness/.build/release/daimon mcp`),
-for dogfooding: run `cd harness && swift build -c release` first, then `/mcp` to (re)connect. Its tools are
-`respond` (delegate a small task to the on-device model, with `thread_id` for continuity), `run_command`,
-and `close_thread`; risky commands need approval via elicitation, or are refused if the client lacks it.
+- `daimon`: this repository's own release build, for dogfooding. Build it first (`swift build -c release`),
+  then `/mcp` to connect. Use `respond` to delegate small, self-contained tasks to the on-device model
+  (pass back `thread_id` to continue), `run_command` to run something locally, `close_thread` when done.
+  Risky commands need approval through elicitation; if this client lacks it they are refused, and the
+  alternatives are running the command here or starting the server with `--yes`.
+- `codex`: `codex mcp-server`, the OpenAI Codex CLI; needs `codex` on `PATH`.
