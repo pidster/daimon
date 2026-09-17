@@ -7,7 +7,16 @@ cd harness
 swift build
 .build/debug/daimon tools
 .build/debug/daimon "What is the date in Tokyo?"
+.build/debug/daimon "Run the tests in $PWD and tell me if they pass"
 ```
+
+As an MCP server (stdio), for example in Claude Code's `.mcp.json`:
+
+```json
+{ "mcpServers": { "daimon": { "command": "/path/to/daimon", "args": ["mcp"] } } }
+```
+
+It exposes `respond` (run a task on the on-device model, with daimon's tools) and `run_command`.
 
 Layout: `harness/` (Swift package, the `daimon` binary), `tools/` (Cargo workspace for Rust tool binaries),
 `docs/`, `scripts/check` (quality gate).

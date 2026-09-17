@@ -30,15 +30,24 @@ cd harness && swift test --filter CurrentDateToolTests/formatsInRequestedZone   
 cd tools && cargo test -p <crate>             # one Rust crate's tests
 harness/.build/debug/daimon tools             # list registered tools
 harness/.build/debug/daimon "What is the date in Tokyo?"   # live model smoke test
+harness/.build/debug/daimon mcp               # MCP server on stdio (stdout is the protocol channel)
 ```
+
+To smoke-test MCP by hand, pipe JSON-RPC lines into `daimon mcp` and keep stdin open (append `; sleep 5` in
+the producing subshell); the server exits on EOF.
 
 ## Architecture
 
-See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one `LanguageModelSession`;
-the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the model can see), and tool
-types under `Tools/`. `harness/Sources/daimon` is a thin swift-argument-parser CLI mirroring `fm respond` flags.
-To add a tool: conform to `FoundationModels.Tool` with `@Generable` `Arguments`, append to the registry, and
-test its pure helper.
+See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one
+`LanguageModelSession`; the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the
+model can see), `CommandRunner` (bounded, timed shell execution), and tool types under `Tools/` including
+`run_command`. `harness/Sources/DaimonMCP` exposes `respond` and `run_command` over stdio MCP via the official
+Swift SDK; `ToolCatalog` is the contract clients see. `harness/Sources/daimon` is a thin swift-argument-parser
+CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform to `FoundationModels.Tool` with
+`@Generable` `Arguments`, append to the registry, and test its pure helper. Heavier tools are plain binaries
+(Rust under `tools/`) that the harness describes to the model (ADR 0005).
+
+`run_command` is unsandboxed by design (ADR 0005); do not add a sandbox or allowlist without an ADR.
 
 ## Standards
 

@@ -1,14 +1,18 @@
 import ArgumentParser
 import DaimonCore
+import DaimonMCP
 import Foundation
 import FoundationModels
 
 @main
 struct Daimon: AsyncParsableCommand {
+    static let defaultInstructions =
+        "You are daimon, a concise assistant. Use the available tools when they help answer accurately."
+
     static let configuration = CommandConfiguration(
         commandName: "daimon",
         abstract: "An on-device, tool-using AI microharness over Apple's Foundation Models.",
-        subcommands: [Respond.self, Tools.self],
+        subcommands: [Respond.self, Tools.self, Mcp.self],
         defaultSubcommand: Respond.self
     )
 }
@@ -69,5 +73,19 @@ struct Tools: ParsableCommand {
         for tool in ToolRegistry.all {
             print("\(tool.name)\t\(tool.description)")
         }
+    }
+}
+
+struct Mcp: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Serve daimon's tools to an MCP client over stdio.",
+        discussion: "Exposes 'respond' (run a task on the on-device model) and 'run_command'. "
+            + "Stdout carries the protocol; diagnostics go to stderr.")
+
+    @Option(name: [.short, .customLong("instructions")], help: "Default instructions for 'respond' sessions.")
+    var instructions: String = Daimon.defaultInstructions
+
+    func run() async throws {
+        try await DaimonServer(defaultInstructions: instructions).run()
     }
 }
