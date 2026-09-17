@@ -14,6 +14,7 @@ recorded as [decisions](decisions/).
 | `scripts/check build` | `swift build -Xswiftc -warnings-as-errors`; `cargo build` with `RUSTFLAGS=-D warnings` |
 | `scripts/check test` | `swift test`; `cargo test --workspace` |
 | `scripts/check format` | Auto-fix formatting with swift-format and rustfmt |
+| `scripts/check coverage` | `swift test --enable-code-coverage` plus an `llvm-cov` per-file line report for the harness sources (not in the gate) |
 | `scripts/check hygiene` | Staged-file checks: conflict markers, trailing whitespace, files over 1 MiB, commit author uses a GitHub noreply address |
 | `scripts/check all` | Everything above, in that order |
 | `scripts/check install-hooks` | Points `core.hooksPath` at `.githooks/` |
@@ -37,7 +38,9 @@ its first crate.
   or `nonisolated(unsafe)`; restructure instead.
 - **Errors** are typed enums with `CustomStringConvertible` descriptions.
 - **Tests** accompany every behaviour change and never require the on-device model. Keep logic in pure
-  functions and test those; the live model is exercised by running the binary.
+  functions and test those; the live model is exercised by running the binary. Tests use swift-testing
+  (`@Suite`, `@Test`, `#expect`). Check `scripts/check coverage` when adding a module; `Agent` and the tool
+  `call` wrappers are the accepted gaps because they need the model.
 - **Layering**: logic in `DaimonCore`; the executable target holds only argument parsing and I/O. Rust tool
   binaries know nothing about agents; the harness owns the model-facing schema.
 - **Commits** are small and single-purpose. The subject says what, the body says why.

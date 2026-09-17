@@ -39,6 +39,22 @@ test_() {
     fi
 }
 
+coverage() {
+    echo "==> coverage (swift)"
+    (
+        cd harness
+        swift test --enable-code-coverage >/dev/null 2>&1 || swift test --enable-code-coverage
+        profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata"
+        set -- .build/out/Products/Debug/*.xctest/Contents/MacOS/*
+        first="$1"; shift
+        objects=""
+        for bin in "$@"; do objects="$objects -object $bin"; done
+        # shellcheck disable=SC2086
+        xcrun llvm-cov report "$first" $objects -instr-profile "$profile" \
+            -ignore-filename-regex='(\.build|Tests|checkouts)/' -show-region-summary=false
+    )
+}
+
 format() {
     (cd harness && swift format --in-place --recursive $SWIFT_PATHS)
     if have_crates; then (cd tools && cargo fmt --all); fi
@@ -82,8 +98,9 @@ case "${1:-all}" in
     build) build ;;
     test) test_ ;;
     format) format ;;
+    coverage) coverage ;;
     hygiene) hygiene ;;
     all) hygiene; lint; build; test_ ;;
     install-hooks) install_hooks ;;
-    *) echo "usage: scripts/check [lint|build|test|format|hygiene|all|install-hooks]" >&2; exit 64 ;;
+    *) echo "usage: scripts/check [lint|build|test|format|coverage|hygiene|all|install-hooks]" >&2; exit 64 ;;
 esac
