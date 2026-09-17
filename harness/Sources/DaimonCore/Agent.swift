@@ -37,14 +37,14 @@ public final class Agent {
     }
 
     /// Sends one user turn and returns the final assistant text.
-    public func respond(to prompt: String) async throws -> String {
+    nonisolated(nonsending) public func respond(to prompt: String) async throws -> String {
         try await session.respond(to: prompt).content
     }
 
     /// Sends one user turn, calling `onDelta` with each new fragment of the
     /// assistant text as it streams, and returns the final text.
     @discardableResult
-    public func stream(_ prompt: String, onDelta: (String) -> Void) async throws -> String {
+    nonisolated(nonsending) public func stream(_ prompt: String, onDelta: (String) -> Void) async throws -> String {
         var emitted = ""
         for try await snapshot in session.streamResponse(to: prompt) {
             let full = snapshot.content

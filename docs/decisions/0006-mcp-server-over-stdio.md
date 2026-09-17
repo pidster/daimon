@@ -15,8 +15,8 @@ processing. MCP is the boundary those harnesses already speak.
 - Two tools are advertised (`DaimonMCP.ToolCatalog`): `respond`, which runs a prompt on the on-device model
   with daimon's registered tools available to it, and `run_command`, which runs a shell command directly
   without the model. Both share `CommandRunner` limits.
-- `respond` is stateless: every call gets a fresh `Agent` and session. Conversation continuity across calls is
-  not offered; the caller owns the conversation.
+- `respond` was initially stateless. Superseded by [ADR 0007](0007-conversation-threads.md): calls continue a
+  thread identified by `thread_id`.
 - Argument validation errors are MCP protocol errors (`invalidParams`); execution failures, including an
   unavailable model, are tool results with `isError: true`, as the MCP spec prescribes.
 - The server exits when stdin reaches EOF. Real clients hold the pipe open for the session's lifetime.
@@ -27,6 +27,6 @@ processing. MCP is the boundary those harnesses already speak.
   stderr.
 - The tool descriptions tell callers about the roughly 4k-token context window so that a frontier-model client
   delegates appropriately sized tasks.
-- The SDK dispatches requests concurrently, so two `respond` calls may run at once, each with its own session.
+- The SDK dispatches requests concurrently, so `respond` calls on different threads run at once.
 - The SDK pulls in swift-nio and related packages; build time and binary size grow accordingly. Accepted
   rather than hand-rolling JSON-RPC.

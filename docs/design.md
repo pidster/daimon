@@ -84,14 +84,20 @@ rendering (`Outcome.rendered`) is what the model sees. There is no sandbox; see
 
 ### MCP server
 
-`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`). It advertises `respond` and `run_command` from
-`ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see. `RespondRequest` and
-`RunCommandRequest` decode and validate arguments as pure, testable values. `respond` builds a fresh `Agent`
-per call; see [ADR 0006](decisions/0006-mcp-server-over-stdio.md).
+`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`). It advertises `respond`, `run_command`, and
+`close_thread` from `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see.
+The request types decode and validate arguments as pure, testable values; see
+[ADR 0006](decisions/0006-mcp-server-over-stdio.md).
+
+`respond` runs on a conversation thread. `ThreadStore` is an actor keeping threads by id with LRU eviction;
+`ConversationThread` is an actor owning one `Agent`, so calls on a thread serialise while threads run
+concurrently. Results carry `structuredContent.thread_id`; see
+[ADR 0007](decisions/0007-conversation-threads.md).
 
 ```
-MCP client ──stdio──▶ DaimonServer ──respond──▶ Agent ──▶ LanguageModelSession ──▶ tools (run_command, ...)
+MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools
                                    ──run_command──▶ CommandRunner
+                                   ──close_thread──▶ ThreadStore
 ```
 
 ### CLI
@@ -108,7 +114,9 @@ Errors are typed enums conforming to `Error` and `CustomStringConvertible`. Libr
 ## Concurrency
 
 Swift 6 strict concurrency is enabled. `LanguageModelSession` is not `Sendable`, so `Agent` is a plain
-`final class` used from one task at a time. Do not move session work into detached tasks.
+`final class` used from one task at a time, and its async methods are `nonisolated(nonsending)` so they run
+in the caller's isolation. That is what lets `ConversationThread` (an actor) own an `Agent`. Do not move
+session work into detached tasks.
 
 ## Extension points
 
@@ -117,5 +125,6 @@ Swift 6 strict concurrency is enabled. `LanguageModelSession` is not `Sendable`,
   reach it through `run_command` or give it a dedicated Swift `Tool` whose description tells the model when to
   use it.
 - New MCP tool: add a `Tool` to `ToolCatalog`, a request type, and a case in `DaimonServer.call`.
+- Thread persistence or context management: extend `ConversationThread`; record the choice in an ADR.
 - Session persistence (transcript save/resume, as `fm` does with `~/.fm/sessions/`) would live in `Agent`.
 - Structured output (`fm respond --schema`) would be a `respond(to:generating:)` overload on `Agent`.

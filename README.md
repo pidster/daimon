@@ -16,7 +16,8 @@ As an MCP server (stdio), for example in Claude Code's `.mcp.json`:
 { "mcpServers": { "daimon": { "command": "/path/to/daimon", "args": ["mcp"] } } }
 ```
 
-It exposes `respond` (run a task on the on-device model, with daimon's tools) and `run_command`.
+It exposes `respond` (run a task on the on-device model, with daimon's tools; pass back the returned
+`thread_id` to continue a conversation), `run_command`, and `close_thread`.
 
 Layout: `harness/` (Swift package, the `daimon` binary), `tools/` (Cargo workspace for Rust tool binaries),
 `docs/`, `scripts/check` (quality gate).

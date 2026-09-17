@@ -5,7 +5,7 @@ import Testing
 
 @Suite struct ToolCatalogTests {
     @Test func advertisesRespondAndRunCommand() {
-        #expect(ToolCatalog.all.map(\.name) == ["respond", "run_command"])
+        #expect(ToolCatalog.all.map(\.name) == ["respond", "run_command", "close_thread"])
     }
 
     @Test func everyToolHasAnObjectSchemaWithRequiredFields() {
@@ -46,6 +46,23 @@ import Testing
         #expect(throws: MCPError.self) {
             try RespondRequest(arguments: ["prompt": .string("x"), "tools": .array([.int(1)])])
         }
+    }
+
+    @Test func respondRequestThreadID() throws {
+        #expect(try RespondRequest(arguments: ["prompt": .string("x")]).threadID == nil)
+        #expect(
+            try RespondRequest(arguments: ["prompt": .string("x"), "thread_id": .string("t-1.a")]).threadID == "t-1.a")
+        for bad: Value in [.string(""), .string("has space"), .string(String(repeating: "x", count: 65)), .int(1)] {
+            #expect(throws: MCPError.self) {
+                try RespondRequest(arguments: ["prompt": .string("x"), "thread_id": bad])
+            }
+        }
+    }
+
+    @Test func decodesCloseThreadRequest() throws {
+        #expect(try CloseThreadRequest(arguments: ["thread_id": .string("abc")]).threadID == "abc")
+        #expect(throws: MCPError.self) { try CloseThreadRequest(arguments: [:]) }
+        #expect(throws: MCPError.self) { try CloseThreadRequest(arguments: ["thread_id": .string("a/b")]) }
     }
 
     @Test func decodesRunCommandRequest() throws {

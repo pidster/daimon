@@ -5,9 +5,9 @@ import MCP
 
 /// Serves daimon's capabilities to MCP clients over stdio.
 ///
-/// Each `respond` call gets a fresh `Agent`, so calls are independent and the
-/// server holds no conversation state. Stdout is the protocol channel; nothing
-/// else in the process may write to it while the server runs.
+/// Conversations are kept as threads in a `ThreadStore` for the life of the
+/// process. Stdout is the protocol channel; nothing else in the process may
+/// write to it while the server runs.
 public struct DaimonServer: Sendable {
     /// Server name reported during the MCP handshake.
     public static let name = "daimon"
@@ -16,15 +16,18 @@ public struct DaimonServer: Sendable {
 
     private let defaultInstructions: String
     private let runner: CommandRunner
+    private let threads: ThreadStore<ConversationThread>
 
     /// Creates a server.
     ///
     /// - Parameters:
     ///   - defaultInstructions: Instructions used by `respond` when the caller supplies none.
     ///   - runner: Limits applied to `run_command` and to the model's own `run_command` tool.
-    public init(defaultInstructions: String, runner: CommandRunner = CommandRunner()) {
+    ///   - maxThreads: Live conversation threads kept before the least recently used is evicted.
+    public init(defaultInstructions: String, runner: CommandRunner = CommandRunner(), maxThreads: Int = 32) {
         self.defaultInstructions = defaultInstructions
         self.runner = runner
+        threads = ThreadStore(capacity: maxThreads)
     }
 
     /// Starts serving on stdin/stdout and returns when the client disconnects.
@@ -52,25 +55,65 @@ public struct DaimonServer: Sendable {
         case ToolCatalog.runCommand.name:
             let request = try RunCommandRequest(arguments: params.arguments)
             return await runCommand(request)
+        case ToolCatalog.closeThread.name:
+            let request = try CloseThreadRequest(arguments: params.arguments)
+            return await closeThread(request)
         default:
             throw MCPError.methodNotFound("Unknown tool: \(params.name)")
         }
     }
 
     private func respond(_ request: RespondRequest) async -> CallTool.Result {
-        let tools: [any FoundationModels.Tool]
-        if request.toolNames.isEmpty {
-            tools = ToolRegistry.all
-        } else {
-            let selection = ToolRegistry.select(request.toolNames)
-            guard selection.unknown.isEmpty else {
-                return failure("Unknown tool(s): \(selection.unknown.joined(separator: ", "))")
+        let thread: ConversationThread
+        var created = false
+        if let id = request.threadID, let existing = await threads.find(id) {
+            guard request.instructions == nil, request.toolNames.isEmpty else {
+                return failure("instructions and tools apply only when a thread is created; \(id) already exists")
             }
-            tools = selection.tools
+            thread = existing
+        } else {
+            let tools: [any FoundationModels.Tool]
+            if request.toolNames.isEmpty {
+                tools = ToolRegistry.all
+            } else {
+                let selection = ToolRegistry.select(request.toolNames)
+                guard selection.unknown.isEmpty else {
+                    return failure("Unknown tool(s): \(selection.unknown.joined(separator: ", "))")
+                }
+                tools = selection.tools
+            }
+            let id = request.threadID ?? UUID().uuidString.lowercased()
+            let instructions = request.instructions ?? defaultInstructions
+            do {
+                thread = try await threads.create(id: id) {
+                    try ConversationThread(id: id, instructions: instructions, tools: tools)
+                }
+                created = true
+            } catch {
+                return failure(String(describing: error))
+            }
         }
         do {
-            let agent = try Agent(instructions: request.instructions ?? defaultInstructions, tools: tools)
-            return success(try await agent.respond(to: request.prompt))
+            let text = try await thread.respond(to: request.prompt)
+            return .init(
+                content: [.text(text: text, annotations: nil, _meta: nil)],
+                structuredContent: .object([
+                    "thread_id": .string(thread.id), "created": .bool(created), "text": .string(text),
+                ]),
+                isError: false
+            )
+        } catch LanguageModelError.contextSizeExceeded {
+            return failure(
+                "thread \(thread.id) has exhausted the model's context window; close it and start a new one")
+        } catch {
+            return failure(String(describing: error))
+        }
+    }
+
+    private func closeThread(_ request: CloseThreadRequest) async -> CallTool.Result {
+        do {
+            try await threads.close(request.threadID)
+            return success("closed \(request.threadID)")
         } catch {
             return failure(String(describing: error))
         }

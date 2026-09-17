@@ -13,7 +13,8 @@ framework, the same system model the `fm` CLI exposes. Full documentation lives 
 - Platform floor is macOS 27, written `.macOS("27.0")` in Package.swift; requires Xcode 27, not just the
   Command Line Tools, for the `@Generable` macro plugin (`docs/decisions/0002-macos-27-baseline.md`).
 - Swift 6 strict concurrency is on; streaming is a callback, never a detached task
-  (`docs/decisions/0003-callback-streaming.md`).
+  (`docs/decisions/0003-callback-streaming.md`). `Agent`'s async methods are `nonisolated(nonsending)` so
+  actors can own an `Agent` (`docs/decisions/0007-conversation-threads.md`).
 
 ## Commands
 
@@ -41,8 +42,9 @@ the producing subshell); the server exits on EOF.
 See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one
 `LanguageModelSession`; the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the
 model can see), `CommandRunner` (bounded, timed shell execution), and tool types under `Tools/` including
-`run_command`. `harness/Sources/DaimonMCP` exposes `respond` and `run_command` over stdio MCP via the official
-Swift SDK; `ToolCatalog` is the contract clients see. `harness/Sources/daimon` is a thin swift-argument-parser
+`run_command`. `harness/Sources/DaimonMCP` exposes `respond`, `run_command`, and `close_thread` over stdio MCP via the
+official Swift SDK; `ToolCatalog` is the contract clients see, and `ThreadStore`/`ConversationThread` (actors)
+keep per-`thread_id` conversations (ADR 0007). `harness/Sources/daimon` is a thin swift-argument-parser
 CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform to `FoundationModels.Tool` with
 `@Generable` `Arguments`, append to the registry, and test its pure helper. Heavier tools are plain binaries
 (Rust under `tools/`) that the harness describes to the model (ADR 0005).

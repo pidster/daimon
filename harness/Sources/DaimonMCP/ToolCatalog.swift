@@ -1,3 +1,4 @@
+import Foundation
 import MCP
 
 /// The tools daimon advertises to MCP clients, with their JSON Schemas.
@@ -11,13 +12,21 @@ public enum ToolCatalog {
         description:
             "Run a task on this Mac's on-device Apple Foundation Model. The model is small with a context window "
             + "of roughly 4k tokens, so keep prompts short and delegate only self-contained tasks such as "
-            + "summarising a passage, classifying text, or driving a build or test via its run_command tool.",
+            + "summarising a passage, classifying text, or driving a build or test via its run_command tool. "
+            + "Omit thread_id to start a new conversation; the result's structuredContent.thread_id continues it.",
         inputSchema: .object([
             "type": .string("object"),
             "properties": .object([
                 "prompt": .object([
                     "type": .string("string"),
                     "description": .string("The task for the model."),
+                ]),
+                "thread_id": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Conversation to continue. Omit to start a new one (an id is generated), or supply an unused "
+                            + "id to start one under that name. instructions and tools apply only when a thread starts."
+                    ),
                 ]),
                 "instructions": .object([
                     "type": .string("string"),
@@ -57,8 +66,35 @@ public enum ToolCatalog {
         annotations: .init(title: "Run command", readOnlyHint: false, destructiveHint: true, openWorldHint: false)
     )
 
+    /// Ends a conversation thread and frees its model session.
+    public static let closeThread = Tool(
+        name: "close_thread",
+        description: "End a respond conversation thread and free its model session.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "thread_id": .object([
+                    "type": .string("string"),
+                    "description": .string("The thread to close."),
+                ])
+            ]),
+            "required": .array([.string("thread_id")]),
+        ]),
+        annotations: .init(title: "Close thread", readOnlyHint: false, idempotentHint: false, openWorldHint: false)
+    )
+
     /// Every tool, in the order clients see them.
-    public static var all: [Tool] { [respond, runCommand] }
+    public static var all: [Tool] { [respond, runCommand, closeThread] }
+}
+
+/// Validates a client-supplied thread id: 1 to 64 characters from `[A-Za-z0-9._-]`.
+///
+/// - Throws: `MCPError.invalidParams` otherwise.
+func validateThreadID(_ id: String) throws {
+    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
+    guard !id.isEmpty, id.count <= 64, id.unicodeScalars.allSatisfy(allowed.contains) else {
+        throw MCPError.invalidParams("'thread_id' must be 1-64 characters from [A-Za-z0-9._-]")
+    }
 }
 
 /// Decoded arguments for the `respond` tool.
@@ -69,6 +105,8 @@ public struct RespondRequest: Equatable, Sendable {
     public var instructions: String?
     /// Names of daimon tools to enable; empty means all registered tools.
     public var toolNames: [String]
+    /// Thread to continue or create; nil means start a new thread with a generated id.
+    public var threadID: String?
 
     /// Decodes and validates MCP call arguments.
     ///
@@ -92,6 +130,29 @@ public struct RespondRequest: Equatable, Sendable {
         } else {
             toolNames = []
         }
+        if let raw = arguments?["thread_id"] {
+            guard let id = raw.stringValue else { throw MCPError.invalidParams("'thread_id' must be a string") }
+            try validateThreadID(id)
+            threadID = id
+        }
+    }
+}
+
+/// Decoded arguments for the `close_thread` tool.
+public struct CloseThreadRequest: Equatable, Sendable {
+    /// The thread to close.
+    public var threadID: String
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` if `thread_id` is missing or malformed.
+    public init(arguments: [String: Value]?) throws {
+        guard let id = arguments?["thread_id"]?.stringValue else {
+            throw MCPError.invalidParams("'thread_id' is required and must be a string")
+        }
+        try validateThreadID(id)
+        threadID = id
     }
 }
 
