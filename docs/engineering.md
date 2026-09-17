@@ -26,6 +26,27 @@ work-in-progress commits on a branch that will be squashed.
 `scripts/check format` fixes most lint findings automatically. Rust checks are skipped until the workspace has
 its first crate.
 
+## Definition of done
+
+A change is done only when all of the following are true. "Works on my machine" is the start, not the end.
+
+1. **Tested.** New or changed behaviour has tests that run without the on-device model, and the whole gate
+   passes (`scripts/check`). Model-dependent paths are exercised by running the binary, and the command used
+   is in the commit message or PR.
+2. **Documented in code.** Every declaration that a reader could reasonably need to understand has a `///`
+   comment: public API (enforced by lint), and internal or private members whose purpose is not obvious from
+   the name. Say what and why, not how.
+3. **Documented for users.** `docs/` reflects the change: a new or changed tool updates its page under
+   `docs/tools/` and the index; a CLI flag or subcommand updates `docs/daimon.md`; an MCP change updates
+   `docs/mcp.md`; an architectural change updates `docs/design.md`; a non-obvious or hard-to-reverse choice
+   gets an ADR. If nothing in `docs/` needs to change, say so in the commit message.
+4. **Recorded.** `CLAUDE.md` is updated when the change alters how an agent should work in this repository
+   (new command, new rule, moved code).
+
+Documentation is part of the development cycle, not a follow-up task. The pre-commit hook reminds you when a
+commit touches `harness/Sources` or `tools/` without touching `docs/`; it is a reminder, not a block,
+because refactors legitimately need none.
+
 ## Rules
 
 - **Formatting** is defined by `harness/.swift-format` (4-space indent, 120 columns, ordered imports) and

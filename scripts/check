@@ -79,6 +79,11 @@ hygiene() {
         fi
     done
 
+    if printf '%s\n' "$staged" | grep -qE '^(harness/Sources|tools/)' \
+        && ! printf '%s\n' "$staged" | grep -qE '^(docs/|CLAUDE\.md|README\.md)'; then
+        echo "reminder: code changed but nothing under docs/ did; see the definition of done in docs/engineering.md"
+    fi
+
     email=$(git config user.email || true)
     case "$email" in
         *@users.noreply.github.com) ;;
