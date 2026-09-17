@@ -3,12 +3,14 @@
     "codex": {
       "type": "stdio",
       "command": "codex",
-      "args": ["mcp-server"]
+      "args": [
+        "mcp-server"
+      ]
     },
     "daimon": {
       "type": "stdio",
-      "command": "harness/.build/release/daimon",
-      "args": ["mcp"]
+      "command": "scripts/daimon-mcp",
+      "args": []
     }
   }
 }

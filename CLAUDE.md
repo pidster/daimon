@@ -91,8 +91,12 @@ and `close_thread`. Details: `docs/design.md`.
 
 ## MCP servers (`.mcp.json`)
 
-- `daimon`: this repository's own release build, for dogfooding. Build it first (`swift build -c release`),
-  then `/mcp` to connect. Use `respond` to delegate small, self-contained tasks to the on-device model
+- `daimon`: this repository's own release build, for dogfooding, launched through `scripts/daimon-mcp`.
+  **If the session starts with the `daimon` server failed to connect, the cause is almost always a missing
+  release build.** Do not treat the tools as unavailable: tell the user to run
+  `cd harness && swift build -c release` and then restart the harness or run `/mcp`, and offer to run the
+  build yourself. The launcher prints the same instructions to stderr. The build is also stale after code
+  changes until it is rerun. Use `respond` to delegate small, self-contained tasks to the on-device model
   (pass back `thread_id` to continue), `run_command` to run something locally, `close_thread` when done.
   Risky commands need approval through elicitation; if this client lacks it they are refused, and the
   alternatives are running the command here or starting the server with `--yes`.
