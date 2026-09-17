@@ -82,9 +82,22 @@ The invariant: a write succeeds if and only if the real file lands inside the wr
 one different mechanism, but creating one needs write access to the destination directory and the same
 volume, so it can only alias files the command could already reach.
 
-Known limitation: tools that apply their own sandbox cannot nest inside daimon's. Run SwiftPM as
-`swift build --disable-sandbox` (and `swift test --disable-sandbox`); Cargo needs nothing. Reads are not
-restricted; omit the tool (`--tool current_date`, or the MCP `tools` argument) where even that is too much.
+### Nested sandboxes
+
+Seatbelt lets a process re-apply an identical profile but refuses a different one
+(`sandbox_apply: Operation not permitted`). Two consequences, both verified on macOS 27:
+
+- Tools that apply their own sandbox cannot run inside daimon's. Run SwiftPM as
+  `swift build --disable-sandbox` and `swift test --disable-sandbox`; Cargo needs nothing.
+- When daimon itself runs inside a sandbox (for example daimon running its own tests through its MCP
+  server), its `sandbox-exec` is refused. `CommandRunner` detects that refusal on the untruncated stderr,
+  records a `policy.decision` with `nested: true`, and runs the command plainly, because the outer sandbox
+  is already confining it. The refusal cannot be produced from outside a sandbox, so this cannot be used
+  to escape one. Tests that assert enforcement skip when nested; `scripts/check` runs the runner suites
+  inside an outer sandbox on every commit.
+
+Reads are not restricted; omit the tool (`--tool current_date`, or the MCP `tools` argument) where even
+that is too much.
 
 ## Implementation
 

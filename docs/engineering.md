@@ -12,7 +12,7 @@ recorded as [decisions](decisions/).
 | --- | --- |
 | `scripts/check lint` | `swift format lint --strict` over the harness; `cargo fmt --check` and `cargo clippy -D warnings` over the tools workspace |
 | `scripts/check build` | `swift build -Xswiftc -warnings-as-errors`; `cargo build` with `RUSTFLAGS=-D warnings` |
-| `scripts/check test` | `swift test`; `cargo test --workspace` |
+| `scripts/check test` | `swift test`; then the `CommandRunner` suites again inside an outer Seatbelt sandbox to exercise the nested-sandbox fallback; `cargo test --workspace` |
 | `scripts/check format` | Auto-fix formatting with swift-format and rustfmt |
 | `scripts/check eval` | Runs the on-device model evaluation (`ModelEvalTests`, gated by `DAIMON_MODEL_TESTS=1`); reports classifier accuracy, asserts no dangerous command rated safe (not in the gate) |
 | `scripts/check coverage` | `swift test --enable-code-coverage` plus an `llvm-cov` per-file line report for the harness sources (not in the gate) |

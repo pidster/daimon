@@ -84,8 +84,9 @@ and `close_thread`. Details: `docs/design.md`.
 
 ## Gotchas that cross languages
 
-- Sandboxes do not nest: inside daimon's sandbox, SwiftPM needs `swift build --disable-sandbox`; Cargo is
-  unaffected.
+- Seatbelt refuses a nested profile that differs from the outer one. Inside daimon's sandbox, SwiftPM
+  needs `swift build --disable-sandbox` (Cargo is unaffected); daimon inside a sandbox detects the refusal
+  and runs commands under the outer sandbox instead (`docs/tools/run_command.md`).
 - Seatbelt matches real paths; profile paths go through `realpath` (`/tmp` and `/var` are symlinks).
 - Stdout is the MCP protocol channel while `daimon mcp` runs; diagnostics go to stderr or unified logging.
 

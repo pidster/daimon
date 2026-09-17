@@ -22,12 +22,13 @@ import Testing
         await #expect(throws: MCPError.self) { try await server.call(.init(name: "nope", arguments: nil)) }
     }
 
-    @Test func elicitationAlwaysFieldParsesLeniently() {
-        #expect(ElicitationApprover.wantsAlways(.bool(true)))
-        #expect(ElicitationApprover.wantsAlways(.string("Yes")))
-        #expect(!ElicitationApprover.wantsAlways(.string("no")))
-        #expect(!ElicitationApprover.wantsAlways(.bool(false)))
-        #expect(!ElicitationApprover.wantsAlways(nil))
+    @Test func elicitationScopeParsesLeniently() {
+        #expect(ElicitationApprover.wantsSession(.string("session")))
+        #expect(ElicitationApprover.wantsSession(.string("Approve for this session")))
+        #expect(ElicitationApprover.wantsSession(.bool(true)))
+        #expect(!ElicitationApprover.wantsSession(.string("once")))
+        #expect(!ElicitationApprover.wantsSession(.string("Approve once")))
+        #expect(!ElicitationApprover.wantsSession(nil))
     }
 
     @Test func closingUnknownThreadIsAToolError() async throws {

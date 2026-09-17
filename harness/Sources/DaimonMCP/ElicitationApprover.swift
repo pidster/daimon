@@ -46,11 +46,13 @@ struct ElicitationApprover: Approver {
             title: "daimon (\(level) risk): \(request.command)",
             description: text,
             properties: [
-                "always": .object([
-                    "type": .string("boolean"),
-                    "title": .string("Always this session"),
-                    "description": .string("Also approve `\(request.command)` for the rest of this session"),
-                    "default": .bool(false),
+                "scope": .object([
+                    "type": .string("string"),
+                    "title": .string("Approve: \(request.command)"),
+                    "description": .string("Run it once, or also for the rest of this session"),
+                    "enum": .array([.string("once"), .string("session")]),
+                    "enumNames": .array([.string("Approve once"), .string("Approve for this session")]),
+                    "default": .string("once"),
                 ])
             ],
             required: []
@@ -59,7 +61,7 @@ struct ElicitationApprover: Approver {
             let result = try await server.requestElicitation(message: text, requestedSchema: schema)
             switch result.action {
             case .accept:
-                return Self.wantsAlways(result.content?["always"]) ? .approvedForSession : .approved
+                return Self.wantsSession(result.content?["scope"]) ? .approvedForSession : .approved
             case .decline:
                 return .denied("declined by the user")
             case .cancel:
@@ -71,10 +73,12 @@ struct ElicitationApprover: Approver {
         }
     }
 
-    /// Reads the optional `always` field leniently: booleans, or the strings clients tend to send.
-    static func wantsAlways(_ value: Value?) -> Bool {
+    /// Reads the optional `scope` field leniently; anything other than a session choice means once.
+    static func wantsSession(_ value: Value?) -> Bool {
         if let flag = value?.boolValue { return flag }
-        if let text = value?.stringValue { return ["true", "yes", "y", "1", "on"].contains(text.lowercased()) }
+        if let text = value?.stringValue {
+            return ["session", "always", "approve for this session", "true", "yes"].contains(text.lowercased())
+        }
         return false
     }
 }

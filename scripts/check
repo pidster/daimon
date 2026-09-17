@@ -33,6 +33,8 @@ build() {
 test_() {
     echo "==> test (swift)"
     (cd harness && swift test)
+    echo "==> test (swift, runner suites inside an outer sandbox)"
+    (cd harness && sandbox-exec -p '(version 1) (allow default)' swift test --disable-sandbox --filter 'CommandRunner|NestedSandbox' 2>&1 | grep -E 'Test run with|✘' | tail -3)
     if have_crates; then
         echo "==> test (rust)"
         (cd tools && cargo test --workspace)

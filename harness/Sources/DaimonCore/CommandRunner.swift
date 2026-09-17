@@ -117,9 +117,45 @@ public struct CommandRunner: Sendable {
         guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
         else { throw Failure.invalidWorkingDirectory(workingDirectory) }
         let started = Date()
+        var sandboxed = options.policy.sandbox.enabled
+        var (outcome, refused) = try await launch(command, in: workingDirectory, sandboxed: sandboxed)
+        if sandboxed, refused {
+            // sandbox-exec cannot apply a profile inside an existing sandbox, and that failure cannot be
+            // produced from outside one, so the process is already confined by an outer sandbox at least as
+            // strict as daimon's. Run the command plainly under that outer sandbox.
+            sandboxed = false
+            audit?.record(
+                .policyDecision,
+                details: decision.merging(["verdict": "allowed", "sandbox": .bool(false), "nested": .bool(true)]) { $1 }
+            )
+            Diagnostics.policy.info("nested sandbox: outer sandbox applies; running without sandbox-exec: \(command)")
+            (outcome, _) = try await launch(command, in: workingDirectory, sandboxed: false)
+        }
+        audit?.record(
+            .commandOutcome,
+            details: [
+                "command": .string(command), "exitStatus": .int(Int(outcome.exitStatus)),
+                "timedOut": .bool(outcome.timedOut),
+                "truncated": .bool(outcome.truncated), "stdout": .string(outcome.stdout),
+                "stderr": .string(outcome.stderr),
+                "seconds": .double(Date().timeIntervalSince(started)),
+            ])
+        Diagnostics.policy.debug("exit \(outcome.exitStatus) after \(Date().timeIntervalSince(started))s: \(command)")
+        return outcome
+    }
+
+    /// Spawns `/bin/sh -c command`, under `sandbox-exec` when `sandboxed`, and captures its outcome.
+    ///
+    /// - Returns: The outcome and whether `sandbox-exec` itself refused to apply its profile, which is
+    ///   judged on the full stderr before truncation.
+    private func launch(
+        _ command: String, in workingDirectory: String, sandboxed: Bool
+    ) async throws -> (
+        Outcome, refused: Bool
+    ) {
 
         let process = Process()
-        if options.policy.sandbox.enabled {
+        if sandboxed {
             let profile = options.policy.seatbeltProfile(
                 workingDirectory: workingDirectory,
                 temporaryDirectory: FileManager.default.temporaryDirectory.path,
@@ -172,8 +208,10 @@ public struct CommandRunner: Sendable {
         stdoutBuffer.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
         stderrBuffer.append(stderrPipe.fileHandleForReading.readDataToEndOfFile())
 
-        let out = Self.tail(stdoutBuffer.contents, maxBytes: options.maxOutputBytes)
-        let err = Self.tail(stderrBuffer.contents, maxBytes: options.maxOutputBytes)
+        let fullStdout = stdoutBuffer.contents
+        let fullStderr = stderrBuffer.contents
+        let out = Self.tail(fullStdout, maxBytes: options.maxOutputBytes)
+        let err = Self.tail(fullStderr, maxBytes: options.maxOutputBytes)
         let status: Int32 =
             process.terminationReason == .uncaughtSignal ? -process.terminationStatus : process.terminationStatus
         let outcome = Outcome(
@@ -183,17 +221,14 @@ public struct CommandRunner: Sendable {
             timedOut: timedOut.withLock { $0 },
             truncated: out.truncated || err.truncated
         )
-        audit?.record(
-            .commandOutcome,
-            details: [
-                "command": .string(command), "exitStatus": .int(Int(status)), "timedOut": .bool(outcome.timedOut),
-                "truncated": .bool(outcome.truncated), "stdout": .string(outcome.stdout),
-                "stderr": .string(outcome.stderr),
-                "seconds": .double(Date().timeIntervalSince(started)),
-            ])
-        Diagnostics.policy.debug("exit \(status) after \(Date().timeIntervalSince(started))s: \(command)")
-        return outcome
+        let refused =
+            sandboxed && status != 0 && fullStdout.isEmpty
+            && String(decoding: fullStderr, as: UTF8.self).contains(Self.sandboxApplyRefusal)
+        return (outcome, refused)
     }
+
+    /// What `sandbox-exec` prints when a different profile is already applied to the process.
+    static let sandboxApplyRefusal = "sandbox_apply: Operation not permitted"
 
     /// Keeps at most `maxBytes` from the end of `data`, decoded as UTF-8 with replacement.
     static func tail(_ data: Data, maxBytes: Int) -> (text: String, truncated: Bool) {
