@@ -17,13 +17,11 @@ happens is written to an audit log you can read back.
 
 ## Quick start
 
-> The install package is in progress. Until it ships, follow [Setup for developers](#setup-for-developers)
-> to build from source; the commands below are the same once `daimon` is on your `PATH`.
-
-Requirements: macOS 27 or later with Apple Intelligence enabled (`fm available` should say the system model
-is available).
+Requirements: an Apple silicon Mac on macOS 27 or later with Apple Intelligence enabled, and Homebrew.
 
 ```bash
+brew install pidster/tap/daimon
+daimon doctor                     # checks the model, sandbox, config, and home directory
 daimon "What is the date in Tokyo?"
 daimon "Run the tests in $PWD and tell me if they pass"
 daimon chat --save today          # interactive; type /help for commands
@@ -65,6 +63,7 @@ Everything is under [docs/](docs/README.md). Start with the one that matches you
 | Understand how the code is put together | [design.md](docs/design.md) |
 | Know why a decision was made | [decisions/](docs/decisions/) (one record per decision) |
 | Work on the code to the project's standard | [engineering.md](docs/engineering.md) |
+| Cut a release | [release.md](docs/release.md) |
 
 Two background pages record what we learned about the platform: [context-management.md](docs/context-management.md)
 on living inside a 4k-token window, and [policy-and-sandboxing.md](docs/policy-and-sandboxing.md) on what

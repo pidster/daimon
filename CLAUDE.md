@@ -34,6 +34,7 @@ scripts/check                      # hygiene + strict lint + warnings-as-errors 
 scripts/check format               # swift-format and rustfmt auto-fix
 scripts/check coverage             # per-file line coverage (not in the gate)
 scripts/check eval                 # on-device model classifier evaluation; slow; not in the gate
+scripts/release X.Y.Z --dry-run    # release preflight, build, package; remote steps printed (docs/release.md)
 
 cd harness && swift build                                        # -> .build/debug/daimon
 cd harness && swift test --filter CommandRunnerTests             # one suite; append /testName for one test

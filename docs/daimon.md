@@ -67,6 +67,12 @@ Shows the audit log (`~/.daimon/logs/audit.jsonl` and rotated files) as one-line
 
 See [logging.md](logging.md) for the event catalogue.
 
+### `daimon doctor`
+
+Checks that this install can work and exits non-zero if anything fails: macOS 27 or later, the on-device
+model available, `/usr/bin/sandbox-exec` present, `config.json` parses, `~/.daimon` writable. Run it first
+when something is wrong. `daimon --version` prints the version.
+
 ### `daimon mcp`
 
 Serves the Model Context Protocol over stdio until the client closes the pipe. See [mcp.md](mcp.md).

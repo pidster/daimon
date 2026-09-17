@@ -1,0 +1,88 @@
+#!/bin/sh
+# Cut a release: preflight, build, package, tag, GitHub release, Homebrew tap formula.
+# Usage: scripts/release X.Y.Z [--dry-run]
+# See docs/release.md. Remote steps (tag push, release, tap push) are printed, not run, with --dry-run.
+set -eu
+
+VERSION="${1:-}"
+DRY_RUN="${2:-}"
+[ -n "$VERSION" ] || { echo "usage: scripts/release X.Y.Z [--dry-run]" >&2; exit 64; }
+case "$VERSION" in *[!0-9.]*|.*|*.|*..*) echo "version must be X.Y.Z" >&2; exit 64 ;; esac
+[ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "--dry-run" ] || { echo "unknown flag $DRY_RUN" >&2; exit 64; }
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+TAG="v$VERSION"
+TARBALL="daimon-$VERSION-arm64.tar.gz"
+TAP_REPO="pidster/homebrew-tap"
+OUT="$ROOT/harness/.build/release-artifacts"
+
+remote() {
+    if [ "$DRY_RUN" = "--dry-run" ]; then
+        echo "[dry-run] $*"
+    else
+        "$@"
+    fi
+}
+
+echo "==> preflight"
+[ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || { echo "not on main" >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 1; }
+CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/Sources/DaimonCore/Audit/AuditEvent.swift)"
+[ "$CURRENT" = "$VERSION" ] || { echo "DaimonVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
+gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated" >&2; exit 1; }
+scripts/check all
+scripts/check eval
+
+echo "==> build"
+(cd harness && swift build -c release)
+BIN="harness/.build/release/daimon"
+rm -rf "$OUT"; mkdir -p "$OUT/stage"
+cp "$BIN" "$OUT/stage/daimon"
+strip "$OUT/stage/daimon"
+cp LICENSE "$OUT/stage/LICENSE"
+[ "$("$OUT/stage/daimon" --version)" = "$VERSION" ] || { echo "built binary reports $("$OUT/stage/daimon" --version)" >&2; exit 1; }
+"$OUT/stage/daimon" doctor
+
+echo "==> package"
+(cd "$OUT/stage" && tar -czf "../$TARBALL" daimon LICENSE)
+(cd "$OUT" && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
+SHA="$(cut -d' ' -f1 "$OUT/$TARBALL.sha256")"
+ls -la "$OUT/$TARBALL"; echo "sha256 $SHA"
+
+echo "==> publish"
+remote git tag -a "$TAG" -m "daimon $VERSION"
+remote git push origin "$TAG"
+remote gh release create "$TAG" "$OUT/$TARBALL" "$OUT/$TARBALL.sha256" --title "daimon $VERSION" --generate-notes \
+    --notes "Install with Homebrew: brew install pidster/tap/daimon. Downloading the tarball directly leaves it quarantined; use Homebrew."
+
+echo "==> tap formula"
+FORMULA="$OUT/daimon.rb"
+cat > "$FORMULA" <<RUBY
+class Daimon < Formula
+  desc "On-device, tool-using AI microharness for macOS"
+  homepage "https://github.com/pidster/daimon"
+  url "https://github.com/pidster/daimon/releases/download/$TAG/$TARBALL"
+  sha256 "$SHA"
+  license "MIT"
+  version "$VERSION"
+
+  depends_on arch: :arm64
+  depends_on macos: :golden_gate
+
+  def install
+    bin.install "daimon"
+  end
+
+  test do
+    assert_equal "$VERSION", shell_output("#{bin}/daimon --version").strip
+  end
+end
+RUBY
+echo "formula written to $FORMULA"
+TAP_DIR="$OUT/tap"
+remote sh -c "rm -rf '$TAP_DIR' && gh repo clone $TAP_REPO '$TAP_DIR' && mkdir -p '$TAP_DIR/Formula' && cp '$FORMULA' '$TAP_DIR/Formula/daimon.rb' && cd '$TAP_DIR' && git add Formula/daimon.rb && git commit -m 'daimon $VERSION' && git push"
+
+echo "==> done"
+echo "verify: brew update && brew install $TAP_REPO/daimon && daimon doctor"

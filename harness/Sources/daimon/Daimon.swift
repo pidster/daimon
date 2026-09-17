@@ -10,7 +10,8 @@ struct Daimon: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "daimon",
         abstract: "An on-device, tool-using AI microharness over Apple's Foundation Models.",
-        subcommands: [Respond.self, Chat.self, Tools.self, Mcp.self, Logs.self],
+        version: DaimonVersion.current,
+        subcommands: [Respond.self, Chat.self, Tools.self, Mcp.self, Logs.self, DoctorCommand.self],
         defaultSubcommand: Respond.self
     )
 }
@@ -344,5 +345,19 @@ struct Logs: ParsableCommand {
                 print(event.summary)
             }
         }
+    }
+}
+
+/// Checks that this install can work: OS version, model availability, sandbox, config, home directory.
+struct DoctorCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "doctor", abstract: "Check that daimon can run on this Mac.",
+        discussion: "Exits non-zero if any check fails. The first thing to run when something is wrong.")
+
+    func run() throws {
+        let findings = Doctor(home: Daimon.home).run()
+        print("daimon \(DaimonVersion.current)")
+        print(Doctor.render(findings))
+        guard Doctor.allPassed(findings) else { throw ExitCode.failure }
     }
 }
