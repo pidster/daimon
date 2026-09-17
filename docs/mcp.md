@@ -45,8 +45,8 @@ in order; different threads run concurrently.
 
 ### `run_command`
 
-Run a shell command directly, without the model. Same limits and safety notes as the model-facing tool:
-see [tools/run_command.md](tools/run_command.md).
+Run a shell command directly, without the model. Same limits, policy, and sandbox as the model-facing tool:
+see [tools/run_command.md](tools/run_command.md). Start the server with `--unsafe` to disable both.
 
 | Argument | Type | Required |
 | --- | --- | --- |

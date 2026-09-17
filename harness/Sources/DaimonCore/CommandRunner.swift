@@ -1,11 +1,12 @@
 import Foundation
 import Synchronization
 
-/// Runs a shell command with a timeout and bounded output capture.
+/// Runs a shell command with a timeout, bounded output capture, and a `CommandPolicy`.
 ///
-/// Output is captured separately for stdout and stderr, then truncated to the
-/// last `maxOutputBytes` of each so that a chatty command cannot exhaust the
-/// model's small context window.
+/// The policy's patterns are checked before launch and its sandbox, when
+/// enabled, wraps the shell in `sandbox-exec`. Output is captured separately
+/// for stdout and stderr, then truncated to the last `maxOutputBytes` of each
+/// so that a chatty command cannot exhaust the model's small context window.
 public struct CommandRunner: Sendable {
     /// Limits applied to every command this runner executes.
     public struct Options: Sendable, Equatable {
@@ -15,12 +16,18 @@ public struct CommandRunner: Sendable {
         public var timeout: Duration
         /// Maximum bytes kept from each of stdout and stderr; earlier output is discarded.
         public var maxOutputBytes: Int
+        /// What may run and how it is confined.
+        public var policy: CommandPolicy
 
-        /// Creates options. Defaults are a 60-second timeout and 4 KiB per stream.
-        public init(workingDirectory: String? = nil, timeout: Duration = .seconds(60), maxOutputBytes: Int = 4096) {
+        /// Creates options. Defaults are a 60-second timeout, 4 KiB per stream, and the default policy.
+        public init(
+            workingDirectory: String? = nil, timeout: Duration = .seconds(60), maxOutputBytes: Int = 4096,
+            policy: CommandPolicy = .default
+        ) {
             self.workingDirectory = workingDirectory
             self.timeout = timeout
             self.maxOutputBytes = maxOutputBytes
+            self.policy = policy
         }
     }
 
@@ -54,12 +61,15 @@ public struct CommandRunner: Sendable {
         case invalidWorkingDirectory(String)
         /// The shell could not be launched.
         case launchFailed(String)
+        /// The policy's patterns rejected the command.
+        case denied(String)
 
         /// Human-readable explanation suitable for printing to stderr.
         public var description: String {
             switch self {
             case .invalidWorkingDirectory(let path): "working directory does not exist: \(path)"
             case .launchFailed(let reason): "could not launch /bin/sh: \(reason)"
+            case .denied(let reason): "command denied by policy: \(reason)"
             }
         }
     }
@@ -76,17 +86,29 @@ public struct CommandRunner: Sendable {
     ///
     /// - Parameter command: A POSIX shell command line.
     /// - Returns: The exit status and bounded output.
-    /// - Throws: `Failure` if the command cannot be started.
+    /// - Throws: `Failure` if the policy rejects the command or it cannot be started.
     public func run(_ command: String) async throws -> Outcome {
-        if let directory = options.workingDirectory {
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory), isDirectory.boolValue
-            else { throw Failure.invalidWorkingDirectory(directory) }
+        if case .denied(let reason) = options.policy.check(command) {
+            throw Failure.denied(reason)
         }
+        let workingDirectory = options.workingDirectory ?? FileManager.default.currentDirectoryPath
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
+        else { throw Failure.invalidWorkingDirectory(workingDirectory) }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", command]
+        if options.policy.sandbox.enabled {
+            let profile = options.policy.seatbeltProfile(
+                workingDirectory: workingDirectory,
+                temporaryDirectory: FileManager.default.temporaryDirectory.path,
+                home: FileManager.default.homeDirectoryForCurrentUser.path
+            )
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+            process.arguments = ["-p", profile, "/bin/sh", "-c", command]
+        } else {
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", command]
+        }
         process.currentDirectoryURL = options.workingDirectory.map { URL(fileURLWithPath: $0) }
         process.standardInput = FileHandle.nullDevice
         let stdoutPipe = Pipe()

@@ -34,14 +34,21 @@ public struct RunCommandTool: Tool {
 
     /// Runs the command and returns a compact rendering of its outcome.
     ///
+    /// A policy denial or a bad working directory is returned as text rather
+    /// than thrown, so the model sees why and can choose another approach
+    /// instead of the whole response failing.
+    ///
     /// - Parameter arguments: The command and optional working directory.
     /// - Returns: Exit status and bounded stdout/stderr, formatted for the model.
-    /// - Throws: `CommandRunner.Failure` if the command cannot be started.
-    public func call(arguments: Arguments) async throws -> String {
+    public func call(arguments: Arguments) async -> String {
         var runner = runner
         if let directory = arguments.workingDirectory {
             runner.options.workingDirectory = directory
         }
-        return try await runner.run(arguments.command).rendered
+        do {
+            return try await runner.run(arguments.command).rendered
+        } catch {
+            return "error: \(error)"
+        }
     }
 }

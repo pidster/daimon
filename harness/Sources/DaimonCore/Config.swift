@@ -13,6 +13,8 @@ public struct Config: Codable, Equatable, Sendable {
     public var commandMaxOutputBytes: Int?
     /// Live MCP conversation threads kept before eviction.
     public var maxThreads: Int?
+    /// What `run_command` may execute and how it is confined.
+    public var commandPolicy: CommandPolicy?
 
     /// Instructions used when the file sets none.
     public static let defaultInstructions =
@@ -21,20 +23,24 @@ public struct Config: Codable, Equatable, Sendable {
     /// Creates a config; nil fields take defaults at resolution.
     public init(
         instructions: String? = nil, commandTimeoutSeconds: Int? = nil, commandMaxOutputBytes: Int? = nil,
-        maxThreads: Int? = nil
+        maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil
     ) {
         self.instructions = instructions
         self.commandTimeoutSeconds = commandTimeoutSeconds
         self.commandMaxOutputBytes = commandMaxOutputBytes
         self.maxThreads = maxThreads
+        self.commandPolicy = commandPolicy
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
     ///
-    /// - Throws: `DecodingError` for malformed JSON, or file-system errors other than "missing".
+    /// - Throws: `DecodingError` for malformed JSON, `CommandPolicy.Failure` for a bad pattern,
+    ///   or file-system errors other than "missing".
     public static func load(from url: URL) throws -> Config {
         guard FileManager.default.fileExists(atPath: url.path) else { return Config() }
-        return try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
+        let config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
+        try config.commandPolicy?.validate()
+        return config
     }
 
     /// Writes this config as pretty-printed JSON.
@@ -52,7 +58,8 @@ public struct Config: Codable, Equatable, Sendable {
             instructions: instructions ?? Self.defaultInstructions,
             runner: CommandRunner.Options(
                 timeout: .seconds(commandTimeoutSeconds ?? 60),
-                maxOutputBytes: commandMaxOutputBytes ?? 4096
+                maxOutputBytes: commandMaxOutputBytes ?? 4096,
+                policy: commandPolicy ?? .default
             ),
             maxThreads: maxThreads ?? 32
         )

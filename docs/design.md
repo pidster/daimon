@@ -92,11 +92,12 @@ tool that changes an answer.
 the requested line, and stops when the page or its byte budget is full, so cost is bounded by the page, not
 the file. The rendering ends with an offset hint the model follows to continue.
 
-`RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which runs `/bin/sh -c` with a
-timeout, captures stdout and stderr separately through pipe readability handlers into `Mutex`-guarded
-buffers, kills on timeout via the pid (SIGTERM, then SIGKILL), and keeps only the tail of each stream. The
-rendering (`Outcome.rendered`) is what the model sees. There is no sandbox; see
-[ADR 0005](decisions/0005-tools-as-plain-binaries.md).
+`RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which checks the
+`CommandPolicy` patterns, runs `/bin/sh -c` (under `sandbox-exec` with a generated Seatbelt profile when
+the sandbox is enabled) with a timeout, captures stdout and stderr separately through pipe readability
+handlers into `Mutex`-guarded buffers, kills on timeout via the pid (SIGTERM, then SIGKILL), and keeps only
+the tail of each stream. The rendering (`Outcome.rendered`) is what the model sees; policy denials are
+rendered too rather than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 
 ### MCP server
 

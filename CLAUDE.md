@@ -54,8 +54,9 @@ CLI mirroring `fm respond` flags plus `mcp`. To add an in-process tool: conform 
 `@Generable` `Arguments`, append to the registry, and test its pure helper. Heavier tools are plain binaries
 (Rust under `tools/`) that the harness describes to the model (ADR 0005).
 
-`run_command` is unsandboxed by design (ADR 0005); do not add a sandbox or allowlist without an ADR.
-`docs/policy-and-sandboxing.md` holds the investigated options. Context overflow is recovered by dropping old
+`run_command` runs under a `CommandPolicy` (deny/allow regexes plus a `sandbox-exec` Seatbelt profile,
+ADR 0009), configured in `config.json`, bypassed by `--unsafe`. Inside the sandbox, SwiftPM needs
+`--disable-sandbox`. Tests drive the real sandbox, so they write only under the working directory and temp. Context overflow is recovered by dropping old
 turns (ADR 0008); `docs/context-management.md` has the rules every tool must follow (bounded output, paging).
 
 ## Standards

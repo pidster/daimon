@@ -23,10 +23,9 @@ translation per tool for no benefit when we control both sides.
 
 ## Consequences
 
-- `run_command` has no sandbox: it runs with the harness's privileges, and the model chooses the command. It is
-  registered by default at the owner's direction. Callers can restrict exposure with the CLI's `--tool`
-  selection or the MCP `tools` argument. A policy layer (allowlist, confirmation) is future work and should be
-  recorded in its own ADR.
+- `run_command` was initially unsandboxed. Superseded by [ADR 0009](0009-command-policy-and-sandbox.md):
+  a `CommandPolicy` with deny/allow patterns and a Seatbelt sandbox now governs it. Callers can still
+  restrict exposure with the CLI's `--tool` selection or the MCP `tools` argument.
 - Output is bounded (4 KiB per stream by default, tail kept) and commands time out (60 s), because the model's
   context window is small.
 - The model can only use a Rust binary well if its Swift `Tool` description explains when to call it; that

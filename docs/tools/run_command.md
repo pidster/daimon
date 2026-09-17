@@ -33,13 +33,33 @@ reports its signal negated (for example `-15` for SIGTERM).
 | Output per stream | 4 KiB, tail kept | `commandMaxOutputBytes` in `config.json` |
 | stdin | `/dev/null` | not configurable |
 
-## Safety
+## Policy and sandbox
 
-There is no sandbox or allowlist: the command runs with daimon's privileges and the model chooses it. This is
-a recorded decision ([ADR 0005](../decisions/0005-tools-as-plain-binaries.md)); the options for changing it
-are in [policy-and-sandboxing.md](../policy-and-sandboxing.md). Until then, omit the tool where it is not
-needed (`--tool current_date`, or the MCP `tools` argument) and run daimon as a user whose permissions you
-are comfortable delegating.
+Every command passes a `CommandPolicy` ([ADR 0009](../decisions/0009-command-policy-and-sandbox.md)),
+configured under `commandPolicy` in `config.json`:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `deny` | `sudo`, `rm -rf /`, `\| sh`, `mkfs`/`diskutil erase`, `dd of=/dev/…` | Regexes; a match rejects the command. |
+| `allow` | `[]` | Regexes; when non-empty the command must match one. Deny wins. |
+| `sandbox.enabled` | `true` | Run under `sandbox-exec`. |
+| `sandbox.allowNetwork` | `true` | Set `false` to deny all networking inside the sandbox. |
+| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the working directory, `$TMPDIR`, and `/private/tmp`. `~` expands. |
+
+Inside the sandbox everything is readable and executable, but writes outside the writable set fail with
+`Operation not permitted`. A denied pattern comes back to the model as `error: command denied by policy: …`
+so it can try something else.
+
+```json
+{ "commandPolicy": { "deny": ["sudo"], "allow": ["^(swift|cargo|git|ls|cat) "],
+                     "sandbox": { "enabled": true, "allowNetwork": false, "writablePaths": [] } } }
+```
+
+`--unsafe` on `respond`, `chat`, and `mcp` turns both layers off with a warning on stderr.
+
+Known limitation: tools that apply their own sandbox cannot nest inside daimon's. Run SwiftPM as
+`swift build --disable-sandbox` (and `swift test --disable-sandbox`); Cargo needs nothing. Reads are not
+restricted; omit the tool (`--tool current_date`, or the MCP `tools` argument) where even that is too much.
 
 ## Implementation
 

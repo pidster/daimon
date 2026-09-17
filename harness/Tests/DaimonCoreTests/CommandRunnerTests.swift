@@ -60,3 +60,65 @@ import Testing
         #expect(CommandRunner.tail(data, maxBytes: 10).text == "a\u{FFFD}b")
     }
 }
+
+@Suite struct CommandRunnerPolicyTests {
+    private func scratch() throws -> String {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-sb-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.path
+    }
+
+    @Test func deniedPatternNeverLaunches() async {
+        await #expect(throws: CommandRunner.Failure.denied("command matches deny pattern secret")) {
+            try await CommandRunner(options: .init(policy: CommandPolicy(deny: ["secret"]))).run("echo secret")
+        }
+    }
+
+    @Test func sandboxAllowsWritesInWorkingDirectoryAndTemp() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let runner = CommandRunner(options: .init(workingDirectory: dir))
+        let outcome = try await runner.run(
+            "echo hi > here.txt && echo hi > \"$TMPDIR/daimon-sb-probe\" && cat here.txt")
+        #expect(outcome.exitStatus == 0, "\(outcome.stderr)")
+        #expect(outcome.stdout == "hi\n")
+    }
+
+    @Test func sandboxBlocksWritesElsewhere() async throws {
+        let dir = try scratch()
+        // The home directory is outside the writable set (working directory, temp, caches).
+        let blocked = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "daimon-sb-blocked-\(UUID().uuidString).txt").path
+        defer {
+            try? FileManager.default.removeItem(atPath: dir)
+            try? FileManager.default.removeItem(atPath: blocked)
+        }
+        let runner = CommandRunner(options: .init(workingDirectory: dir))
+        let outcome = try await runner.run("echo x > '\(blocked)'")
+        #expect(outcome.exitStatus != 0)
+        #expect(outcome.stderr.contains("Operation not permitted"))
+        #expect(!FileManager.default.fileExists(atPath: blocked))
+    }
+
+    @Test func sandboxCanBlockNetwork() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        var options = CommandRunner.Options(workingDirectory: dir, timeout: .seconds(10))
+        options.policy.sandbox.allowNetwork = false
+        let outcome = try await CommandRunner(options: options).run("curl -sS -m 3 https://example.com -o /dev/null")
+        #expect(outcome.exitStatus != 0)
+    }
+
+    @Test func unrestrictedRunsPlainShell() async throws {
+        let dir = try scratch()
+        let other = try scratch()
+        defer {
+            try? FileManager.default.removeItem(atPath: dir)
+            try? FileManager.default.removeItem(atPath: other)
+        }
+        let runner = CommandRunner(options: .init(workingDirectory: dir, policy: .unrestricted))
+        let outcome = try await runner.run("echo x > '\(other)/ok.txt'")
+        #expect(outcome.exitStatus == 0)
+        #expect(FileManager.default.fileExists(atPath: "\(other)/ok.txt"))
+    }
+}

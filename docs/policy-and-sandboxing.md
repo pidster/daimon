@@ -1,8 +1,9 @@
 # Policy and sandboxing: what is available and what daimon should do
 
-Status: investigation, 2026-09-17. No policy is implemented yet; `run_command` is unsandboxed by
-[ADR 0005](decisions/0005-tools-as-plain-binaries.md). This page records the options so the decision can be
-made deliberately.
+Status: investigated 2026-09-17; layers 1, 2, 4, and the audit half of 5 are implemented (see
+[ADR 0009](decisions/0009-command-policy-and-sandbox.md) and [tools/run_command.md](tools/run_command.md)).
+Layer 3 (confirmation in chat) is not. This page keeps the survey so the next step can be chosen
+deliberately.
 
 ## What the Foundation Models framework offers
 
@@ -44,14 +45,16 @@ Ordered from cheapest to strongest. They compose.
    and optionally network regardless of what the command line says. This is the layer that actually enforces.
 5. **Audit**: persist transcripts for MCP threads and chat, so every tool call and output is on disk.
 
-## Recommendation
+## What was done
 
-Implement 2 and 4 together as one `CommandPolicy` type in `DaimonCore`, configured from `config.json` with
-safe defaults (deny list on, sandbox on, writes allowed under the working directory and temp), and a
-`--unsafe` style opt-out for both CLI and MCP. Add 3 to `chat`. Record the choice in an ADR, and treat the
-Seatbelt dependency as a known risk: if Apple removes `sandbox-exec`, layer 2 remains.
+Layers 2 and 4 are one `CommandPolicy` type in `DaimonCore`, configured from `config.json` with safe
+defaults (deny list on, sandbox on, writes allowed under the working directory, temp, and build caches),
+and `--unsafe` as the opt-out for CLI and MCP. Verified empirically: writes outside the set and network (when
+disabled) are blocked by the kernel; SwiftPM needs `--disable-sandbox` inside it; Cargo is unaffected.
 
-Open questions for the owner:
+Still open:
 
-- Should MCP `respond` default to a stricter policy than the CLI, given the caller is another agent?
-- Is network access from `run_command` needed at all in the first cut?
+- Layer 3, confirmation in `chat`, is cheap and not yet done.
+- Network defaults to allowed. The one-field switch is `sandbox.allowNetwork`.
+- MCP `respond` uses the same policy as the CLI. A stricter default for agent callers would be a separate
+  `commandPolicy` in config keyed by entry point.

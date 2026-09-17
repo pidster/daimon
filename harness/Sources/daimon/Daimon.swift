@@ -34,9 +34,12 @@ struct Respond: AsyncParsableCommand {
     @Flag(inversion: .prefixedNo, help: "Stream the output as it is generated.")
     var stream = true
 
+    @Flag(help: "Disable the run_command policy and sandbox.")
+    var unsafe = false
+
     mutating func run() async throws {
         let text = try prompt ?? Self.readStdin()
-        let config = try Daimon.loadConfig()
+        let config = try Daimon.loadConfig(unsafe: unsafe)
         let tools = try Daimon.selectTools(toolNames, from: ToolRegistry(runner: config.runner))
         let agent = try Agent(instructions: instructions ?? config.instructions, tools: tools)
         if stream {
@@ -75,12 +78,21 @@ extension Daimon {
     static let home = Home.resolve()
 
     /// Reads `config.json` from the home directory, tolerating its absence.
-    static func loadConfig() throws -> Config.Resolved {
+    /// With `unsafe`, the run_command policy and sandbox are switched off.
+    static func loadConfig(unsafe: Bool = false) throws -> Config.Resolved {
+        var resolved: Config.Resolved
         do {
-            return try Config.load(from: home.configFile).resolved
+            resolved = try Config.load(from: home.configFile).resolved
         } catch let error as DecodingError {
             throw ValidationError("Malformed \(home.configFile.path): \(error)")
+        } catch let error as CommandPolicy.Failure {
+            throw ValidationError("\(home.configFile.path): \(error)")
         }
+        if unsafe {
+            resolved.runner.policy = .unrestricted
+            FileHandle.standardError.write(Data("warning: --unsafe: run_command policy and sandbox are off\n".utf8))
+        }
+        return resolved
     }
 
     /// Resolves `--tool` names against the registry, or all tools when none are given.
@@ -106,8 +118,11 @@ struct Mcp: AsyncParsableCommand {
         help: "Default instructions for 'respond' sessions. Defaults to config.json's instructions.")
     var instructions: String?
 
+    @Flag(help: "Disable the run_command policy and sandbox.")
+    var unsafe = false
+
     func run() async throws {
-        var config = try Daimon.loadConfig()
+        var config = try Daimon.loadConfig(unsafe: unsafe)
         if let instructions { config.instructions = instructions }
         try await DaimonServer(config: config).run()
     }
@@ -133,8 +148,11 @@ struct Chat: AsyncParsableCommand {
     @Option(name: .long, help: "Save the transcript under this name on exit. Defaults to the resumed name.")
     var save: String?
 
+    @Flag(help: "Disable the run_command policy and sandbox.")
+    var unsafe = false
+
     mutating func run() async throws {
-        let config = try Daimon.loadConfig()
+        let config = try Daimon.loadConfig(unsafe: unsafe)
         try Daimon.home.ensure()
         let store = TranscriptStore(directory: Daimon.home.transcripts)
         let tools = try Daimon.selectTools(toolNames, from: ToolRegistry(runner: config.runner))

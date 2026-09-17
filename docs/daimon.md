@@ -14,6 +14,7 @@ One prompt in, one reply out. The prompt is read from stdin when omitted.
 | `-i, --instructions <text>` | System instructions for the session. Default: `config.json`, else the built-in default. |
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
+| `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
 
 ```
 daimon "What is the date in Tokyo?"
@@ -31,6 +32,7 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `--tool <name>` (repeatable) | As for `respond`. |
 | `-r, --resume <name>` | Continue a transcript saved under `~/.daimon/transcripts/<name>.json`. |
 | `--save <name>` | Save the transcript under this name on exit. Defaults to the resumed name. |
+| `--unsafe` | Disable the `run_command` policy and sandbox. |
 
 | Command | Effect |
 | --- | --- |
@@ -54,6 +56,7 @@ Serves the Model Context Protocol over stdio until the client closes the pipe. S
 | Flag | Meaning |
 | --- | --- |
 | `-i, --instructions <text>` | Default instructions for `respond` threads that supply none. |
+| `--unsafe` | Disable the `run_command` policy and sandbox for every call. |
 
 ## Home directory and configuration
 
@@ -74,12 +77,14 @@ subcommands only read from it.
 | `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
 | `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
+| `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
 
 ```json
 { "instructions": "You are terse.", "commandTimeoutSeconds": 120 }
 ```
 
-A malformed file is an error; a missing file is fine. Unknown fields are ignored.
+A malformed file or an invalid `commandPolicy` pattern is an error; a missing file is fine. Unknown fields are
+ignored.
 
 ## Context window
 
