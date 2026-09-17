@@ -1,0 +1,19 @@
+[workspace]
+resolver = "3"
+# One crate per tool binary; add each under tools/<name> and list it here.
+members = []
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.98"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"

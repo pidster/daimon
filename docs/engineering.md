@@ -10,9 +10,10 @@ recorded as [decisions](decisions/).
 
 | Command | What it does |
 | --- | --- |
-| `scripts/check lint` | `swift format lint --strict` over `Sources`, `Tests`, `Package.swift` |
-| `scripts/check build` | `swift build -Xswiftc -warnings-as-errors` |
-| `scripts/check test` | `swift test` |
+| `scripts/check lint` | `swift format lint --strict` over the harness; `cargo fmt --check` and `cargo clippy -D warnings` over the tools workspace |
+| `scripts/check build` | `swift build -Xswiftc -warnings-as-errors`; `cargo build` with `RUSTFLAGS=-D warnings` |
+| `scripts/check test` | `swift test`; `cargo test --workspace` |
+| `scripts/check format` | Auto-fix formatting with swift-format and rustfmt |
 | `scripts/check hygiene` | Staged-file checks: conflict markers, trailing whitespace, files over 1 MiB, commit author uses a GitHub noreply address |
 | `scripts/check all` | Everything above, in that order |
 | `scripts/check install-hooks` | Points `core.hooksPath` at `.githooks/` |
@@ -21,11 +22,14 @@ Run `scripts/check install-hooks` once after cloning. The pre-commit hook runs `
 and `test`; on a warm build cache this takes a few seconds. Bypass with `git commit --no-verify` only for
 work-in-progress commits on a branch that will be squashed.
 
-`swift format --in-place --recursive Sources Tests Package.swift` fixes most lint findings automatically.
+`scripts/check format` fixes most lint findings automatically. Rust checks are skipped until the workspace has
+its first crate.
 
 ## Rules
 
-- **Formatting** is defined by `.swift-format`: 4-space indent, 120 columns, ordered imports.
+- **Formatting** is defined by `harness/.swift-format` (4-space indent, 120 columns, ordered imports) and
+  `tools/rustfmt.toml` (100 columns). Rust crates inherit the workspace lints: `unsafe_code` forbidden,
+  clippy `pedantic`, `unwrap_used` and `expect_used` warned, and warnings are errors in the gate.
 - **Documentation**: every `public` declaration has a `///` comment; `Throws:` and `Parameters:` sections are
   validated by the linter.
 - **Safety**: no force unwrap, force try, or implicitly unwrapped optionals. No `fatalError` in library code.
@@ -34,7 +38,8 @@ work-in-progress commits on a branch that will be squashed.
 - **Errors** are typed enums with `CustomStringConvertible` descriptions.
 - **Tests** accompany every behaviour change and never require the on-device model. Keep logic in pure
   functions and test those; the live model is exercised by running the binary.
-- **Layering**: logic in `DaimonCore`; the executable target holds only argument parsing and I/O.
+- **Layering**: logic in `DaimonCore`; the executable target holds only argument parsing and I/O. Rust tool
+  binaries know nothing about agents; the harness owns the model-facing schema.
 - **Commits** are small and single-purpose. The subject says what, the body says why.
 - **Decisions** that are non-obvious or hard to reverse get an ADR in `docs/decisions/`.
 

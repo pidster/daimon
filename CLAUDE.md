@@ -17,22 +17,26 @@ framework, the same system model the `fm` CLI exposes. Full documentation lives 
 
 ## Commands
 
+Layout: `harness/` is the Swift package (the `daimon` binary); `tools/` is a Cargo workspace for Rust tool
+binaries; `docs/` is the documentation; `scripts/check` is the quality gate. Swift commands run inside
+`harness/`, Rust commands inside `tools/`.
+
 ```
 scripts/check install-hooks                   # once per clone: enables the pre-commit gate
-scripts/check                                 # hygiene + lint + warnings-as-errors build + tests
-scripts/check lint                            # swift format lint --strict
-swift format --in-place --recursive Sources Tests Package.swift   # auto-fix formatting
-swift build                                   # -> .build/debug/daimon
-swift test --filter CurrentDateToolTests/formatsInRequestedZone   # one test
-.build/debug/daimon tools                     # list registered tools
-.build/debug/daimon "What is the date in Tokyo?"   # live model smoke test
+scripts/check                                 # hygiene + lint + warnings-as-errors build + tests, both toolchains
+scripts/check format                          # auto-fix swift-format and rustfmt findings
+cd harness && swift build                     # -> harness/.build/debug/daimon
+cd harness && swift test --filter CurrentDateToolTests/formatsInRequestedZone   # one Swift test
+cd tools && cargo test -p <crate>             # one Rust crate's tests
+harness/.build/debug/daimon tools             # list registered tools
+harness/.build/debug/daimon "What is the date in Tokyo?"   # live model smoke test
 ```
 
 ## Architecture
 
-See `docs/design.md`. In one paragraph: `Sources/DaimonCore` holds `Agent` (wraps one `LanguageModelSession`;
+See `docs/design.md`. In one paragraph: `harness/Sources/DaimonCore` holds `Agent` (wraps one `LanguageModelSession`;
 the framework runs the tool loop), `ToolRegistry.all` (the single list of tools the model can see), and tool
-types under `Tools/`. `Sources/daimon` is a thin swift-argument-parser CLI mirroring `fm respond` flags.
+types under `Tools/`. `harness/Sources/daimon` is a thin swift-argument-parser CLI mirroring `fm respond` flags.
 To add a tool: conform to `FoundationModels.Tool` with `@Generable` `Arguments`, append to the registry, and
 test its pure helper.
 

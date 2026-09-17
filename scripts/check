@@ -3,22 +3,45 @@
 # .github/workflows/ci.yml, and humans. See docs/engineering.md.
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
 SWIFT_PATHS="Sources Tests Package.swift"
 
+# Rust checks run only once the workspace has at least one crate.
+have_crates() {
+    ls tools/*/Cargo.toml >/dev/null 2>&1
+}
+
 lint() {
-    echo "==> lint"
-    swift format lint --recursive --strict $SWIFT_PATHS
+    echo "==> lint (swift)"
+    (cd harness && swift format lint --recursive --strict $SWIFT_PATHS)
+    if have_crates; then
+        echo "==> lint (rust)"
+        (cd tools && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings)
+    fi
 }
 
 build() {
-    echo "==> build (warnings are errors)"
-    swift build -Xswiftc -warnings-as-errors
+    echo "==> build (swift, warnings are errors)"
+    (cd harness && swift build -Xswiftc -warnings-as-errors)
+    if have_crates; then
+        echo "==> build (rust, warnings are errors)"
+        (cd tools && RUSTFLAGS="-D warnings" cargo build --workspace)
+    fi
 }
 
 test_() {
-    echo "==> test"
-    swift test
+    echo "==> test (swift)"
+    (cd harness && swift test)
+    if have_crates; then
+        echo "==> test (rust)"
+        (cd tools && cargo test --workspace)
+    fi
+}
+
+format() {
+    (cd harness && swift format --in-place --recursive $SWIFT_PATHS)
+    if have_crates; then (cd tools && cargo fmt --all); fi
 }
 
 hygiene() {
@@ -27,7 +50,7 @@ hygiene() {
     staged=$(git diff --cached --name-only --diff-filter=ACMR)
 
     for f in $staged; do
-        case "$f" in *.swift|*.md|*.yml|*.yaml|*.json|*.sh|scripts/*)
+        case "$f" in *.swift|*.rs|*.toml|*.md|*.yml|*.yaml|*.json|*.sh|scripts/*)
             if grep -nE '^(<<<<<<<|=======|>>>>>>>)( |$)' "$f" >/dev/null 2>&1; then
                 echo "conflict marker: $f"; status=1
             fi
@@ -58,8 +81,9 @@ case "${1:-all}" in
     lint) lint ;;
     build) build ;;
     test) test_ ;;
+    format) format ;;
     hygiene) hygiene ;;
     all) hygiene; lint; build; test_ ;;
     install-hooks) install_hooks ;;
-    *) echo "usage: scripts/check [lint|build|test|hygiene|all|install-hooks]" >&2; exit 64 ;;
+    *) echo "usage: scripts/check [lint|build|test|format|hygiene|all|install-hooks]" >&2; exit 64 ;;
 esac

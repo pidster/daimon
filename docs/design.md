@@ -19,6 +19,24 @@ arguments into the tool's `@Generable` `Arguments` type, invokes `call(arguments
 transcript, and continues generation. `Agent` therefore contains no loop of its own; it only guards
 availability and shapes the API.
 
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `harness/` | Swift package: the `daimon` binary and `DaimonCore` |
+| `tools/` | Cargo workspace: one crate per Rust tool binary |
+| `docs/` | This documentation and the ADRs |
+| `scripts/check` | The quality gate for both toolchains |
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `harness/` | Swift package: the `daimon` binary and `DaimonCore` |
+| `tools/` | Cargo workspace: one crate per Rust tool binary |
+| `docs/` | This documentation and the ADRs |
+| `scripts/check` | The quality gate for both toolchains |
+
 ## Targets
 
 | Target | Kind | Responsibility |
@@ -46,7 +64,7 @@ from the CLI and reports unknown ones so the CLI can fail before touching the mo
 
 ### Tools
 
-Each tool is a `struct` conforming to `FoundationModels.Tool` under `Sources/DaimonCore/Tools/`:
+Each tool is a `struct` conforming to `FoundationModels.Tool` under `harness/Sources/DaimonCore/Tools/`:
 
 - `name` is the identifier the model uses; keep it `snake_case` and stable.
 - `description` is prompt text; write it for the model, not for humans.
