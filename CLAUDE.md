@@ -84,5 +84,8 @@ pushes.
 
 ## MCP servers
 
-`.mcp.json` registers a `codex` server (`codex mcp-server`), exposing the OpenAI Codex CLI as MCP tools. It
-requires the `codex` CLI on `PATH`.
+`.mcp.json` registers two servers. `codex` (`codex mcp-server`) exposes the OpenAI Codex CLI and needs the
+`codex` CLI on `PATH`. `daimon` is this repository's own release build (`harness/.build/release/daimon mcp`),
+for dogfooding: run `cd harness && swift build -c release` first, then `/mcp` to (re)connect. Its tools are
+`respond` (delegate a small task to the on-device model, with `thread_id` for continuity), `run_command`,
+and `close_thread`; risky commands need approval via elicitation, or are refused if the client lacks it.

@@ -4,6 +4,11 @@
       "type": "stdio",
       "command": "codex",
       "args": ["mcp-server"]
+    },
+    "daimon": {
+      "type": "stdio",
+      "command": "harness/.build/release/daimon",
+      "args": ["mcp"]
     }
   }
 }
