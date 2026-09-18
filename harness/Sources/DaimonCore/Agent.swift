@@ -1,20 +1,6 @@
 import Foundation
 import FoundationModels
 
-/// Errors raised by the harness before the model is involved.
-public enum AgentError: Error, CustomStringConvertible {
-    /// The on-device model cannot be used, with the framework's reason (not enabled, not ready, unsupported device).
-    case modelUnavailable(SystemLanguageModel.Availability.UnavailableReason)
-
-    /// Human-readable explanation suitable for printing to stderr.
-    public var description: String {
-        switch self {
-        case .modelUnavailable(let reason):
-            return "The on-device model is unavailable: \(reason)"
-        }
-    }
-}
-
 /// A tool-using agent over the on-device Apple Foundation Model.
 ///
 /// `Agent` owns a `LanguageModelSession`, which keeps the transcript and
@@ -24,7 +10,7 @@ public enum AgentError: Error, CustomStringConvertible {
 /// session is rebuilt from a condensed transcript and the prompt retried.
 public final class Agent {
     /// The model every session is created on; kept so sessions can be rebuilt.
-    private let model: SystemLanguageModel
+    public let model: ResolvedModel
     /// Tools bound to every session, in registration order.
     private let tools: [any Tool]
     /// The live session. Replaced, never mutated, when the conversation is condensed or reset.
@@ -37,24 +23,24 @@ public final class Agent {
     /// Where turns, responses, condensations, and errors are recorded.
     public let audit: AuditLog?
 
-    /// Creates an agent bound to the default system model.
+    /// Creates an agent on a model.
     ///
     /// - Parameters:
     ///   - instructions: System-level guidance the model follows for the whole session.
     ///   - tools: Tools the model may call; each must have a unique `name`.
+    ///   - model: Which model; defaults to the on-device system model.
     ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
     ///   - audit: Where to record turns; nil records nothing.
-    /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
+    /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public init(
-        instructions: String, tools: [any Tool], contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
-    )
-        throws
-    {
-        model = try Self.availableModel()
+        instructions: String, tools: [any Tool], model: ModelSelection = .default,
+        contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
+    ) throws {
+        self.model = try model.resolve()
         self.tools = tools
         self.contextPolicy = contextPolicy
         self.audit = audit
-        session = LanguageModelSession(model: model, tools: tools, instructions: instructions)
+        session = self.model.session(tools: tools, instructions: instructions)
     }
 
     /// Creates an agent that continues a saved conversation.
@@ -62,35 +48,34 @@ public final class Agent {
     /// - Parameters:
     ///   - transcript: A transcript previously read from `Agent.transcript`.
     ///   - tools: Tools the model may call; they must match the names the transcript refers to.
+    ///   - model: Which model; defaults to the on-device system model.
     ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
     ///   - audit: Where to record turns; nil records nothing.
-    /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
+    /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public init(
-        transcript: Transcript, tools: [any Tool], contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
-    )
-        throws
-    {
-        model = try Self.availableModel()
+        transcript: Transcript, tools: [any Tool], model: ModelSelection = .default,
+        contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
+    ) throws {
+        self.model = try model.resolve()
         self.tools = tools
         self.contextPolicy = contextPolicy
         self.audit = audit
-        session = LanguageModelSession(model: model, tools: tools, transcript: transcript)
+        session = self.model.session(tools: tools, transcript: transcript)
     }
 
     /// The conversation so far, suitable for saving and resuming.
     public var transcript: Transcript { session.transcript }
 
-    /// Tokens the current transcript occupies, as counted by the model.
+    /// Tokens the current transcript occupies, as counted by the model, or nil if it cannot count.
     ///
     /// - Throws: Framework errors if counting fails.
-    nonisolated(nonsending) public func contextTokens() async throws -> Int {
+    nonisolated(nonsending) public func contextTokens() async throws -> Int? {
         try await model.tokenCount(for: session.transcript)
     }
 
     /// Starts a fresh session with the same instructions and tools, discarding the conversation.
     public func reset() {
-        session = LanguageModelSession(
-            model: model, tools: tools, transcript: session.transcript.condensed(keepTurns: 0))
+        session = model.session(tools: tools, transcript: session.transcript.condensed(keepTurns: 0))
     }
 
     /// Runs `operation`; on context overflow under a `.condense` policy, rebuilds the
@@ -103,20 +88,18 @@ public final class Agent {
             guard case .condense(let keepTurns) = contextPolicy else {
                 throw LanguageModelError.contextSizeExceeded(details)
             }
-            session = LanguageModelSession(
-                model: model, tools: tools, transcript: before.condensed(keepTurns: keepTurns))
+            let condensed = before.condensed(keepTurns: keepTurns)
+            session = model.session(tools: tools, transcript: condensed)
             condensations += 1
+            audit?.record(
+                .condensation,
+                details: [
+                    "turnsBefore": .int(before.turnCount), "turnsAfter": .int(condensed.turnCount),
+                    "contextSize": .int(details.contextSize), "tokenCount": .int(details.tokenCount),
+                ])
+            Diagnostics.agent.info("condensed \(before.turnCount) -> \(condensed.turnCount) turns")
             return try await operation()
         }
-    }
-
-    /// The default system model, or `AgentError.modelUnavailable` if it cannot serve requests.
-    private static func availableModel() throws -> SystemLanguageModel {
-        let model = SystemLanguageModel.default
-        if case .unavailable(let reason) = model.availability {
-            throw AgentError.modelUnavailable(reason)
-        }
-        return model
     }
 
     /// Sends one user turn and returns the final assistant text.

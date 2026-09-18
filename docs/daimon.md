@@ -15,6 +15,7 @@ One prompt in, one reply out. The prompt is read from stdin when omitted.
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
+| `-m, --model <model>` | `system` (default, on device) or `private-cloud` (Apple Private Cloud Compute; data leaves the Mac, noted on stderr). Defaults to `config.json`. |
 | `-y, --yes` | Approve risky commands without asking. Without it, `respond` refuses commands at or above the approval threshold. |
 
 ```
@@ -34,6 +35,7 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `-r, --resume <name>` | Continue a transcript saved under `~/.daimon/transcripts/<name>.json`. |
 | `--save <name>` | Save the transcript under this name on exit. Defaults to the resumed name. |
 | `--unsafe` | Disable the `run_command` policy and sandbox. |
+| `-m, --model <model>` | As for `respond`. |
 
 | Command | Effect |
 | --- | --- |
@@ -70,7 +72,8 @@ See [logging.md](logging.md) for the event catalogue.
 ### `daimon doctor`
 
 Checks that this install can work and exits non-zero if anything fails: macOS 27 or later, the on-device
-model available, `/usr/bin/sandbox-exec` present, `config.json` parses, `~/.daimon` writable. Run it first
+model available, the configured model available when it is not `system`, `/usr/bin/sandbox-exec` present,
+`config.json` parses, `~/.daimon` writable. Run it first
 when something is wrong. `daimon --version` prints the version.
 
 ### `daimon mcp`
@@ -81,6 +84,7 @@ Serves the Model Context Protocol over stdio until the client closes the pipe. S
 | --- | --- |
 | `-i, --instructions <text>` | Default instructions for `respond` threads that supply none. |
 | `--unsafe` | Disable the `run_command` policy and sandbox for every call. |
+| `-m, --model <model>` | Default model for new threads; callers may override per thread. |
 | `-y, --yes` | Approve risky commands without asking the client's user. |
 
 ## Home directory and configuration
@@ -99,6 +103,7 @@ subcommands only read from it.
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `instructions` | built-in | Default system instructions for new sessions. |
+| `model` | `system` | `system` or `private-cloud`. See [ADR 0013](decisions/0013-model-selection.md). |
 | `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
 | `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |

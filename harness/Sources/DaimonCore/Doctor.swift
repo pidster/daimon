@@ -22,15 +22,29 @@ public struct Doctor: Sendable {
 
     /// Where daimon keeps its state.
     public var home: Home
+    /// The configured model, checked in addition to the system model.
+    public var model: ModelSelection
 
-    /// Creates a doctor for `home`.
-    public init(home: Home) {
+    /// Creates a doctor for `home` and the configured `model`.
+    public init(home: Home, model: ModelSelection = .default) {
         self.home = home
+        self.model = model
     }
 
     /// Runs every check. Never throws: problems are findings.
     public func run() -> [Finding] {
-        [macOSVersion(), modelAvailability(), sandboxExec(), config(), homeWritable()]
+        var findings = [macOSVersion(), modelAvailability(), sandboxExec(), config(), homeWritable()]
+        if model != .system { findings.insert(configuredModel(), at: 2) }
+        return findings
+    }
+
+    private func configuredModel() -> Finding {
+        do {
+            _ = try model.resolve()
+            return Finding(name: "configured model", ok: true, detail: "\(model) available")
+        } catch {
+            return Finding(name: "configured model", ok: false, detail: "\(error)")
+        }
     }
 
     /// True when every finding passed.

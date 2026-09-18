@@ -96,8 +96,9 @@ Seatbelt lets a process re-apply an identical profile but refuses a different on
   to escape one. Tests that assert enforcement skip when nested; `scripts/check` runs the runner suites
   inside an outer sandbox on every commit.
 
-Reads are not restricted; omit the tool (`--tool current_date`, or the MCP `tools` argument) where even
-that is too much.
+Reads are not restricted; omit the tool (`--tool current_date`, or the MCP `respond` `tools` argument)
+where even that is too much. There is no direct MCP `run_command`; other harnesses reach it only through
+the model.
 
 ## Implementation
 

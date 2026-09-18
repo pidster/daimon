@@ -1,7 +1,10 @@
 # daimon as an MCP server
 
 `daimon mcp` speaks the Model Context Protocol over stdio, so other agent harnesses can delegate work to the
-on-device model. It advertises three tools. Stdout is the protocol channel; diagnostics go to stderr. The
+on-device model. It advertises two tools: `respond` and `close_thread`. daimon's own tools (`run_command`,
+`read_file`, `current_date`) are not exposed directly; they are reachable only by asking `respond` to use
+them, so every command runs under the model's policy, sandbox, and approval with the audit trail of a
+turn ([ADR 0006](decisions/0006-mcp-server-over-stdio.md), amended). Stdout is the protocol channel; diagnostics go to stderr. The
 server runs until the client closes stdin.
 
 ## Client configuration
@@ -32,6 +35,7 @@ Run a prompt on the on-device model, with daimon's tools available to it, on a c
 | `thread_id` | string | no | Omit to start a thread (an id is generated). Supply an unused id to name a new thread. Supply a known id to continue it. `[A-Za-z0-9._-]{1,64}`. |
 | `instructions` | string | no | System instructions. Only when a thread starts; an error afterwards. |
 | `tools` | string[] | no | Names of daimon tools to enable. Only when a thread starts. Default: all. |
+| `model` | string | no | `system` (default) or `private-cloud` (data leaves the Mac). Only when a thread starts. |
 
 Result content is the reply text. `structuredContent`:
 
@@ -42,12 +46,6 @@ Result content is the reply text. `structuredContent`:
 `condensed` is true when older turns were dropped to fit the window on this call. Threads live in memory for
 the server's lifetime; the least recently used is evicted beyond `maxThreads` (32). Calls on one thread run
 in order; different threads run concurrently.
-
-### `run_command`
-
-Run a shell command directly, without the model. Same limits, policy, sandbox, and approval as the
-model-facing tool: see [tools/run_command.md](tools/run_command.md). Start the server with `--unsafe` to
-disable policy and sandbox, or `--yes` to skip approval.
 
 ## Approval
 

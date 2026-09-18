@@ -57,15 +57,16 @@ subshell); the server exits on EOF. `docs/mcp.md` has a ready-made example.
 
 ## Architecture in one paragraph
 
-`Agent` wraps one `LanguageModelSession`; the framework runs the tool loop. `ToolRegistry` is the single
+`Agent` wraps one `LanguageModelSession` created by a `ResolvedModel` (`ModelSelection`: `system` or
+`private-cloud`; adapters are unavailable on macOS; ADR 0013); the framework runs the tool loop. `ToolRegistry` is the single
 list of tools the model sees (`current_date`, `run_command`, `read_file`), each wrapped by `AuditedTool`.
 `CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus on-device
 model classifier, ask at `moderate` and above through an `Approver` per entry point), then runs `/bin/sh -c`
 under `sandbox-exec` with a generated profile, bounded output and a timeout. `FileReader` pages files.
 `Home`, `Config`, and `TranscriptStore` are `~/.daimon`. `AuditLog` writes JSON Lines; `Diagnostics` wraps
 unified logging. `ContextPolicy` recovers from context overflow by dropping old turns. `DaimonMCP` exposes
-`respond` (per-`thread_id` conversations held by `ThreadStore`/`ConversationThread` actors), `run_command`,
-and `close_thread`. Details: `docs/design.md`.
+`respond` (per-`thread_id` conversations held by `ThreadStore`/`ConversationThread` actors) and
+`close_thread`; daimon's own tools are reachable only through `respond`. Details: `docs/design.md`.
 
 ## Rules
 
@@ -93,11 +94,15 @@ and `close_thread`. Details: `docs/design.md`.
 
 ## MCP servers (`.mcp.json`)
 
-**Run every git command through daimon** (`mcp__daimon__run_command` with the repository as
-`working_directory`), never through Bash: status, log, diff, add, commit, push. This is deliberate
-dogfooding. Expect an approval dialog for commands that change repository state; choose "Approve for this
-session" for repeated shapes. The pre-commit hook then runs inside daimon's sandbox, which `scripts/check`
-detects (SwiftPM gets `--disable-sandbox`, the nested-sandbox test step is skipped). If daimon is not
+**Run every git command through daimon by prompting `mcp__daimon__respond`**, never through Bash:
+status, log, diff, add, commit, push. There is no direct `run_command` MCP tool by decision; the on-device
+model runs the command with its own `run_command` tool, so each one is classified, sandboxed, approved,
+and audited as a turn. Prompt shape that works: `Use run_command with working directory <repo> to run
+exactly: <command> . Report the exit status and output verbatim, nothing else.` Put commit messages in a
+file and commit with `git commit -q -F <path>` so the command stays short. Use a `thread_id` such as
+`git` and pass `tools: ["run_command"]` so the model has nothing else to reach for. Expect an approval
+dialog for commands that change repository state; choose "Approve for this session" for repeated shapes.
+The pre-commit hook then runs inside daimon's sandbox, which `scripts/check` detects. If daimon is not
 connected, say so and ask the user to run `/mcp` rather than falling back to Bash.
 
 - `daimon`: this repository's own release build, for dogfooding, launched through `scripts/daimon-mcp`.
@@ -106,7 +111,6 @@ connected, say so and ask the user to run `/mcp` rather than falling back to Bas
   `cd harness && swift build -c release` and then restart the harness or run `/mcp`, and offer to run the
   build yourself. The launcher prints the same instructions to stderr. The build is also stale after code
   changes until it is rerun. Use `respond` to delegate small, self-contained tasks to the on-device model
-  (pass back `thread_id` to continue), `run_command` to run something locally, `close_thread` when done.
-  Risky commands need approval through elicitation; if this client lacks it they are refused, and the
-  alternatives are running the command here or starting the server with `--yes`.
+  (pass back `thread_id` to continue) and `close_thread` when done. Commands the model runs need approval
+  through elicitation; if this client lacks it they are refused.
 - `codex`: `codex mcp-server`, the OpenAI Codex CLI; needs `codex` on `PATH`.

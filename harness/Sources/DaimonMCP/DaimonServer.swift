@@ -88,9 +88,6 @@ public struct DaimonServer: Sendable {
             case ToolCatalog.respond.name:
                 let request = try RespondRequest(arguments: params.arguments)
                 result = await respond(request)
-            case ToolCatalog.runCommand.name:
-                let request = try RunCommandRequest(arguments: params.arguments)
-                result = await runCommand(request)
             case ToolCatalog.closeThread.name:
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
@@ -123,8 +120,9 @@ public struct DaimonServer: Sendable {
         let thread: ConversationThread
         var created = false
         if let id = request.threadID, let existing = await threads.find(id) {
-            guard request.instructions == nil, request.toolNames.isEmpty else {
-                return failure("instructions and tools apply only when a thread is created; \(id) already exists")
+            guard request.instructions == nil, request.toolNames.isEmpty, request.model == nil else {
+                return failure(
+                    "instructions, tools, and model apply only when a thread is created; \(id) already exists")
             }
             thread = existing
         } else {
@@ -142,15 +140,17 @@ public struct DaimonServer: Sendable {
                 tools = selection.tools
             }
             let instructions = request.instructions ?? config.instructions
+            let model = request.model ?? config.model
             do {
                 thread = try await threads.create(id: id) {
-                    try ConversationThread(id: id, instructions: instructions, tools: tools, audit: threadAudit)
+                    try ConversationThread(
+                        id: id, instructions: instructions, tools: tools, model: model, audit: threadAudit)
                 }
                 threadAudit.record(
                     .sessionStart,
                     details: [
                         "entryPoint": "mcp-thread", "instructions": .string(instructions),
-                        "tools": .array(tools.map { .string($0.name) }),
+                        "tools": .array(tools.map { .string($0.name) }), "model": .string(model.description),
                     ])
                 created = true
             } catch {
@@ -181,19 +181,6 @@ public struct DaimonServer: Sendable {
             try await threads.close(request.threadID)
             audit.log(forSession: request.threadID).record(.sessionEnd, details: ["reason": "closed"])
             return success("closed \(request.threadID)")
-        } catch {
-            return failure(String(describing: error))
-        }
-    }
-
-    /// Runs a command with the configured limits, without involving the model.
-    private func runCommand(_ request: RunCommandRequest) async -> CallTool.Result {
-        var runner = CommandRunner(options: config.runner, audit: audit, approval: gate(audit: audit))
-        if let directory = request.workingDirectory {
-            runner.options.workingDirectory = directory
-        }
-        do {
-            return success(try await runner.run(request.command).rendered)
         } catch {
             return failure(String(describing: error))
         }

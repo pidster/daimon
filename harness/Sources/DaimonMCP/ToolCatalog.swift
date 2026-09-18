@@ -1,3 +1,4 @@
+import DaimonCore
 import Foundation
 import MCP
 
@@ -12,7 +13,7 @@ public enum ToolCatalog {
         description:
             "Run a task on this Mac's on-device Apple Foundation Model. The model is small with a context window "
             + "of roughly 4k tokens, so keep prompts short and delegate only self-contained tasks such as "
-            + "summarising a passage, classifying text, or driving a build or test via its run_command tool. "
+            + "summarising a passage, classifying text, or driving a build or test through its own run_command tool. "
             + "Omit thread_id to start a new conversation; the result's structuredContent.thread_id continues it.",
         inputSchema: .object([
             "type": .string("object"),
@@ -38,32 +39,16 @@ public enum ToolCatalog {
                     "description": .string(
                         "Names of daimon tools the model may call. Omit to allow all registered tools."),
                 ]),
+                "model": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Model for a new thread: system (on device, default) or private-cloud (Apple Private Cloud "
+                            + "Compute; data leaves the Mac). Only when a thread starts."),
+                ]),
             ]),
             "required": .array([.string("prompt")]),
         ]),
         annotations: .init(title: "Respond on device", readOnlyHint: false, openWorldHint: false)
-    )
-
-    /// Runs a shell command on this machine without involving the model.
-    public static let runCommand = Tool(
-        name: "run_command",
-        description:
-            "Run a shell command on this Mac with /bin/sh -c and return its exit status and the tail of its output.",
-        inputSchema: .object([
-            "type": .string("object"),
-            "properties": .object([
-                "command": .object([
-                    "type": .string("string"),
-                    "description": .string("POSIX shell command line."),
-                ]),
-                "working_directory": .object([
-                    "type": .string("string"),
-                    "description": .string("Absolute path to run in. Defaults to the server's current directory."),
-                ]),
-            ]),
-            "required": .array([.string("command")]),
-        ]),
-        annotations: .init(title: "Run command", readOnlyHint: false, destructiveHint: true, openWorldHint: false)
     )
 
     /// Ends a conversation thread and frees its model session.
@@ -84,7 +69,7 @@ public enum ToolCatalog {
     )
 
     /// Every tool, in the order clients see them.
-    public static var all: [Tool] { [respond, runCommand, closeThread] }
+    public static var all: [Tool] { [respond, closeThread] }
 }
 
 /// Validates a client-supplied thread id: 1 to 64 characters from `[A-Za-z0-9._-]`.
@@ -107,6 +92,8 @@ public struct RespondRequest: Equatable, Sendable {
     public var toolNames: [String]
     /// Thread to continue or create; nil means start a new thread with a generated id.
     public var threadID: String?
+    /// Model for a new thread; nil means the server default.
+    public var model: ModelSelection?
 
     /// Decodes and validates MCP call arguments.
     ///
@@ -135,6 +122,14 @@ public struct RespondRequest: Equatable, Sendable {
             try validateThreadID(id)
             threadID = id
         }
+        if let raw = arguments?["model"] {
+            guard let text = raw.stringValue else { throw MCPError.invalidParams("'model' must be a string") }
+            do {
+                model = try ModelSelection(parsing: text)
+            } catch {
+                throw MCPError.invalidParams("\(error)")
+            }
+        }
     }
 }
 
@@ -153,30 +148,5 @@ public struct CloseThreadRequest: Equatable, Sendable {
         }
         try validateThreadID(id)
         threadID = id
-    }
-}
-
-/// Decoded arguments for the `run_command` tool.
-public struct RunCommandRequest: Equatable, Sendable {
-    /// POSIX shell command line.
-    public var command: String
-    /// Optional absolute directory to run in.
-    public var workingDirectory: String?
-
-    /// Decodes and validates MCP call arguments.
-    ///
-    /// - Parameter arguments: The raw `tools/call` arguments.
-    /// - Throws: `MCPError.invalidParams` if `command` is missing or a field has the wrong type.
-    public init(arguments: [String: Value]?) throws {
-        guard let command = arguments?["command"]?.stringValue, !command.isEmpty else {
-            throw MCPError.invalidParams("'command' is required and must be a non-empty string")
-        }
-        self.command = command
-        if let raw = arguments?["working_directory"] {
-            guard let path = raw.stringValue else {
-                throw MCPError.invalidParams("'working_directory' must be a string")
-            }
-            workingDirectory = path
-        }
     }
 }

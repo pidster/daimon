@@ -1,3 +1,4 @@
+import DaimonCore
 import MCP
 import Testing
 
@@ -5,7 +6,7 @@ import Testing
 
 @Suite struct ToolCatalogTests {
     @Test func advertisesRespondAndRunCommand() {
-        #expect(ToolCatalog.all.map(\.name) == ["respond", "run_command", "close_thread"])
+        #expect(ToolCatalog.all.map(\.name) == ["respond", "close_thread"])
     }
 
     @Test func everyToolHasAnObjectSchemaWithRequiredFields() {
@@ -59,21 +60,21 @@ import Testing
         }
     }
 
+    @Test func respondRequestModel() throws {
+        #expect(try RespondRequest(arguments: ["prompt": .string("x")]).model == nil)
+        #expect(
+            try RespondRequest(arguments: ["prompt": .string("x"), "model": .string("private-cloud")]).model
+                == .privateCloud)
+        #expect(throws: MCPError.self) {
+            try RespondRequest(arguments: ["prompt": .string("x"), "model": .string("nope")])
+        }
+        #expect(throws: MCPError.self) { try RespondRequest(arguments: ["prompt": .string("x"), "model": .int(1)]) }
+    }
+
     @Test func decodesCloseThreadRequest() throws {
         #expect(try CloseThreadRequest(arguments: ["thread_id": .string("abc")]).threadID == "abc")
         #expect(throws: MCPError.self) { try CloseThreadRequest(arguments: [:]) }
         #expect(throws: MCPError.self) { try CloseThreadRequest(arguments: ["thread_id": .string("a/b")]) }
     }
 
-    @Test func decodesRunCommandRequest() throws {
-        let request = try RunCommandRequest(arguments: [
-            "command": .string("ls"), "working_directory": .string("/tmp"),
-        ])
-        #expect(request.command == "ls")
-        #expect(request.workingDirectory == "/tmp")
-        #expect(throws: MCPError.self) { try RunCommandRequest(arguments: ["command": .string("")]) }
-        #expect(throws: MCPError.self) {
-            try RunCommandRequest(arguments: ["command": .string("ls"), "working_directory": .int(1)])
-        }
-    }
 }

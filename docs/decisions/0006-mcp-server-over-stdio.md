@@ -12,9 +12,11 @@ processing. MCP is the boundary those harnesses already speak.
 
 - `daimon mcp` serves MCP over stdio using the official `modelcontextprotocol/swift-sdk`. No other transport
   for now.
-- Two tools are advertised (`DaimonMCP.ToolCatalog`): `respond`, which runs a prompt on the on-device model
-  with daimon's registered tools available to it, and `run_command`, which runs a shell command directly
-  without the model. Both share `CommandRunner` limits.
+- Tools advertised (`DaimonMCP.ToolCatalog`): `respond`, which runs a prompt on the on-device model with
+  daimon's registered tools available to it, and (ADR 0007) `close_thread`. A direct `run_command` MCP tool
+  existed from this ADR until 2026-09-17 and was removed: daimon's own tools are usable only through the
+  model, so every command carries a turn's audit trail and the harness's value is the loop, not a remote
+  shell.
 - `respond` was initially stateless. Superseded by [ADR 0007](0007-conversation-threads.md): calls continue a
   thread identified by `thread_id`.
 - Argument validation errors are MCP protocol errors (`invalidParams`); execution failures, including an

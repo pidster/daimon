@@ -41,9 +41,15 @@ struct Respond: AsyncParsableCommand {
     @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking (non-interactive).")
     var yes = false
 
+    @Option(
+        name: [.short, .customLong("model")],
+        help: "Model: system (on device) or private-cloud. Defaults to config.json.")
+    var model: String?
+
     mutating func run() async throws {
         let text = try prompt ?? Self.readStdin()
-        let config = try Daimon.loadConfig(unsafe: unsafe)
+        var config = try Daimon.loadConfig(unsafe: unsafe)
+        if let model { config.model = try Daimon.parseModel(model) }
         let audit = try Daimon.openAudit(config: config, entryPoint: "respond", unsafe: unsafe)
         let approver: any Approver =
             yes
@@ -61,10 +67,11 @@ struct Respond: AsyncParsableCommand {
             details: [
                 "entryPoint": "respond", "instructions": .string(instructions),
                 "tools": .array(tools.map { .string($0.name) }),
-                "unsafe": .bool(unsafe),
+                "unsafe": .bool(unsafe), "model": .string(config.model.description),
             ])
         defer { audit.record(.sessionEnd) }
-        let agent = try Agent(instructions: instructions, tools: tools, audit: audit)
+        Daimon.warnIfLeavingDevice(config.model)
+        let agent = try Agent(instructions: instructions, tools: tools, model: config.model, audit: audit)
         if stream {
             try await agent.stream(text) { delta in
                 print(delta, terminator: "")
@@ -112,6 +119,8 @@ extension Daimon {
             throw ValidationError("\(home.configFile.path): \(error)")
         } catch let error as Config.Failure {
             throw ValidationError("\(home.configFile.path): \(error)")
+        } catch let error as ModelSelection.Failure {
+            throw ValidationError("\(home.configFile.path): \(error)")
         }
         if unsafe {
             resolved.runner.policy = .unrestricted
@@ -128,6 +137,25 @@ extension Daimon {
         try home.ensure()
         let sink = try FileAuditSink(url: home.auditFile, limits: config.auditLimits)
         return AuditLog(session: session, sink: sink)
+    }
+
+    /// Parses a `--model` value into a usage error on failure.
+    static func parseModel(_ text: String) throws -> ModelSelection {
+        do {
+            return try ModelSelection(parsing: text)
+        } catch {
+            throw ValidationError("\(error)")
+        }
+    }
+
+    /// Tells the user on stderr when the chosen model sends data off the machine.
+    static func warnIfLeavingDevice(_ model: ModelSelection) {
+        if model.leavesDevice {
+            FileHandle.standardError.write(
+                Data(
+                    "note: model \(model) runs on Apple's Private Cloud Compute; prompts and tool output leave this Mac\n"
+                        .utf8))
+        }
     }
 
     /// Resolves `--tool` names against the registry, or all tools when none are given.
@@ -159,11 +187,23 @@ struct Mcp: AsyncParsableCommand {
     @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking the client's user.")
     var yes = false
 
+    @Option(
+        name: [.short, .customLong("model")],
+        help: "Default model for threads: system (on device) or private-cloud.")
+    var model: String?
+
     func run() async throws {
         var config = try Daimon.loadConfig(unsafe: unsafe)
         if let instructions { config.instructions = instructions }
+        if let model { config.model = try Daimon.parseModel(model) }
+        Daimon.warnIfLeavingDevice(config.model)
         let audit = try Daimon.openAudit(config: config, entryPoint: "mcp", unsafe: unsafe)
-        audit.record(.sessionStart, details: ["entryPoint": "mcp", "unsafe": .bool(unsafe), "autoApprove": .bool(yes)])
+        audit.record(
+            .sessionStart,
+            details: [
+                "entryPoint": "mcp", "unsafe": .bool(unsafe), "autoApprove": .bool(yes),
+                "model": .string(config.model.description),
+            ])
         defer { audit.record(.sessionEnd) }
         try await DaimonServer(config: config, audit: audit, autoApprove: yes).run()
     }
@@ -192,8 +232,14 @@ struct Chat: AsyncParsableCommand {
     @Flag(help: "Disable the run_command policy and sandbox.")
     var unsafe = false
 
+    @Option(
+        name: [.short, .customLong("model")],
+        help: "Model: system (on device) or private-cloud. Defaults to config.json.")
+    var model: String?
+
     mutating func run() async throws {
-        let config = try Daimon.loadConfig(unsafe: unsafe)
+        var config = try Daimon.loadConfig(unsafe: unsafe)
+        if let model { config.model = try Daimon.parseModel(model) }
         try Daimon.home.ensure()
         let store = TranscriptStore(directory: Daimon.home.transcripts)
         let audit = try Daimon.openAudit(config: config, entryPoint: "chat", unsafe: unsafe)
@@ -209,14 +255,16 @@ struct Chat: AsyncParsableCommand {
                 "entryPoint": "chat", "instructions": .string(instructions),
                 "tools": .array(tools.map { .string($0.name) }),
                 "resume": resume.map { .string($0) } ?? .null, "unsafe": .bool(unsafe),
+                "model": .string(config.model.description),
             ])
         defer { audit.record(.sessionEnd) }
+        Daimon.warnIfLeavingDevice(config.model)
         var agent: Agent
         if let resume {
-            agent = try Agent(transcript: try store.load(resume), tools: tools, audit: audit)
+            agent = try Agent(transcript: try store.load(resume), tools: tools, model: config.model, audit: audit)
             Self.note("resumed '\(resume)' (\(agent.transcript.turnCount) turns)")
         } else {
-            agent = try Agent(instructions: instructions, tools: tools, audit: audit)
+            agent = try Agent(instructions: instructions, tools: tools, model: config.model, audit: audit)
         }
         Self.note("audit log: \(Daimon.home.auditFile.path) session \(audit.session)")
         var saveName = save ?? resume
@@ -237,7 +285,7 @@ struct Chat: AsyncParsableCommand {
                 continue
             case .tokens:
                 do {
-                    let tokens = try await agent.contextTokens()
+                    let tokens = try await agent.contextTokens().map(String.init) ?? "unknown"
                     print(
                         "\(tokens) tokens in \(agent.transcript.turnCount) turns; condensed \(agent.condensations) times"
                     )
@@ -355,7 +403,8 @@ struct DoctorCommand: ParsableCommand {
         discussion: "Exits non-zero if any check fails. The first thing to run when something is wrong.")
 
     func run() throws {
-        let findings = Doctor(home: Daimon.home).run()
+        let model = (try? Daimon.loadConfig().model) ?? .default
+        let findings = Doctor(home: Daimon.home, model: model).run()
         print("daimon \(DaimonVersion.current)")
         print(Doctor.render(findings))
         guard Doctor.allPassed(findings) else { throw ExitCode.failure }

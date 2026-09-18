@@ -47,7 +47,7 @@ of the session, or deny with a reason. A denial returns to the model as
 | --- | --- | --- |
 | `daimon respond` | denying, unless `--yes` | Non-interactive: risky commands are refused with a message naming the three ways forward. `--yes` approves everything. |
 | `daimon chat` | terminal | Prints the command, level, and reasons on stderr; reads `y`, `n`, or `a` (always this session). |
-| `daimon mcp` | MCP elicitation, unless `--yes` | Asks the client's user through the protocol: Accept runs, Decline refuses, and a `scope` choice of once (default) or this session. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
+| `daimon mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol: Accept runs, Decline refuses, and a `scope` choice of once (default) or this session. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
 
 ## Configuration
 

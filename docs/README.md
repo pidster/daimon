@@ -12,6 +12,7 @@
 | [logging.md](logging.md) | The audit log (format, kinds, `daimon logs`) and diagnostics (`DAIMON_LOG`, unified logging) |
 | [context-management.md](context-management.md) | The small context window: framework APIs, what daimon does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Investigation of tool policy and sandboxing options (decision pending) |
+| [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
 | [release.md](release.md) | How a release is cut: tag, tarball, GitHub release, Homebrew tap formula |
 | [engineering.md](engineering.md) | Standards, tooling, the pre-commit gate, and CI |
 | [decisions/](decisions/) | Architecture Decision Records, one per significant decision |

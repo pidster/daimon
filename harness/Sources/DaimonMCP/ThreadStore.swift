@@ -15,9 +15,13 @@ public actor ConversationThread {
     /// Creates a thread with its own model session.
     ///
     /// - Throws: `AgentError.modelUnavailable` if the on-device model cannot be used.
-    init(id: String, instructions: String, tools: [any Tool], audit: AuditLog? = nil) throws {
+    init(
+        id: String, instructions: String, tools: [any Tool], model: ModelSelection = .default, audit: AuditLog? = nil
+    )
+        throws
+    {
         self.id = id
-        agent = try Agent(instructions: instructions, tools: tools, audit: audit)
+        agent = try Agent(instructions: instructions, tools: tools, model: model, audit: audit)
     }
 
     /// Sends one user turn on this thread's session.

@@ -2,7 +2,8 @@
 
 **daimon** is a small, on-device AI agent for the Mac. It runs Apple's built-in Foundation Model, the same
 one behind Apple Intelligence and the `fm` command, and gives it tools: it can run shell commands, read
-files, and tell the time, and it can be extended with more. Nothing leaves your machine.
+files, and tell the time, and it can be extended with more. By default nothing leaves your machine; Apple's
+Private Cloud Compute model is available as an explicit opt-in.
 
 It has two faces:
 
@@ -46,7 +47,8 @@ To let another harness use it, register it as an MCP server. For Claude Code, in
 ```
 
 It exposes `respond` (run a task on the on-device model, with daimon's tools; pass back the returned
-`thread_id` to continue a conversation), `run_command`, and `close_thread`.
+`thread_id` to continue a conversation) and `close_thread`. daimon's own tools are used by the model, not
+called directly.
 
 ## Documentation
 

@@ -22,8 +22,8 @@ It has two faces:
 ## Success criteria
 
 1. `daimon "<prompt>"` answers using the on-device model and calls registered tools when they help.
-2. An MCP client can list daimon's tools, run a command, and hold multi-turn conversations with the model on
-   named threads, over stdio.
+2. An MCP client can hold multi-turn conversations with the model on named threads over stdio, with
+   daimon's tools available to the model.
 3. Adding a tool is a single Swift type plus one line in the registry; heavier tools are separate binaries
    (Rust where it suits) that the harness describes to the model.
 4. The CLI feels familiar to an `fm` user: the same flag names where the semantics match.

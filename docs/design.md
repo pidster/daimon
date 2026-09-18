@@ -48,9 +48,15 @@ availability and shapes the API.
 
 ## Components
 
+### `ModelSelection` and `ResolvedModel`
+
+`ModelSelection` names the model (`system` or `private-cloud`); `resolve()` checks
+availability and returns a `ResolvedModel`, which erases the concrete `LanguageModel` behind session
+makers and an optional token counter. See [ADR 0013](decisions/0013-model-selection.md).
+
 ### `Agent`
 
-Owns one `LanguageModelSession` at a time. Construction checks `SystemLanguageModel.default.availability` and
+Owns one `LanguageModelSession` at a time, created by a `ResolvedModel`. Construction checks `SystemLanguageModel.default.availability` and
 throws `AgentError.modelUnavailable(reason)` rather than letting the first request fail obscurely. An agent
 can also start from a saved `Transcript`.
 
@@ -117,8 +123,9 @@ rendered too rather than thrown. See [ADR 0009](decisions/0009-command-policy-an
 
 ### MCP server
 
-`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`). It advertises `respond`, `run_command`, and
-`close_thread` from `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see.
+`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`). It advertises `respond` and `close_thread` from
+`ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; daimon's own tools
+are reachable only through `respond`.
 The request types decode and validate arguments as pure, testable values; see
 [ADR 0006](decisions/0006-mcp-server-over-stdio.md).
 
@@ -129,7 +136,6 @@ concurrently. Results carry `structuredContent.thread_id`; see
 
 ```
 MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools
-                                   ──run_command──▶ CommandRunner
                                    ──close_thread──▶ ThreadStore
 ```
 
