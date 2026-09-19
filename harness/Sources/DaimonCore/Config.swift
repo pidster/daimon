@@ -162,12 +162,5 @@ public struct Config: Codable, Equatable, Sendable {
         public var approvalTimeout: Duration?
         /// How long a persisted approval lasts.
         public var approvalLifetime: Duration
-
-        /// The classifier this configuration calls for.
-        public var classifier: any RiskClassifier {
-            approvalUsesModel
-                ? CompositeRiskClassifier([RuleRiskClassifier.standard, ModelRiskClassifier()])
-                : RuleRiskClassifier.standard
-        }
     }
 }

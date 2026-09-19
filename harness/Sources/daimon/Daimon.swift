@@ -51,12 +51,12 @@ struct Respond: AsyncParsableCommand {
         let session = try Daimon.begin(
             .init(
                 entryPoint: "respond", instructions: instructions, model: try model.map(Daimon.parseModel),
-                toolNames: toolNames, unsafe: unsafe, autoApprove: yes),
+                toolNames: toolNames, unsafe: unsafe, autoApprove: yes))
+        defer { session.end() }
+        let agent = try session.openAgent(
             approver: DenyingApprover(
                 reason: "approval required; re-run with --yes, use daimon chat to be asked, or lower approval.threshold"
             ))
-        defer { session.end() }
-        let agent = try session.openAgent()
         if stream {
             try await agent.stream(text) { delta in
                 print(delta, terminator: "")
@@ -106,15 +106,15 @@ extension Daimon {
     /// The user's home directory for daimon state, honouring `DAIMON_HOME`.
     static let home = Home.resolve()
 
-    /// Sets up a session, turning set-up failures into usage errors and printing the egress note.
-    static func begin(_ request: Session.Request, approver: any Approver) throws -> Session {
+    /// Sets up a session, turning set-up failures into usage errors and printing its notes to stderr.
+    static func begin(_ request: Session.Request) throws -> Session {
         let session: Session
         do {
-            session = try Session.begin(request, home: home, approver: approver)
+            session = try Session.begin(request, home: home)
         } catch let failure as Session.Failure {
             throw ValidationError("\(failure)")
         }
-        if let note = session.egressNote {
+        for note in session.notes {
             FileHandle.standardError.write(Data((note + "\n").utf8))
         }
         return session
@@ -157,8 +157,7 @@ struct Mcp: AsyncParsableCommand {
         let session = try Daimon.begin(
             .init(
                 entryPoint: "mcp", instructions: instructions, model: try model.map(Daimon.parseModel), unsafe: unsafe,
-                autoApprove: yes),
-            approver: DenyingApprover(reason: "unused: the MCP server elicits approval itself"))
+                autoApprove: yes))
         defer { session.end() }
         try await DaimonServer(session: session).run()
     }
@@ -204,16 +203,15 @@ struct Chat: AsyncParsableCommand {
         let session = try Daimon.begin(
             .init(
                 entryPoint: "chat", instructions: instructions, model: try model.map(Daimon.parseModel),
-                toolNames: toolNames, unsafe: unsafe, resume: resume),
-            approver: TerminalApprover())
+                toolNames: toolNames, unsafe: unsafe, resume: resume))
         defer { session.end() }
         try Daimon.home.ensure()
         var agent: Agent
         if let resume {
-            agent = try session.openAgent(transcript: try store.load(resume))
+            agent = try session.openAgent(approver: TerminalApprover(), transcript: try store.load(resume))
             Self.note("resumed '\(resume)' (\(agent.transcript.turnCount) turns)")
         } else {
-            agent = try session.openAgent()
+            agent = try session.openAgent(approver: TerminalApprover())
         }
         Self.note("audit log: \(Daimon.home.auditFile.path) session \(session.audit.session)")
         var saveName = save ?? resume
@@ -228,7 +226,7 @@ struct Chat: AsyncParsableCommand {
             case .help:
                 print(ChatInput.helpText)
             case .tools:
-                for tool in session.tools { print("\(tool.name)\t\(tool.description)") }
+                for tool in agent.tools { print("\(tool.name)\t\(tool.description)") }
             case .tokens:
                 do {
                     let tokens = try await agent.contextTokens().map(String.init) ?? "unknown"

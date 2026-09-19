@@ -16,12 +16,7 @@ func scratchSession(entryPoint: String = "mcp") throws -> Session {
     let root = FileManager.default.temporaryDirectory.appending(path: "daimon-mcp-tests-\(UUID().uuidString)")
     let home = Home(root: root)
     try home.ensure()
-    // Rules only: unit tests never run the on-device classifier (architecture review A1).
-    try Data(#"{"approval": {"useModel": false}}"#.utf8).write(to: home.configFile)
-    return try Session.begin(.init(entryPoint: entryPoint), home: home, approver: DenyingApprover(reason: "test")) {
-        _, _ in
-        MemoryAuditSink()
-    }
+    return try Session.begin(.init(entryPoint: entryPoint), home: home, dependencies: .testing())
 }
 
 @Suite struct DaimonServerTests {
@@ -29,8 +24,8 @@ func scratchSession(entryPoint: String = "mcp") throws -> Session {
     let fakeServer: DaimonServer
 
     init() throws {
-        server = try DaimonServer(session: try scratchSession())
-        fakeServer = try DaimonServer(session: try scratchSession()) { session, id, _, _, _ in
+        server = DaimonServer(session: try scratchSession())
+        fakeServer = DaimonServer(session: try scratchSession()) { session, _, id, _, _, _ in
             (FakeThread(reply: "\(id):"), nil, session.audit.log(forSession: id))
         }
     }
@@ -50,12 +45,12 @@ func scratchSession(entryPoint: String = "mcp") throws -> Session {
         struct Grant: Approver {
             func decide(_ request: ApprovalRequest) async -> ApprovalDecision { .approved(.project) }
         }
-        let session = try scratchSession().with(approver: Grant())
+        let session = try scratchSession()
         // Two threads opened from the same session share one store and one session-approval set.
-        let first = try session.conversation(id: "a").conversation
+        let first = try session.conversation(id: "a", approver: Grant()).conversation
         try await first.gate.clear(command: "touch a", workingDirectory: "/repo")
         #expect(await session.store.find(pattern: "touch *", directory: "/repo")?.source == "mcp")
-        let second = try session.with(approver: DenyingApprover(reason: "must not ask")).conversation(id: "b")
+        let second = try session.conversation(id: "b", approver: DenyingApprover(reason: "must not ask"))
         try await second.conversation.gate.clear(command: "touch b", workingDirectory: "/repo")
     }
 

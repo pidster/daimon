@@ -12,7 +12,8 @@ public final class Agent {
     /// The model every session is created on; kept so sessions can be rebuilt.
     public let model: ResolvedModel
     /// Tools bound to every session, in registration order.
-    private let tools: [any Tool]
+    /// The tools the model may call.
+    public let tools: [any Tool]
     /// The live session. Replaced, never mutated, when the conversation is condensed or reset.
     private var session: LanguageModelSession
 

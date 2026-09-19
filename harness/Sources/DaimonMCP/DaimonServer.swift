@@ -16,7 +16,6 @@ public struct DaimonServer: Sendable {
     /// Server version reported during the MCP handshake; the same single source as `--version`.
     public static let version = DaimonVersion.current
 
-    /// Default instructions, `run_command` limits, and thread capacity.
     /// The session every thread shares: policy, store, session approvals, audit, and the elicitation approver.
     private let session: Session
     /// Live conversations by `thread_id`.
@@ -30,32 +29,34 @@ public struct DaimonServer: Sendable {
     /// Builds a thread for a new `thread_id`: the conversation's thread plus the gate its tools use.
     public typealias ThreadFactory =
         @Sendable (
-            _ session: Session, _ id: String, _ instructions: String?, _ toolNames: [String]?, _ model: ModelSelection?
+            _ session: Session, _ approver: any Approver, _ id: String, _ instructions: String?,
+            _ toolNames: [String]?, _ model: ModelSelection?
         ) throws -> (thread: any RespondingThread, gate: ApprovalGate?, audit: AuditLog)
     private let makeThread: ThreadFactory
+    /// Asks the client's user through elicitation; `--yes` sessions bypass it inside the gate.
+    private let approver: ElicitationApprover
 
-    /// Creates a server over a session begun by the CLI. The session's approver is replaced by MCP
-    /// elicitation unless it was `--yes`; threads are opened through `Session.openConversation`, so
-    /// every face of daimon shares one set-up path.
+    /// Creates a server over a session begun by the CLI. Threads are opened through
+    /// `Session.openConversation` with an elicitation approver, so every face of daimon shares one
+    /// set-up path and differs only in how it asks.
     ///
     /// - Parameters:
     ///   - session: The session from `Session.begin`.
     ///   - makeThread: How threads are built; tests inject a fake that needs no model.
-    /// - Throws: `Session.Failure` if the session's tool selection is invalid.
     public init(
         session: Session,
-        makeThread: @escaping ThreadFactory = { session, id, instructions, toolNames, model in
+        makeThread: @escaping ThreadFactory = { session, approver, id, instructions, toolNames, model in
             let opened = try session.openConversation(
-                id: id, instructions: instructions, toolNames: toolNames, model: model)
+                id: id, approver: approver, instructions: instructions, toolNames: toolNames, model: model)
             return (ConversationThread(id: id, agent: opened.agent), opened.conversation.gate, opened.audit)
         }
-    ) throws {
+    ) {
         server = Server(
             name: Self.name, version: Self.version,
             capabilities: .init(
                 resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false)))
-        self.session = try session.with(
-            approver: ElicitationApprover(server: server, client: client, timeout: session.config.approvalTimeout))
+        self.session = session
+        approver = ElicitationApprover(server: server, client: client, timeout: session.config.approvalTimeout)
         threads = ThreadStore(capacity: session.config.maxThreads)
         self.makeThread = makeThread
     }
@@ -151,7 +152,7 @@ public struct DaimonServer: Sendable {
         do {
             opened = try await threads.findOrCreate(id: id) {
                 let made = try makeThread(
-                    session, id, request.instructions, request.toolNames.isEmpty ? nil : request.toolNames,
+                    session, approver, id, request.instructions, request.toolNames.isEmpty ? nil : request.toolNames,
                     request.model)
                 openedGate = made.gate
                 return made.thread
@@ -171,7 +172,7 @@ public struct DaimonServer: Sendable {
                 details: [
                     "entryPoint": "mcp-thread", "instructions": .string(instructions),
                     "tools": .array(
-                        (request.toolNames.isEmpty ? session.tools.map(\.name) : request.toolNames).map { .string($0) }),
+                        (request.toolNames.isEmpty ? session.toolNames : request.toolNames).map { .string($0) }),
                     "model": .string(model.description),
                 ])
         } else if request.instructions != nil || !request.toolNames.isEmpty || request.model != nil {

@@ -14,7 +14,7 @@ import Testing
 
     private func begin(_ request: Session.Request, home: Home) throws -> (Session, MemoryAuditSink) {
         let sink = MemoryAuditSink()
-        let session = try Session.begin(request, home: home, approver: DenyingApprover(reason: "test")) { _, _ in sink }
+        let session = try Session.begin(request, home: home, dependencies: .testing(sink: sink))
         return (session, sink)
     }
 
@@ -28,8 +28,10 @@ import Testing
         #expect(session.instructions == "override")
         #expect(session.config.model == .privateCloud)
         #expect(session.config.runner.policy == .unrestricted)
-        #expect(session.tools.map(\.name) == ["current_date"])
-        #expect(session.egressNote?.contains("leave this Mac") == true)
+        #expect(session.toolNames == ["current_date"])
+        #expect(session.notes.count == 2)
+        #expect(session.notes.first?.contains("--unsafe") == true)
+        #expect(session.notes.last?.contains("leave this Mac") == true)
         let start = sink.events.first
         #expect(start?.kind == .sessionStart)
         #expect(start?.details["entryPoint"] == "respond")
@@ -49,8 +51,8 @@ import Testing
         #expect(session.instructions == "from file")
         #expect(session.config.model == .system)
         #expect(session.config.runner.policy == .default)
-        #expect(session.tools.map(\.name) == ToolRegistry().all.map(\.name))
-        #expect(session.egressNote == nil)
+        #expect(session.toolNames == ToolRegistry().all.map(\.name))
+        #expect(session.notes.isEmpty)
     }
 
     @Test func rejectsUnknownToolsAndMalformedConfig() throws {
@@ -66,14 +68,30 @@ import Testing
     @Test func disabledAuditRecordsNothing() throws {
         let home = try temporaryHome(config: #"{"audit":{"enabled":false}}"#)
         defer { try? FileManager.default.removeItem(at: home.root) }
-        var sinkBuilt = false
         let session = try Session.begin(
-            .init(entryPoint: "respond"), home: home, approver: DenyingApprover(reason: "x")
-        ) { _, _ in
-            sinkBuilt = true
-            return MemoryAuditSink()
-        }
-        #expect(!sinkBuilt)
+            .init(entryPoint: "respond"), home: home,
+            dependencies: .init(
+                makeClassifier: { _ in RuleRiskClassifier.standard },
+                makeSink: { _, _ in
+                    Issue.record("sink built although the audit log is disabled")
+                    return MemoryAuditSink()
+                }))
         #expect(session.audit.currentTurn == 0)
+    }
+
+    @Test func liveDependenciesFollowTheConfigAndTestingOnesNeverUseTheModel() throws {
+        let live = Session.Dependencies.live
+        #expect(live.makeClassifier(Config().resolved) is CompositeRiskClassifier)
+        #expect(live.makeClassifier(Config(approval: .init(useModel: false)).resolved) is RuleRiskClassifier)
+        #expect(Session.Dependencies.testing().makeClassifier(Config().resolved) is RuleRiskClassifier)
+    }
+
+    @Test func yesReplacesTheFacesApproverWithAutoApproval() async throws {
+        let home = try temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let (session, sink) = try begin(.init(entryPoint: "respond", autoApprove: true), home: home)
+        let gate = try session.conversation(id: "t", approver: DenyingApprover(reason: "must not be asked"))
+        try await gate.conversation.gate.clear(command: "rm -rf build", workingDirectory: home.root.path)
+        #expect(sink.events.last?.details["decision"] == "approved")
     }
 }

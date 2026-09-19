@@ -79,23 +79,31 @@ obscurely. An agent can also start from a saved `Transcript`.
 ### `Session` and `Conversation`
 
 `Session.begin` is the one place an entry point's flags become a running configuration: it loads
-`config.json`, applies `--instructions`, `--model`, and `--unsafe`, opens the audit log and the
-`ApprovalStore`, creates the `SessionApprovals` set, selects `--tool` names, sets up the session's own
-`Conversation`, and records `session.start` with the same fields for `respond`, `chat`, and `mcp`.
+`config.json`, applies `--instructions`, `--model`, and `--unsafe`, checks `--tool` names, opens the
+audit log and the `ApprovalStore`, creates the `SessionApprovals` set and the risk classifier, and
+records `session.start` with the same fields for `respond`, `chat`, and `mcp`. Anything the user should
+see about the set-up (the `--unsafe` warning, the off-device model note) comes back as `notes` for the
+face to print; library code never writes to stderr.
+
+What a session builds from its config is injected through `Session.Dependencies`: `live` makes the
+on-device classifier when `approval.useModel` is set and appends to the audit file; `testing()` is
+rules only with a memory sink. Every unit test passes `testing()`, which is how "tests never need the
+model" holds for sessions as well as for gates.
 
 A `Conversation` is one gate plus the tools wired to it, built by one function for every face of daimon.
-The three faces are overlays on this core:
+The approver is the one thing that differs between faces, so it is given when a conversation is opened,
+not when the session begins; a `--yes` request replaces it with `AutoApprover` inside the core, so the
+flag means the same everywhere. The three faces are overlays on this core:
 
 | Face | How it opens its conversation |
 | --- | --- |
-| `respond` | `session.openAgent()` over the session's own conversation |
-| `chat` | `session.openAgent(transcript:)`, the same conversation, resumable |
-| `mcp` | `session.with(approver:)` swaps in elicitation once the server has a transport (a `--yes` session keeps its `AutoApprover`), then `session.openConversation(id:…)` per `thread_id` with its own audit session, gate, tools, and optional instruction, tool, and model overrides |
+| `respond` | `session.openAgent(approver:)` with a denying approver that explains `--yes` and `chat` |
+| `chat` | `session.openAgent(approver:transcript:)` with the terminal approver, resumable |
+| `mcp` | `session.openConversation(id:approver:…)` per `thread_id` with the elicitation approver, its own audit session, gate, tools, and optional instruction, tool, and model overrides |
 
 Every conversation of a session shares its config, `ApprovalStore`, and `SessionApprovals`, so a
 "this project" answer on one MCP thread is written once and a "this session" answer covers every thread.
-The CLI adds only the approver and the stderr note. Tested with an injected memory sink; the MCP tests
-build real sessions over a scratch home and check that two threads share one store.
+The MCP tests build real sessions over a scratch home and check that two threads share one store.
 
 ### Home, config, transcripts
 
