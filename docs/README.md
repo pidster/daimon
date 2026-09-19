@@ -8,7 +8,7 @@
 | [mcp.md](mcp.md) | daimon as an MCP server: client setup, tools, errors |
 | [design.md](design.md) | Architecture: components, data flow, extension points |
 | [fm-cli.md](fm-cli.md) | What the Apple `fm` command family does and does not offer, as observed |
-| [approval.md](approval.md) | Risk classification (rules + on-device model), approval per entry point, eval results |
+| [approval.md](approval.md) | Risk classification (rules + on-device model), approval scopes and persistence, eval results |
 | [logging.md](logging.md) | The audit log (format, kinds, `daimon logs`) and diagnostics (`DAIMON_LOG`, unified logging) |
 | [context-management.md](context-management.md) | The small context window: framework APIs, what daimon does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |

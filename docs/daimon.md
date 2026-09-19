@@ -47,8 +47,9 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, Ctrl-D | Exit, saving if a name is set. |
 
-When the model wants to run a risky command, chat prints it with the reasons and asks `[y]es / [n]o /
-[a]lways this session` on stderr before continuing.
+When the model wants to run a risky command, chat prints it with the reasons and asks on stderr:
+`y` runs it once, `s` for the session, `p` for this project (30 days, this directory), `a` always (30
+days, any directory), `n` refuses.
 
 Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes cleanly.
 
@@ -79,6 +80,12 @@ model available, the configured model available when it is not `system`, `/usr/b
 `config.json` parses, `~/.daimon` writable. Run it first
 when something is wrong. `daimon --version` prints the version.
 
+### `daimon approvals`
+
+`daimon approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, command.
+`daimon approvals revoke <id>` removes one; `daimon approvals clear` removes all. See
+[approval.md](approval.md).
+
 ### `daimon mcp`
 
 Serves the Model Context Protocol over stdio until the client closes the pipe. See [mcp.md](mcp.md).
@@ -100,6 +107,7 @@ State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes 
 | --- | --- |
 | `config.json` | Optional settings, below. |
 | `transcripts/<name>.json` | Saved conversations. |
+| `approvals.json` | Standing command approvals (`project` and `always` scopes), user-only. |
 | `logs/audit.jsonl` | The audit log, user-only, rotated by size. See [logging.md](logging.md). |
 
 `config.json` fields, all optional:
@@ -113,7 +121,7 @@ State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes 
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
 | `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
 | `audit` | `{ "enabled": true, "maxFileBytes": 10485760, "keepFiles": 5 }` | Audit log switch and rotation. |
-| `approval` | `{ "threshold": "moderate", "useModel": true, "timeoutSeconds": 600 }` | When to ask a human before `run_command`, and how long silence is tolerated before it counts as a refusal (`0` waits forever); see [approval.md](approval.md). |
+| `approval` | `{ "threshold": "moderate", "useModel": true, "timeoutSeconds": 600, "persistDays": 30 }` | When to ask a human before `run_command`, how long silence is tolerated before it counts as a refusal (`0` waits forever), and how long persisted approvals last; see [approval.md](approval.md). |
 
 Environment: `DAIMON_HOME` relocates the directory; `DAIMON_LOG=debug|info|error` mirrors diagnostics to
 stderr.

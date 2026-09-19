@@ -41,9 +41,9 @@ import Testing
     }
 
     @Test(arguments: [
-        (CreateElicitation.Result.Action.accept, ApprovalDecision.approved),
-        (.decline, .denied("declined by the user")),
-        (.cancel, .denied("cancelled by the user")),
+        (CreateElicitation.Result.Action.accept, ApprovalDecision.approved(.once)),
+        (CreateElicitation.Result.Action.decline, ApprovalDecision.denied("declined by the user")),
+        (CreateElicitation.Result.Action.cancel, ApprovalDecision.denied("cancelled by the user")),
     ])
     func mapsTheClientsAnswer(action: CreateElicitation.Result.Action, expected: ApprovalDecision) async throws {
         let pair = try await connectedPair { CreateElicitation.Result(action: action, content: nil) }

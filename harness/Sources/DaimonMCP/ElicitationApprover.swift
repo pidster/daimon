@@ -29,7 +29,8 @@ struct ElicitationApprover: Approver {
         self.timeout = timeout
     }
 
-    /// Sends an elicitation with the command and reasons; accept with `approve: true` runs it.
+    /// Sends an elicitation with the command and reasons. Accept runs it with the chosen scope
+    /// (once by default); Decline, Cancel, or silence refuses.
     func decide(_ request: ApprovalRequest) async -> ApprovalDecision {
         guard client.elicitation.withLock({ $0 }) else {
             return .denied(
@@ -38,14 +39,10 @@ struct ElicitationApprover: Approver {
                     + "elicitation; run the command from the calling harness, or start daimon mcp with --yes to "
                     + "auto-approve, or lower approval.threshold in config.json")
         }
-        // Accept means run; Decline or Cancel means do not. The only field is optional, so a client
-        // that submits an empty form on Accept still approves. Clients render different parts of an
-        // elicitation (title, message, field titles, descriptions), so the command appears in all of them.
+        // Clients render different parts of an elicitation, so the command appears in the title, the
+        // message, and the description, and the scope picker's labels say exactly what each choice keeps.
         let level = request.assessment.level.rawValue
         let reasons = request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n")
-        // No form fields: Accept runs the command once, Decline refuses. A fieldless dialog is the
-        // shape clients render most reliably. The title is short because clients trim it; the full
-        // command leads the description, which renders before the buttons.
         let text = """
             Command:
             \(request.command)
@@ -54,17 +51,33 @@ struct ElicitationApprover: Approver {
             Risk: \(level)
             \(reasons)
 
-            Accept runs it once. Decline refuses.\(timeout.map { " No answer within \($0) counts as Decline." } ?? "")
+            Accept runs it. Decline refuses.\(timeout.map { " No answer within \($0) counts as Decline." } ?? "")
             """
         let schema = Elicitation.RequestSchema(
-            title: "daimon: approve command? (\(level) risk)", description: text, properties: [:], required: [])
+            title: "daimon: approve command? (\(level) risk)",
+            description: text,
+            properties: [
+                "scope": .object([
+                    "type": .string("string"),
+                    "title": .string("Remember this approval"),
+                    "description": .string("How long to keep approving this exact command"),
+                    "enum": .array(ApprovalScope.allCases.map { .string($0.rawValue) }),
+                    "enumNames": .array([
+                        .string("Once"), .string("This session"),
+                        .string("This project (30 days, this directory)"), .string("Always (30 days, any directory)"),
+                    ]),
+                    "default": .string("once"),
+                ])
+            ],
+            required: []
+        )
         let server = server
         do {
             let result = try await withOptionalTimeout(timeout) {
                 try await server.requestElicitation(message: text, requestedSchema: schema)
             }
             switch result.action {
-            case .accept: return .approved
+            case .accept: return .approved(Self.scope(from: result.content?["scope"]))
             case .decline: return .denied("declined by the user")
             case .cancel: return .denied("cancelled by the user")
             }
@@ -75,5 +88,15 @@ struct ElicitationApprover: Approver {
             Diagnostics.mcp.error("elicitation failed: \(error)")
             return .denied("approval request failed: \(error)")
         }
+    }
+
+    /// Reads the optional `scope` field leniently: raw values, labels, or nothing (which means once).
+    static func scope(from value: Value?) -> ApprovalScope {
+        guard let text = value?.stringValue?.lowercased() else { return .once }
+        if let scope = ApprovalScope(rawValue: text) { return scope }
+        if text.hasPrefix("this session") { return .session }
+        if text.hasPrefix("this project") { return .project }
+        if text.hasPrefix("always") { return .always }
+        return .once
     }
 }

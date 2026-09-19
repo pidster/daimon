@@ -49,7 +49,7 @@ sensitive; it is why it is user-only.
 | `error` | `message`, `context` | anywhere |
 | `classifier.verdict` | `command`, `level`, `reasons`, `sources`, `seconds` | `ApprovalGate` |
 | `approval.requested` | `command`, `level` | `ApprovalGate` |
-| `approval.decided` | `command`, `decision` (`approved`, `approvedForSession`, `denied`, `timed-out`, `cached`), `reason` | `ApprovalGate` |
+| `approval.decided` | `command`, `decision` (`approved` with `scope`, `denied`, `timed-out`, `cached` for session, `cached-project`/`cached-always` for persisted), `reason`, `approvalID`, `expiresAt`, `downgradedFrom` when a dangerous command's persisted scope was reduced to session | `ApprovalGate` |
 
 Every tool the model can call is wrapped by `AuditedTool`, so a new tool is audited without doing anything.
 

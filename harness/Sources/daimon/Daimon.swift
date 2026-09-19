@@ -11,7 +11,7 @@ struct Daimon: AsyncParsableCommand {
         commandName: "daimon",
         abstract: "An on-device, tool-using AI microharness over Apple's Foundation Models.",
         version: DaimonVersion.current,
-        subcommands: [Respond.self, Chat.self, Tools.self, Mcp.self, Logs.self, DoctorCommand.self],
+        subcommands: [Respond.self, Chat.self, Tools.self, Mcp.self, Logs.self, DoctorCommand.self, Approvals.self],
         defaultSubcommand: Respond.self
     )
 }
@@ -355,5 +355,58 @@ struct DoctorCommand: ParsableCommand {
         print("daimon \(DaimonVersion.current)")
         print(Doctor.render(findings))
         guard Doctor.allPassed(findings) else { throw ExitCode.failure }
+    }
+}
+
+/// Lists and revokes standing command approvals in ~/.daimon/approvals.json.
+struct Approvals: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Show or revoke standing command approvals.",
+        discussion:
+            "Project and always approvals outlive the process. They are exact command lines, expire, and never cover dangerous commands.",
+        subcommands: [List.self, Revoke.self, Clear.self], defaultSubcommand: List.self)
+
+    /// Prints live approvals, newest first.
+    struct List: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "List standing approvals.")
+
+        func run() async throws {
+            let store = ApprovalStore(url: Daimon.home.approvalsFile)
+            let entries = await store.all
+            if entries.isEmpty {
+                print("no standing approvals")
+                return
+            }
+            for entry in entries {
+                let where_ = entry.workingDirectory ?? "any directory"
+                print(
+                    "\(entry.id)\t\(entry.scope.rawValue)\texpires \(entry.expiresAt.formatted(date: .abbreviated, time: .omitted))\t\(where_)\t\(entry.command)"
+                )
+            }
+        }
+    }
+
+    /// Removes one approval by id.
+    struct Revoke: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Revoke one standing approval by id.")
+
+        @Argument(help: "The id shown by 'daimon approvals'.")
+        var id: String
+
+        func run() async throws {
+            let store = ApprovalStore(url: Daimon.home.approvalsFile)
+            guard try await store.revoke(id: id) else { throw ValidationError("no approval with id \(id)") }
+            print("revoked \(id)")
+        }
+    }
+
+    /// Removes every approval.
+    struct Clear: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Revoke every standing approval.")
+
+        func run() async throws {
+            try await ApprovalStore(url: Daimon.home.approvalsFile).clear()
+            print("cleared")
+        }
     }
 }

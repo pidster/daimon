@@ -30,12 +30,17 @@ public struct Config: Codable, Equatable, Sendable {
         public var useModel: Bool?
         /// Seconds to wait for an approval answer before treating silence as a denial; 0 waits forever.
         public var timeoutSeconds: Int?
+        /// Days a persisted (project or always) approval lasts.
+        public var persistDays: Int?
 
         /// Creates settings; nil fields take defaults.
-        public init(threshold: String? = nil, useModel: Bool? = nil, timeoutSeconds: Int? = nil) {
+        public init(
+            threshold: String? = nil, useModel: Bool? = nil, timeoutSeconds: Int? = nil, persistDays: Int? = nil
+        ) {
             self.threshold = threshold
             self.useModel = useModel
             self.timeoutSeconds = timeoutSeconds
+            self.persistDays = persistDays
         }
     }
 
@@ -116,7 +121,8 @@ public struct Config: Codable, Equatable, Sendable {
             approvalThreshold: approval?.threshold == "never"
                 ? nil : RiskLevel(rawValue: approval?.threshold ?? "") ?? .moderate,
             approvalUsesModel: approval?.useModel ?? true,
-            approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600)
+            approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600),
+            approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600)
         )
     }
 
@@ -154,6 +160,8 @@ public struct Config: Codable, Equatable, Sendable {
         public var approvalUsesModel: Bool
         /// How long an approval request may go unanswered before it counts as a denial; nil waits forever.
         public var approvalTimeout: Duration?
+        /// How long a persisted approval lasts.
+        public var approvalLifetime: Duration
 
         /// The classifier this configuration calls for.
         public var classifier: any RiskClassifier {

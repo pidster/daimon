@@ -19,10 +19,8 @@ public struct ApprovalRequest: Equatable, Sendable {
 
 /// What the approver decided.
 public enum ApprovalDecision: Equatable, Sendable {
-    /// Run it this once.
-    case approved
-    /// Run it, and do not ask again for this exact command in this session.
-    case approvedForSession
+    /// Run it, and remember the approval for `scope`.
+    case approved(ApprovalScope)
     /// Do not run it; the reason is returned to the model.
     case denied(String)
     /// Nobody answered within the wait; treated as a denial, because no answer is not an answer.
@@ -39,8 +37,8 @@ public protocol Approver: Sendable {
 public struct AutoApprover: Approver {
     /// Creates the approver.
     public init() {}
-    /// Always approves.
-    public func decide(_ request: ApprovalRequest) async -> ApprovalDecision { .approved }
+    /// Always approves, once.
+    public func decide(_ request: ApprovalRequest) async -> ApprovalDecision { .approved(.once) }
 }
 
 /// Denies everything with a fixed explanation, for non-interactive entry points.
@@ -69,7 +67,7 @@ public struct TerminalApprover: Approver {
             approval needed (\(request.assessment.level.rawValue)): \(request.command)
               in \(request.workingDirectory)
               \(request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n  "))
-            run it? [y]es / [n]o / [a]lways this session:\u{20}
+            run it? [y]es once / [s]ession / [p]roject (30 days, this directory) / [a]lways (30 days) / [n]o:\u{20}
             """
         FileHandle.standardError.write(Data(text.utf8))
         guard let line = readLine() else { return .denied("no answer (end of input)") }
@@ -79,8 +77,10 @@ public struct TerminalApprover: Approver {
     /// Maps an answer to a decision; anything unrecognised denies.
     public static func parse(_ answer: String) -> ApprovalDecision {
         switch answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "y", "yes": .approved
-        case "a", "always": .approvedForSession
+        case "y", "yes", "once": .approved(.once)
+        case "s", "session": .approved(.session)
+        case "p", "project": .approved(.project)
+        case "a", "always": .approved(.always)
         case "n", "no", "": .denied("declined by the user")
         default: .denied("unrecognised answer '\(answer)'")
         }
@@ -97,6 +97,8 @@ public actor ApprovalGate {
     private let classifier: any RiskClassifier
     private let approver: any Approver
     private let audit: AuditLog?
+    private let store: ApprovalStore?
+    private let source: String
     private var sessionApprovals: Set<String> = []
 
     /// Session approvals are keyed on the exact command line in the exact directory.
@@ -111,11 +113,18 @@ public actor ApprovalGate {
     ///   - approver: Decides when the level is at or above `threshold`.
     ///   - threshold: Ask at this level and above; nil disables asking (still audits verdicts).
     ///   - audit: Where verdicts and decisions are recorded.
-    public init(classifier: any RiskClassifier, approver: any Approver, threshold: RiskLevel?, audit: AuditLog? = nil) {
+    ///   - store: Standing approvals that outlive the process; nil keeps only session approvals.
+    ///   - source: Entry point name recorded on grants.
+    public init(
+        classifier: any RiskClassifier, approver: any Approver, threshold: RiskLevel?, audit: AuditLog? = nil,
+        store: ApprovalStore? = nil, source: String = "unknown"
+    ) {
         self.classifier = classifier
         self.approver = approver
         self.threshold = threshold
         self.audit = audit
+        self.store = store
+        self.source = source
     }
 
     /// Returns normally if reading `path` is acceptable.
@@ -153,16 +162,43 @@ public actor ApprovalGate {
             audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "cached"])
             return
         }
+        if assessment.level < .dangerous,
+            let standing = await store?.find(command: command, directory: workingDirectory)
+        {
+            audit?.record(
+                .approvalDecided,
+                details: [
+                    "command": .string(command), "decision": .string("cached-\(standing.scope.rawValue)"),
+                    "approvalID": .string(standing.id),
+                ])
+            return
+        }
         audit?.record(
             .approvalRequested, details: ["command": .string(command), "level": .string(assessment.level.rawValue)])
         let decision = await approver.decide(
             ApprovalRequest(command: command, workingDirectory: workingDirectory, assessment: assessment))
         switch decision {
-        case .approved:
-            audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "approved"])
-        case .approvedForSession:
-            sessionApprovals.insert(Self.key(command, workingDirectory))
-            audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "approvedForSession"])
+        case .approved(let requested):
+            // A dangerous command is never remembered beyond the session, whatever was chosen.
+            let scope = (requested.isPersistent && assessment.level == .dangerous) ? .session : requested
+            var details: [String: JSONValue] = [
+                "command": .string(command), "decision": "approved", "scope": .string(scope.rawValue),
+            ]
+            if scope != requested { details["downgradedFrom"] = .string(requested.rawValue) }
+            if scope != .once { sessionApprovals.insert(Self.key(command, workingDirectory)) }
+            if scope.isPersistent, let store {
+                do {
+                    let entry = try await store.grant(
+                        command: command, directory: workingDirectory, scope: scope, level: assessment.level,
+                        source: source)
+                    details["approvalID"] = .string(entry.id)
+                    details["expiresAt"] = .string(entry.expiresAt.ISO8601Format())
+                } catch {
+                    details["persistError"] = .string("\(error)")
+                    Diagnostics.policy.error("could not persist approval: \(error)")
+                }
+            }
+            audit?.record(.approvalDecided, details: details)
         case .denied(let reason):
             audit?.record(
                 .approvalDecided,

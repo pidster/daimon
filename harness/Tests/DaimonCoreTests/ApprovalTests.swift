@@ -133,7 +133,7 @@ import Testing
     }
 
     @Test func sessionApprovalIsCachedPerExactCommand() async throws {
-        let approver = Recording(.approvedForSession)
+        let approver = Recording(.approved(.session))
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
             classifier: Fixed(level: .dangerous), approver: approver, threshold: .moderate,
@@ -171,9 +171,11 @@ import Testing
     }
 
     @Test func terminalAnswersParse() {
-        #expect(TerminalApprover.parse("y") == .approved)
-        #expect(TerminalApprover.parse(" Yes ") == .approved)
-        #expect(TerminalApprover.parse("a") == .approvedForSession)
+        #expect(TerminalApprover.parse("y") == .approved(.once))
+        #expect(TerminalApprover.parse(" Yes ") == .approved(.once))
+        #expect(TerminalApprover.parse("a") == .approved(.always))
+        #expect(TerminalApprover.parse("s") == .approved(.session))
+        #expect(TerminalApprover.parse("p") == .approved(.project))
         #expect(TerminalApprover.parse("n") == .denied("declined by the user"))
         #expect(TerminalApprover.parse("") == .denied("declined by the user"))
         #expect(TerminalApprover.parse("maybe") == .denied("unrecognised answer 'maybe'"))

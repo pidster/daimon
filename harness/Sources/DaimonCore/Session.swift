@@ -107,9 +107,10 @@ public struct Session: Sendable {
         let sessionID = String(UUID().uuidString.prefix(8)).lowercased()
         let sink: any AuditSink = config.auditEnabled ? try makeSink(home, config) : NullAuditSink()
         let audit = AuditLog(session: sessionID, sink: sink)
+        let store = ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime)
         let gate = ApprovalGate(
             classifier: config.classifier, approver: request.autoApprove ? AutoApprover() : approver,
-            threshold: config.approvalThreshold, audit: audit)
+            threshold: config.approvalThreshold, audit: audit, store: store, source: request.entryPoint)
         let registry = ToolRegistry(runner: config.runner, audit: audit, approval: gate)
         let tools: [any Tool]
         if request.toolNames.isEmpty {
