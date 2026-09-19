@@ -121,5 +121,5 @@ the model.
 
 ## Implementation
 
-`CommandRunner` in `harness/Sources/DaimonCore/CommandRunner.swift` does the work and is tested by running
+`CommandRunner` in `harness/Sources/DaimonCore/Exec/CommandRunner.swift` does the work and is tested by running
 real commands in `CommandRunnerTests`; `RunCommandTool` is the thin model-facing wrapper.

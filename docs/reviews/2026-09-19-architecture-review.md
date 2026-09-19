@@ -316,30 +316,36 @@ policy pre-pass with the enclosing segment as fallback.
 Ordered by recommended sequence: the two structural fixes first because later items land on them,
 then the mechanical de-duplications. Effort S (under an hour), M (half a day), L (a day or more).
 
-- [ ] A1 Inject the classifier (and sink) through a `Session.Dependencies` value; remove `Config.Resolved.classifier`; make the MCP and session tests rules-only; add a guard against model use in tests (M)
-- [ ] A2 Add a `TurnClock` owned by `Conversation`, shared by gate and audit log; key once-approvals and refusals on it; give `ApprovalGate` its own error type (M)
-- [ ] A5 Move the approver from `Session` to `openAgent`/`conversation`; delete `with(approver:)` and the placeholder `DenyingApprover` in `Mcp` (M)
-- [ ] A3 Store `OpenThread { thread, gate, audit }` in `ThreadStore`; delete `GateRegistry` and the captured `openedGate` (S)
-- [ ] A4 Record thread and `/new` `session.start` events inside `DaimonCore`; align field sets with `logging.md` (S)
-- [ ] A6 Introduce `ToolSelection` and `Threshold` enums end to end (S)
-- [ ] A13 Decode `approval.threshold` once via the `Threshold` enum (S)
-- [ ] A7 Typed detail constructors per `AuditEvent.Kind`, with a test that pins the documented field set (M)
-- [ ] A9 `CommandRunner.run(_:in:)`; drop `Options.workingDirectory` (S)
-- [ ] A11 `Agent` returns `Reply { text, condensed }`; remove the duplicate stream branch (S)
-- [ ] A8 Always wrap tools in `AuditedTool`; descriptions without a runner (S)
-- [ ] A15 Move `limits` and `examplePrompt` onto each tool type (S)
-- [ ] A10 Return session warnings as values; store `Request` on `Session` (S)
-- [ ] A18 Split a command line once and pass the parts to the gate; make `pattern` required on `ApprovalRequest` (S)
-- [ ] A17 One `ToolError.render`; reword the read refusal (S)
-- [ ] A12 `ShortID.make()` (S)
-- [ ] A14 One `SafeName.validate` (S)
-- [ ] A16 `@OptionGroup SessionOptions`; add `--tool` to `mcp`; one usage-error helper (S)
-- [ ] A19 `EntryPoint` enum (S)
-- [ ] A22 Consistent `Failure` naming; keep underlying errors; `--resume` failures as usage errors (S)
-- [ ] A20 Write down the actor-versus-`Mutex` rule in `design.md` (S)
-- [ ] A21 Decide `DaimonCore`'s public surface and trim (M)
-- [ ] A23 Regroup `DaimonCore` sources into folders (S)
+- [x] A1 Inject the classifier (and sink) through a `Session.Dependencies` value; remove `Config.Resolved.classifier`; make the MCP and session tests rules-only; add a guard against model use in tests (M)
+- [x] A2 Add a `TurnClock` owned by `Conversation`, shared by gate and audit log; key once-approvals and refusals on it; give `ApprovalGate` its own error type (M)
+- [x] A5 Move the approver from `Session` to `openAgent`/`conversation`; delete `with(approver:)` and the placeholder `DenyingApprover` in `Mcp` (M)
+- [x] A3 Store `OpenThread { thread, gate, audit }` in `ThreadStore`; delete `GateRegistry` and the captured `openedGate` (S)
+- [x] A4 Record thread and `/new` `session.start` events inside `DaimonCore`; align field sets with `logging.md` (S)
+- [x] A6 Introduce `ToolSelection` and `Threshold` enums end to end (S)
+- [x] A13 Decode `approval.threshold` once via the `Threshold` enum (S)
+- [x] A7 Typed detail constructors per `AuditEvent.Kind`, with a test that pins the documented field set (M)
+- [x] A9 `CommandRunner.run(_:in:)`; drop `Options.workingDirectory` (S)
+- [x] A11 `Agent` returns `Reply { text, condensed }`; remove the duplicate stream branch (S)
+- [x] A8 Always wrap tools in `AuditedTool`; descriptions without a runner (S)
+- [x] A15 Move `limits` and `examplePrompt` onto each tool type (S)
+- [x] A10 Return session warnings as values; store `Request` on `Session` (S)
+- [x] A18 Split a command line once and pass the parts to the gate; make `pattern` required on `ApprovalRequest` (S)
+- [x] A17 One `ToolError.render`; reword the read refusal (S)
+- [x] A12 `ShortID.make()` (S)
+- [x] A14 One `SafeName.validate` (S)
+- [x] A16 `@OptionGroup SessionOptions`; add `--tool` to `mcp`; one usage-error helper (S)
+- [x] A19 `EntryPoint` enum (S)
+- [x] A22 Consistent `Failure` naming; keep underlying errors; `--resume` failures as usage errors (S)
+- [x] A20 Write down the actor-versus-`Mutex` rule in `design.md` (S)
+- [x] A21 Decide `DaimonCore`'s public surface and trim (M)
+- [x] A23 Regroup `DaimonCore` sources into folders (S)
 
 ## Status
 
-Open.
+Closed on 2026-09-19. All 23 items landed in the commits after `543de9d`, one or a few findings per
+commit, in the todo order; each commit message names its findings. Departures from the proposed fixes:
+A17 keeps the two wordings ("command not approved", "read not approved") behind one `ToolOutput.error`
+renderer, with the read refusal typed as `FileReader.Failure.notApproved`; A20 converts nothing, because
+every existing type already fits the rule once it was written down; A21 trims only `ToolOutput`, because
+the survey found the rest of the public surface is either called by `DaimonMCP` or `daimon` or is an
+extension point, and keeps the `DaimonCore` product export.

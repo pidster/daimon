@@ -18,9 +18,17 @@ paths:
 - `LanguageModelSession` is not `Sendable`. `Agent` owns it as a plain `final class` and its async methods
   are `nonisolated(nonsending)`, so an actor (`ConversationThread`) can own an `Agent`. New async APIs on
   types that hold a session follow the same pattern.
+- Actor when operations suspend or a change is a multi-step sequence that must not interleave
+  (`ApprovalGate`, `ApprovalStore`, `ThreadStore`); `final class` with a `Mutex` when every operation is a
+  short synchronous critical section (`TurnClock`, `AuditLog`, `SessionApprovals`). `docs/design.md`
+  "Concurrency" has the rule; follow it rather than choosing per file.
 - Shared mutable state uses `Mutex` from `Synchronization`. `Mutex` is non-copyable: hold it in a
   `final class … : Sendable` with a `let` (see `OutputBuffer`, `ClientCapabilityFlags`), never as a struct
   stored property or a closure capture.
+- `public` only for what `DaimonMCP` or `daimon` calls, an extension-point protocol, or a type a public
+  signature exposes; everything else internal (tests use `@testable import`). Folders in `DaimonCore`
+  group by concern (`Session/`, `Exec/`, `Approval/`, `Audit/`, `Tools/`, `Config/`, `CLI/`, `Support/`);
+  put a new file where its neighbours are.
 - Do not wrap session work in `Task.detached` or an `AsyncThrowingStream` closure; streaming is a delta
   callback on the caller's task (ADR 0003).
 - Foundation formatters (`ISO8601DateFormatter`, `JSONEncoder`) are not `Sendable`; use value-type format

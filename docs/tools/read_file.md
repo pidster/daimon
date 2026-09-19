@@ -45,5 +45,5 @@ CRLF line endings are handled; the returned lines never include `\n` or `\r`.
 
 ## Implementation
 
-`FileReader` and `LineScanner` in `harness/Sources/DaimonCore/FileReader.swift`, tested in `FileReaderTests`
+`FileReader` and `LineScanner` in `harness/Sources/DaimonCore/Tools/FileReader.swift`, tested in `FileReaderTests`
 including chunk-boundary and early-stop cases; `ReadFileTool` is the model-facing wrapper.

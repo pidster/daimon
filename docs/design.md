@@ -32,7 +32,7 @@ availability and shapes the API.
 
 | Target | Kind | Responsibility |
 | --- | --- | --- |
-| `DaimonCore` | library | `Agent`, `ToolRegistry`, `CommandRunner`, tool implementations, typed errors. All model-facing logic lives here. |
+| `DaimonCore` | library | All model-facing logic, grouped by folder: `Session/` (session, conversation, agent, model selection, context policy, tool registry and catalogue), `Exec/` (command runner, policy, splitter, regex cache), `Approval/` (gate, classifiers, store, threshold), `Audit/` (events, details, log, turn clock, diagnostics), `Tools/` (the tools, the file reader, and the audit wrapper), `Config/` (config, home, transcripts), `CLI/` (doctor and chat input, here so they are testable), `Support/` (timeout, ids, names). |
 | `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
 | `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `logs`, `doctor`, `mcp`. Session set-up is `Session.begin` in `DaimonCore`. |
 | `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic. |
@@ -187,6 +187,20 @@ Swift 6 strict concurrency is enabled. `LanguageModelSession` is not `Sendable`,
 `final class` used from one task at a time, and its async methods are `nonisolated(nonsending)` so they run
 in the caller's isolation. That is what lets `ConversationThread` (an actor) own an `Agent`. Do not move
 session work into detached tasks.
+
+Actor or `Mutex` is chosen by one rule. A type is an actor when its operations suspend (awaiting a human,
+the model, or another actor) or when a change is a multi-step sequence that must not interleave, such as
+the approval store's load-mutate-save: `ApprovalGate`, `ApprovalStore`, `ThreadStore`,
+`ConversationThread`. A type is a `final class` holding a `Mutex` when every operation is a short
+synchronous critical section that callers must not have to `await`: `SessionApprovals`, `TurnClock`,
+`AuditLog`, the sinks, `OutputBuffer`, `ClientCapabilityFlags`.
+
+## Visibility
+
+`DaimonCore` is an implementation library for the two executables, not a published API. A declaration is
+`public` when `DaimonMCP` or `daimon` calls it, or when it is an extension point a new component conforms
+to (`DaimonTool`, `Approver`, `RiskClassifier`, `AuditSink`) or a type such a public signature exposes.
+Everything else is internal; tests reach it through `@testable import`.
 
 ## Extension points
 
