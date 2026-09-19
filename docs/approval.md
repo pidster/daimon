@@ -40,14 +40,16 @@ prints every miss with the model's reason, and is the place to add any command t
 
 `ApprovalGate` (one per session) classifies, audits the verdict, and if the level is at or above the
 threshold asks the session's `Approver`. Decisions: approve once, approve this exact command for the rest
-of the session, or deny with a reason. A denial returns to the model as
-`error: command not approved: …` so it can choose another approach.
+of the session, deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
+an answer, so an approver that hears nothing within `approval.timeoutSeconds` (default 120) reports
+`unanswered`, the gate refuses the command and audits the decision as `timed-out`. A denial returns to the
+model as `error: command not approved: …` so it can choose another approach.
 
 | Entry point | Approver | Behaviour |
 | --- | --- | --- |
 | `daimon respond` | denying, unless `--yes` | Non-interactive: risky commands are refused with a message naming the three ways forward. `--yes` approves everything. |
 | `daimon chat` | terminal | Prints the command, level, and reasons on stderr; reads `y`, `n`, or `a` (always this session). |
-| `daimon mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol: Accept runs, Decline refuses, and a `scope` choice of once (default) or this session. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
+| `daimon mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol with a fieldless dialog: Accept runs it once, Decline refuses, silence for `approval.timeoutSeconds` refuses. Session-wide approval is not offered over MCP for now (see the note below). If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
 
 ## Configuration
 
@@ -59,6 +61,12 @@ of the session, or deny with a reason. A denial returns to the model as
 | --- | --- | --- |
 | `threshold` | `moderate` | Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`. |
 | `useModel` | `true` | Run the model classifier alongside the rules. `false` is faster and deterministic. |
+| `timeoutSeconds` | `120` | How long an approval may go unanswered before it counts as declined. |
+
+The MCP dialog deliberately has no form fields. Dogfooding from Claude Code showed its dialog becoming
+unresponsive when the form carried a picker, so the dialog is now only text plus Accept and Decline, the
+shape clients render most reliably. How to offer "approve for this session" over MCP, and how approval
+should reach clients that do not render elicitation at all, is an open design question.
 
 `never` still classifies and audits; it just does not ask.
 

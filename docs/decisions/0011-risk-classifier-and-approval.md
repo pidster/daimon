@@ -20,6 +20,10 @@ catches every dangerous command in a labelled set but under-rates some moderate 
 - Approvers per entry point: denying (non-interactive `respond`, unless `--yes`), terminal (`chat`), MCP
   elicitation (`mcp`, unless `--yes`), with a clear denial when the client lacks elicitation.
 - Every verdict and decision is audited (`classifier.verdict`, `approval.*`).
+- Amended 2026-09-19: an unanswered approval is a denial. Approvers report `unanswered` after
+  `approval.timeoutSeconds` (default 120) and the gate refuses, auditing `timed-out`. The MCP dialog is
+  fieldless (Accept once or Decline) because a form picker made Claude Code's dialog unresponsive; session
+  approval over MCP and approval for clients without elicitation are open questions.
 - A model evaluation suite runs only with `DAIMON_MODEL_TESTS=1` (`scripts/check eval`); it asserts that
   no dangerous command is rated below moderate and reports accuracy.
 

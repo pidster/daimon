@@ -19,11 +19,14 @@ struct ElicitationApprover: Approver {
     let server: Server
     /// What the client advertised during initialize.
     let client: ClientCapabilityFlags
+    /// How long to wait for an answer before treating silence as a denial.
+    let timeout: Duration
 
     /// Creates an approver over `server`; support is learned from the initialize hook.
-    init(server: Server, client: ClientCapabilityFlags) {
+    init(server: Server, client: ClientCapabilityFlags, timeout: Duration) {
         self.server = server
         self.client = client
+        self.timeout = timeout
     }
 
     /// Sends an elicitation with the command and reasons; accept with `approve: true` runs it.
@@ -40,8 +43,9 @@ struct ElicitationApprover: Approver {
         // elicitation (title, message, field titles, descriptions), so the command appears in all of them.
         let level = request.assessment.level.rawValue
         let reasons = request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n")
-        // The title is short because clients trim it; the full command leads the description, which
-        // renders before the options, and the message repeats it for clients that show only that.
+        // No form fields: Accept runs the command once, Decline refuses. A fieldless dialog is the
+        // shape clients render most reliably. The title is short because clients trim it; the full
+        // command leads the description, which renders before the buttons.
         let text = """
             Command:
             \(request.command)
@@ -50,45 +54,26 @@ struct ElicitationApprover: Approver {
             Risk: \(level)
             \(reasons)
 
-            Accept runs it (once, or for this session). Decline refuses.
+            Accept runs it once. Decline refuses. No answer within \(timeout) counts as Decline.
             """
         let schema = Elicitation.RequestSchema(
-            title: "daimon: approve command? (\(level) risk)",
-            description: text,
-            properties: [
-                "scope": .object([
-                    "type": .string("string"),
-                    "title": .string("Approve"),
-                    "description": .string("Once, or for the rest of this session"),
-                    "enum": .array([.string("once"), .string("session")]),
-                    "enumNames": .array([.string("Approve once"), .string("Approve for this session")]),
-                    "default": .string("once"),
-                ])
-            ],
-            required: []
-        )
+            title: "daimon: approve command? (\(level) risk)", description: text, properties: [:], required: [])
+        let server = server
         do {
-            let result = try await server.requestElicitation(message: text, requestedSchema: schema)
-            switch result.action {
-            case .accept:
-                return Self.wantsSession(result.content?["scope"]) ? .approvedForSession : .approved
-            case .decline:
-                return .denied("declined by the user")
-            case .cancel:
-                return .denied("cancelled by the user")
+            let result = try await withTimeout(timeout) {
+                try await server.requestElicitation(message: text, requestedSchema: schema)
             }
+            switch result.action {
+            case .accept: return .approved
+            case .decline: return .denied("declined by the user")
+            case .cancel: return .denied("cancelled by the user")
+            }
+        } catch let timeout as TimeoutError {
+            Diagnostics.mcp.info("approval unanswered: \(timeout)")
+            return .unanswered(timeout.duration)
         } catch {
             Diagnostics.mcp.error("elicitation failed: \(error)")
             return .denied("approval request failed: \(error)")
         }
-    }
-
-    /// Reads the optional `scope` field leniently; anything other than a session choice means once.
-    static func wantsSession(_ value: Value?) -> Bool {
-        if let flag = value?.boolValue { return flag }
-        if let text = value?.stringValue {
-            return ["session", "always", "approve for this session", "true", "yes"].contains(text.lowercased())
-        }
-        return false
     }
 }

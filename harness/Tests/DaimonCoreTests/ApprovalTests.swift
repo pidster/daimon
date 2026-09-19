@@ -103,6 +103,18 @@ import Testing
         #expect(sink.events[2].details["decision"] == "denied")
     }
 
+    @Test func unansweredApprovalIsAuditedAsTimedOutAndDenied() async {
+        let sink = MemoryAuditSink()
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: Recording(.unanswered(.seconds(2))), threshold: .moderate,
+            audit: AuditLog(session: "s", sink: sink))
+        await #expect(throws: CommandRunner.Failure.self) {
+            try await gate.clear(command: "touch x", workingDirectory: "/")
+        }
+        #expect(sink.events.last?.details["decision"] == "timed-out")
+        #expect(sink.events.last?.details["reason"]?.stringValue?.contains("unanswered") == true)
+    }
+
     @Test func sessionApprovalIsCachedPerExactCommand() async throws {
         let approver = Recording(.approvedForSession)
         let sink = MemoryAuditSink()

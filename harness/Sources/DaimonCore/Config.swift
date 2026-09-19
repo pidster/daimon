@@ -28,11 +28,14 @@ public struct Config: Codable, Equatable, Sendable {
         public var threshold: String?
         /// Whether the on-device model classifies alongside the rules.
         public var useModel: Bool?
+        /// Seconds to wait for an approval answer before treating silence as a denial.
+        public var timeoutSeconds: Int?
 
         /// Creates settings; nil fields take defaults.
-        public init(threshold: String? = nil, useModel: Bool? = nil) {
+        public init(threshold: String? = nil, useModel: Bool? = nil, timeoutSeconds: Int? = nil) {
             self.threshold = threshold
             self.useModel = useModel
+            self.timeoutSeconds = timeoutSeconds
         }
     }
 
@@ -113,7 +116,8 @@ public struct Config: Codable, Equatable, Sendable {
                 maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5),
             approvalThreshold: approval?.threshold == "never"
                 ? nil : RiskLevel(rawValue: approval?.threshold ?? "") ?? .moderate,
-            approvalUsesModel: approval?.useModel ?? true
+            approvalUsesModel: approval?.useModel ?? true,
+            approvalTimeout: .seconds(approval?.timeoutSeconds ?? 120)
         )
     }
 
@@ -149,6 +153,8 @@ public struct Config: Codable, Equatable, Sendable {
         public var approvalThreshold: RiskLevel?
         /// Whether the on-device model classifies alongside the rules.
         public var approvalUsesModel: Bool
+        /// How long an approval request may go unanswered before it counts as a denial.
+        public var approvalTimeout: Duration
 
         /// The classifier this configuration calls for.
         public var classifier: any RiskClassifier {

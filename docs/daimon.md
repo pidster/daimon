@@ -109,7 +109,7 @@ subcommands only read from it.
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
 | `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
 | `audit` | `{ "enabled": true, "maxFileBytes": 10485760, "keepFiles": 5 }` | Audit log switch and rotation. |
-| `approval` | `{ "threshold": "moderate", "useModel": true }` | When to ask a human before `run_command`; see [approval.md](approval.md). |
+| `approval` | `{ "threshold": "moderate", "useModel": true, "timeoutSeconds": 120 }` | When to ask a human before `run_command`, and how long silence is tolerated before it counts as a refusal; see [approval.md](approval.md). |
 
 Environment: `DAIMON_HOME` relocates the directory; `DAIMON_LOG=debug|info|error` mirrors diagnostics to
 stderr.

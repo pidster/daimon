@@ -25,6 +25,8 @@ public enum ApprovalDecision: Equatable, Sendable {
     case approvedForSession
     /// Do not run it; the reason is returned to the model.
     case denied(String)
+    /// Nobody answered within the wait; treated as a denial, because no answer is not an answer.
+    case unanswered(Duration)
 }
 
 /// A channel to a human (or a policy standing in for one).
@@ -144,6 +146,12 @@ public actor ApprovalGate {
             audit?.record(
                 .approvalDecided,
                 details: ["command": .string(command), "decision": "denied", "reason": .string(reason)])
+            throw CommandRunner.Failure.disapproved(reason)
+        case .unanswered(let waited):
+            let reason = "no answer within \(waited); an unanswered approval counts as declined"
+            audit?.record(
+                .approvalDecided,
+                details: ["command": .string(command), "decision": "timed-out", "reason": .string(reason)])
             throw CommandRunner.Failure.disapproved(reason)
         }
     }

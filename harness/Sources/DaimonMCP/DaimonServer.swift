@@ -46,7 +46,8 @@ public struct DaimonServer: Sendable {
     /// The approver for this server's connection.
     private var approver: any Approver {
         autoApprove
-            ? AutoApprover() : ElicitationApprover(server: server, client: client)
+            ? AutoApprover()
+            : ElicitationApprover(server: server, client: client, timeout: config.approvalTimeout)
     }
 
     /// A gate for one session (thread or direct call), sharing this server's approver.
