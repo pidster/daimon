@@ -31,6 +31,20 @@ not the differentiator. Items, in order of leverage:
 - **Roots and progress.** Use the client's declared roots as the sandbox's writable root; send progress
   notifications during long commands.
 
+## Models
+
+- **Locally installed models beyond Apple's.** The intent is to select any model installed on the Mac.
+  Probed in the macOS 27.0 SDK on 2026-09-19 (`FoundationModels.swiftinterface`): the framework has no
+  catalogue of installed models. `SystemLanguageModel` is one model with two use cases (`general`,
+  `contentTagging`); `SystemLanguageModel.Adapter` is obsoleted in 27.0 on every platform, so adapter
+  files cannot be loaded; `PrivateCloudComputeLanguageModel` is the only other Apple model. The extension
+  point is the `LanguageModel` and `LanguageModelExecutor` protocols (27.0): daimon can plug a backend
+  into `LanguageModelSession` by implementing an executor over a local runtime (MLX, llama.cpp, Ollama)
+  and naming it as a third `ModelSelection` in `config.json`. Next step is a spike on what the executor
+  protocol requires (tool calling, streaming, token counting) and which runtime to try first; then an ADR
+  amending [ADR 0013](decisions/0013-model-selection.md). Discovery of "what is installed" would be
+  daimon's own (a models directory or the runtime's list), not the framework's.
+
 ## Open design
 
 - Approval for clients that do not render elicitation (mobile). Paused; see
