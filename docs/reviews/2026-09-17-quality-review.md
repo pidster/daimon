@@ -472,5 +472,5 @@ the no-elicitation client; the network test asserts the kernel's "Operation not 
 failure; every default rule and deny pattern is compiled by a test. All medium items are now closed.
 
 2026-09-19, later: D10 through D20, Q4, and Q5 addressed (commit "Close the low-severity correctness
-findings from the review"). Remaining: O3, O4, O5, O7 through O13, T7 through T11, Q2, Q3, Q6, Q7 (doc
-drift, code hygiene, test debt).
+findings from the review"). 2026-09-19, final: O3, O4, O5, O7 through O13, T7 through T11, Q2, Q3, Q6, and Q7 addressed (commit
+"Close the review's drift, hygiene, and test-debt findings"). Every finding in this review is now closed.

@@ -30,12 +30,25 @@ import Testing
         #expect(AuditEvent(session: "s", kind: .sessionEnd).summary.hasSuffix("session.end session=s"))
     }
 
+    @Test func summariesCoverPolicyAndCommandBranches() {
+        let decision = AuditEvent(
+            session: "s", kind: .policyDecision, details: ["verdict": "denied", "command": "rm -rf /"])
+        #expect(decision.summary.hasSuffix("policy.decision session=s: denied rm -rf /"))
+        let outcome = AuditEvent(session: "s", kind: .commandOutcome, details: ["exitStatus": 3, "command": "make"])
+        #expect(outcome.summary.hasSuffix("command.outcome session=s: exit=3 make"))
+        let error = AuditEvent(session: "s", kind: .error, details: ["message": "boom"])
+        #expect(error.summary.hasSuffix("error session=s: boom"))
+        let generic = AuditEvent(session: "s", kind: .mcpRequest, details: ["tool": "respond", "arguments": "{}"])
+        #expect(generic.summary.hasSuffix("mcp.request session=s: arguments={} tool=respond"))
+    }
+
     @Test func jsonValueRoundTrips() throws {
         let value: JSONValue = ["a": [1, 2.5, "x", true, nil], "b": ["c": "d"]]
         let data = try JSONEncoder().encode(value)
         #expect(try JSONDecoder().decode(JSONValue.self, from: data) == value)
         #expect(JSONValue.string("s").stringValue == "s")
         #expect(JSONValue.int(1).stringValue == nil)
+        #expect(JSONValue.int(1).intValue == 1)
     }
 }
 

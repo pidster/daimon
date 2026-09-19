@@ -23,7 +23,18 @@ import Testing
     }
 
     @Test func configResolvesTimeout() {
-        #expect(Config().resolved.approvalTimeout == .seconds(120))
+        #expect(Config().resolved.approvalTimeout == .seconds(600))
         #expect(Config(approval: .init(timeoutSeconds: 5)).resolved.approvalTimeout == .seconds(5))
+        #expect(Config(approval: .init(timeoutSeconds: 0)).resolved.approvalTimeout == nil)
+    }
+
+    @Test func optionalTimeoutRunsUnboundedWhenNil() async throws {
+        #expect(try await withOptionalTimeout(nil) { 7 } == 7)
+        await #expect(throws: TimeoutError.self) {
+            try await withOptionalTimeout(.milliseconds(20)) {
+                try await Task.sleep(for: .seconds(5))
+                return 0
+            }
+        }
     }
 }

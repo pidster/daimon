@@ -20,15 +20,51 @@ public struct Doctor: Sendable {
         }
     }
 
+    /// How the doctor asks about models, so tests can answer without the framework.
+    public struct Probes: Sendable {
+        /// Nil when the system model is available, else the reason it is not.
+        public var systemModel: @Sendable () -> String?
+        /// Nil when the given model resolves, else the failure text.
+        public var configuredModel: @Sendable (ModelSelection) -> String?
+
+        /// Probes that ask the framework.
+        public static let live = Probes(
+            systemModel: {
+                if case .unavailable(let reason) = SystemLanguageModel.default.availability {
+                    return ModelSelection.explain(reason)
+                }
+                return nil
+            },
+            configuredModel: { model in
+                do {
+                    _ = try model.resolve()
+                    return nil
+                } catch {
+                    return "\(error)"
+                }
+            })
+
+        /// Creates probes.
+        public init(
+            systemModel: @escaping @Sendable () -> String?,
+            configuredModel: @escaping @Sendable (ModelSelection) -> String?
+        ) {
+            self.systemModel = systemModel
+            self.configuredModel = configuredModel
+        }
+    }
+
     /// Where daimon keeps its state.
     public var home: Home
     /// The configured model, checked in addition to the system model.
     public var model: ModelSelection
+    private let probes: Probes
 
     /// Creates a doctor for `home` and the configured `model`.
-    public init(home: Home, model: ModelSelection = .default) {
+    public init(home: Home, model: ModelSelection = .default, probes: Probes = .live) {
         self.home = home
         self.model = model
+        self.probes = probes
     }
 
     /// Runs every check. Never throws: problems are findings.
@@ -39,12 +75,10 @@ public struct Doctor: Sendable {
     }
 
     private func configuredModel() -> Finding {
-        do {
-            _ = try model.resolve()
-            return Finding(name: "configured model", ok: true, detail: "\(model) available")
-        } catch {
-            return Finding(name: "configured model", ok: false, detail: "\(error)")
+        if let problem = probes.configuredModel(model) {
+            return Finding(name: "configured model", ok: false, detail: problem)
         }
+        return Finding(name: "configured model", ok: true, detail: "\(model) available")
     }
 
     /// True when every finding passed.
@@ -66,16 +100,10 @@ public struct Doctor: Sendable {
     }
 
     private func modelAvailability() -> Finding {
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            return Finding(name: "model", ok: true, detail: "on-device model available")
-        case .unavailable(let reason):
-            return Finding(
-                name: "model", ok: false,
-                detail:
-                    "unavailable (\(reason)); enable Apple Intelligence in System Settings and wait for the model to download"
-            )
+        if let problem = probes.systemModel() {
+            return Finding(name: "model", ok: false, detail: problem)
         }
+        return Finding(name: "model", ok: true, detail: "on-device model available")
     }
 
     private func sandboxExec() -> Finding {

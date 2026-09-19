@@ -40,12 +40,6 @@ public enum JSONValue: Codable, Equatable, Sendable, ExpressibleByStringLiteral,
         return nil
     }
 
-    /// The boolean, if this is one.
-    public var boolValue: Bool? {
-        if case .bool(let b) = self { return b }
-        return nil
-    }
-
     /// Decodes from any JSON shape.
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

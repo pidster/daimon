@@ -48,30 +48,16 @@ struct Respond: AsyncParsableCommand {
 
     mutating func run() async throws {
         let text = try prompt ?? Self.readStdin()
-        var config = try Daimon.loadConfig(unsafe: unsafe)
-        if let model { config.model = try Daimon.parseModel(model) }
-        let audit = try Daimon.openAudit(config: config, entryPoint: "respond", unsafe: unsafe)
-        let approver: any Approver =
-            yes
-            ? AutoApprover()
-            : DenyingApprover(
+        let session = try Daimon.begin(
+            .init(
+                entryPoint: "respond", instructions: instructions, model: try model.map(Daimon.parseModel),
+                toolNames: toolNames, unsafe: unsafe, autoApprove: yes),
+            approver: DenyingApprover(
                 reason: "approval required; re-run with --yes, use daimon chat to be asked, or lower approval.threshold"
-            )
-        let gate = ApprovalGate(
-            classifier: config.classifier, approver: approver, threshold: config.approvalThreshold, audit: audit)
-        let tools = try Daimon.selectTools(
-            toolNames, from: ToolRegistry(runner: config.runner, audit: audit, approval: gate))
-        let instructions = instructions ?? config.instructions
-        audit.record(
-            .sessionStart,
-            details: [
-                "entryPoint": "respond", "instructions": .string(instructions),
-                "tools": .array(tools.map { .string($0.name) }),
-                "unsafe": .bool(unsafe), "model": .string(config.model.description),
-            ])
-        defer { audit.record(.sessionEnd) }
-        Daimon.warnIfLeavingDevice(config.model)
-        let agent = try Agent(instructions: instructions, tools: tools, model: config.model, audit: audit)
+            ))
+        defer { session.end() }
+        let agent = try Agent(
+            instructions: session.instructions, tools: session.tools, model: session.config.model, audit: session.audit)
         if stream {
             try await agent.stream(text) { delta in
                 print(delta, terminator: "")
@@ -121,36 +107,18 @@ extension Daimon {
     /// The user's home directory for daimon state, honouring `DAIMON_HOME`.
     static let home = Home.resolve()
 
-    /// Reads `config.json` from the home directory, tolerating its absence.
-    /// With `unsafe`, the run_command policy and sandbox are switched off.
-    static func loadConfig(unsafe: Bool = false) throws -> Config.Resolved {
-        var resolved: Config.Resolved
+    /// Sets up a session, turning set-up failures into usage errors and printing the egress note.
+    static func begin(_ request: Session.Request, approver: any Approver) throws -> Session {
+        let session: Session
         do {
-            resolved = try Config.load(from: home.configFile).resolved
-        } catch let error as DecodingError {
-            throw ValidationError("Malformed \(home.configFile.path): \(error)")
-        } catch let error as CommandPolicy.Failure {
-            throw ValidationError("\(home.configFile.path): \(error)")
-        } catch let error as Config.Failure {
-            throw ValidationError("\(home.configFile.path): \(error)")
-        } catch let error as ModelSelection.Failure {
-            throw ValidationError("\(home.configFile.path): \(error)")
+            session = try Session.begin(request, home: home, approver: approver)
+        } catch let failure as Session.Failure {
+            throw ValidationError("\(failure)")
         }
-        if unsafe {
-            resolved.runner.policy = .unrestricted
-            FileHandle.standardError.write(Data("warning: --unsafe: run_command policy and sandbox are off\n".utf8))
+        if let note = session.egressNote {
+            FileHandle.standardError.write(Data((note + "\n").utf8))
         }
-        return resolved
-    }
-
-    /// Opens the audit log for a new session, creating `~/.daimon/logs` if needed.
-    /// Disabled by config yields a log that records nothing.
-    static func openAudit(config: Config.Resolved, entryPoint: String, unsafe: Bool) throws -> AuditLog {
-        let session = String(UUID().uuidString.prefix(8)).lowercased()
-        guard config.auditEnabled else { return .disabled(session: session) }
-        try home.ensure()
-        let sink = try FileAuditSink(url: home.auditFile, limits: config.auditLimits)
-        return AuditLog(session: session, sink: sink)
+        return session
     }
 
     /// Parses a `--model` value into a usage error on failure.
@@ -161,34 +129,14 @@ extension Daimon {
             throw ValidationError("\(error)")
         }
     }
-
-    /// Tells the user on stderr when the chosen model sends data off the machine.
-    static func warnIfLeavingDevice(_ model: ModelSelection) {
-        if model.leavesDevice {
-            FileHandle.standardError.write(
-                Data(
-                    "note: model \(model) runs on Apple's Private Cloud Compute; prompts and tool output leave this Mac\n"
-                        .utf8))
-        }
-    }
-
-    /// Resolves `--tool` names against the registry, or all tools when none are given.
-    static func selectTools(_ names: [String], from registry: ToolRegistry) throws -> [any Tool] {
-        guard !names.isEmpty else { return registry.all }
-        let selection = registry.select(names)
-        guard selection.unknown.isEmpty else {
-            throw ValidationError("Unknown tool(s): \(selection.unknown.joined(separator: ", "))")
-        }
-        return selection.tools
-    }
 }
 
 /// Serves MCP over stdio until the client closes the pipe.
 struct Mcp: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Serve daimon's tools to an MCP client over stdio.",
-        discussion: "Exposes 'respond' (run a task on the on-device model) and 'run_command'. "
-            + "Stdout carries the protocol; diagnostics go to stderr.")
+        discussion: "Exposes 'respond' (run a task on the model, on a named thread) and 'close_thread', and the "
+            + "resources daimon://tools and daimon://tools.md. Stdout carries the protocol; diagnostics go to stderr.")
 
     @Option(
         name: [.short, .customLong("instructions")],
@@ -207,19 +155,13 @@ struct Mcp: AsyncParsableCommand {
     var model: String?
 
     func run() async throws {
-        var config = try Daimon.loadConfig(unsafe: unsafe)
-        if let instructions { config.instructions = instructions }
-        if let model { config.model = try Daimon.parseModel(model) }
-        Daimon.warnIfLeavingDevice(config.model)
-        let audit = try Daimon.openAudit(config: config, entryPoint: "mcp", unsafe: unsafe)
-        audit.record(
-            .sessionStart,
-            details: [
-                "entryPoint": "mcp", "unsafe": .bool(unsafe), "autoApprove": .bool(yes),
-                "model": .string(config.model.description),
-            ])
-        defer { audit.record(.sessionEnd) }
-        try await DaimonServer(config: config, audit: audit, autoApprove: yes).run()
+        let session = try Daimon.begin(
+            .init(
+                entryPoint: "mcp", instructions: instructions, model: try model.map(Daimon.parseModel), unsafe: unsafe,
+                autoApprove: yes),
+            approver: DenyingApprover(reason: "unused: the MCP server elicits approval itself"))
+        defer { session.end() }
+        try await DaimonServer(config: session.config, audit: session.audit, autoApprove: yes).run()
     }
 }
 
@@ -251,52 +193,48 @@ struct Chat: AsyncParsableCommand {
         help: "Model: system (on device) or private-cloud. Defaults to config.json.")
     var model: String?
 
+    @Flag(name: .long, help: "List saved transcripts (for --resume) and exit.")
+    var list = false
+
     mutating func run() async throws {
-        var config = try Daimon.loadConfig(unsafe: unsafe)
-        if let model { config.model = try Daimon.parseModel(model) }
-        try Daimon.home.ensure()
         let store = TranscriptStore(directory: Daimon.home.transcripts)
-        let audit = try Daimon.openAudit(config: config, entryPoint: "chat", unsafe: unsafe)
-        let gate = ApprovalGate(
-            classifier: config.classifier, approver: TerminalApprover(), threshold: config.approvalThreshold,
-            audit: audit)
-        let tools = try Daimon.selectTools(
-            toolNames, from: ToolRegistry(runner: config.runner, audit: audit, approval: gate))
-        let instructions = instructions ?? config.instructions
-        audit.record(
-            .sessionStart,
-            details: [
-                "entryPoint": "chat", "instructions": .string(instructions),
-                "tools": .array(tools.map { .string($0.name) }),
-                "resume": resume.map { .string($0) } ?? .null, "unsafe": .bool(unsafe),
-                "model": .string(config.model.description),
-            ])
-        defer { audit.record(.sessionEnd) }
-        Daimon.warnIfLeavingDevice(config.model)
+        if list {
+            for name in try store.list() { print(name) }
+            return
+        }
+        let session = try Daimon.begin(
+            .init(
+                entryPoint: "chat", instructions: instructions, model: try model.map(Daimon.parseModel),
+                toolNames: toolNames, unsafe: unsafe, resume: resume),
+            approver: TerminalApprover())
+        defer { session.end() }
+        try Daimon.home.ensure()
         var agent: Agent
         if let resume {
-            agent = try Agent(transcript: try store.load(resume), tools: tools, model: config.model, audit: audit)
+            agent = try Agent(
+                transcript: try store.load(resume), tools: session.tools, model: session.config.model,
+                audit: session.audit)
             Self.note("resumed '\(resume)' (\(agent.transcript.turnCount) turns)")
         } else {
-            agent = try Agent(instructions: instructions, tools: tools, model: config.model, audit: audit)
+            agent = try Agent(
+                instructions: session.instructions, tools: session.tools, model: session.config.model,
+                audit: session.audit)
         }
-        Self.note("audit log: \(Daimon.home.auditFile.path) session \(audit.session)")
+        Self.note("audit log: \(Daimon.home.auditFile.path) session \(session.audit.session)")
         var saveName = save ?? resume
         Self.note("daimon chat. /help for commands, /quit or Ctrl-D to exit.")
 
-        while true {
+        loop: while true {
             print("> ", terminator: "")
             fflush(stdout)
-            guard let line = readLine() else { break }
+            guard let line = readLine() else { break loop }
             switch ChatInput(line: line) {
             case .quit:
-                break
+                break loop
             case .help:
                 print(ChatInput.helpText)
-                continue
             case .tools:
-                for tool in tools { print("\(tool.name)\t\(tool.description)") }
-                continue
+                for tool in session.tools { print("\(tool.name)\t\(tool.description)") }
             case .tokens:
                 do {
                     let tokens = try await agent.contextTokens().map(String.init) ?? "unknown"
@@ -306,7 +244,6 @@ struct Chat: AsyncParsableCommand {
                 } catch {
                     Self.note("error: \(error)")
                 }
-                continue
             case .save(let name):
                 guard let name = name ?? saveName else {
                     Self.note("usage: /save <name>")
@@ -319,15 +256,12 @@ struct Chat: AsyncParsableCommand {
                 } catch {
                     Self.note("error: \(error)")
                 }
-                continue
             case .new:
                 agent.reset()
-                audit.record(.sessionStart, details: ["entryPoint": "chat", "reason": "new"])
+                session.audit.record(.sessionStart, details: ["entryPoint": "chat", "reason": "new"])
                 Self.note("new conversation")
-                continue
             case .unknown(let command):
                 Self.note("unknown command /\(command); /help lists commands")
-                continue
             case .message(let text):
                 guard !text.isEmpty else { continue }
                 let before = agent.condensations
@@ -344,9 +278,7 @@ struct Chat: AsyncParsableCommand {
                     print()
                     Self.note("error: \(error)")
                 }
-                continue
             }
-            break
         }
 
         if let saveName {
@@ -358,6 +290,7 @@ struct Chat: AsyncParsableCommand {
     /// Writes a status line to stderr so stdout stays clean for replies.
     private static func note(_ text: String) {
         FileHandle.standardError.write(Data((text + "\n").utf8))
+        Diagnostics.chat.info(text)
     }
 }
 
@@ -391,7 +324,7 @@ struct Logs: ParsableCommand {
             }
             kinds.append(parsed)
         }
-        let config = try Daimon.loadConfig()
+        let config = try Session.loadConfig(home: Daimon.home)
         var files = Array(
             FileAuditSink.rotatedFiles(for: Daimon.home.auditFile, keep: config.auditLimits.keepFiles).reversed())
         files.append(Daimon.home.auditFile)
@@ -417,7 +350,7 @@ struct DoctorCommand: ParsableCommand {
         discussion: "Exits non-zero if any check fails. The first thing to run when something is wrong.")
 
     func run() throws {
-        let model = (try? Daimon.loadConfig().model) ?? .default
+        let model = (try? Session.loadConfig(home: Daimon.home).model) ?? .default
         let findings = Doctor(home: Daimon.home, model: model).run()
         print("daimon \(DaimonVersion.current)")
         print(Doctor.render(findings))

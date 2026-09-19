@@ -35,7 +35,7 @@ sensitive; it is why it is user-only.
 
 | Kind | Details | Written by |
 | --- | --- | --- |
-| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`), `instructions`, `tools`, `model`, `unsafe`, `autoApprove`, `resume`, `reason` (`new`) | CLI, MCP |
+| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`), `instructions`, `tools`, `model`, `unsafe`, `autoApprove`, `resume` (all entry points record the same fields via `Session.begin`), `reason` (`new`) | CLI, MCP |
 | `session.end` | `reason`: `closed` (explicit), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
 | `prompt` | `text` | `Agent` |
 | `response` | `text`, `condensed`, `seconds` | `Agent` |

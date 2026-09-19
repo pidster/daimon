@@ -2,11 +2,17 @@ import DaimonCore
 import Foundation
 import FoundationModels
 
+/// What `DaimonServer.respond` needs from a thread, so tests can substitute one without a model.
+public protocol RespondingThread: Sendable {
+    /// Sends one user turn and returns the reply and whether older turns were dropped to fit.
+    func respond(to prompt: String) async throws -> (text: String, condensed: Bool)
+}
+
 /// One conversation with the on-device model, addressable by id across MCP calls.
 ///
 /// An actor so that calls on the same thread serialise (a session cannot answer
 /// two prompts at once) while different threads run concurrently.
-public actor ConversationThread {
+public actor ConversationThread: RespondingThread {
     /// The identifier clients pass as `thread_id`.
     public nonisolated let id: String
     /// The conversation; isolated to this actor because it is not `Sendable`.
@@ -15,7 +21,7 @@ public actor ConversationThread {
     /// Creates a thread with its own model session.
     ///
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
-    init(
+    public init(
         id: String, instructions: String, tools: [any Tool], model: ModelSelection = .default, audit: AuditLog? = nil
     )
         throws

@@ -3,8 +3,8 @@ import FoundationModels
 
 /// Asks the on-device model to judge a command, with a structured verdict.
 ///
-/// Measured on this project's labelled set: catches every dangerous command,
-/// under-rates some moderate ones as safe, under a second per call. Always
+/// Measured on this project's labelled set (`scripts/check eval`): 44 of 45,
+/// never rating a dangerous command safe, about 1.5 s per call. Always
 /// combine with `RuleRiskClassifier`; never let it lower a level.
 public struct ModelRiskClassifier: RiskClassifier {
     /// The structured verdict the model produces. `reason` comes first on purpose: the model

@@ -19,11 +19,11 @@ struct ElicitationApprover: Approver {
     let server: Server
     /// What the client advertised during initialize.
     let client: ClientCapabilityFlags
-    /// How long to wait for an answer before treating silence as a denial.
-    let timeout: Duration
+    /// How long to wait for an answer before treating silence as a denial; nil waits forever.
+    let timeout: Duration?
 
     /// Creates an approver over `server`; support is learned from the initialize hook.
-    init(server: Server, client: ClientCapabilityFlags, timeout: Duration) {
+    init(server: Server, client: ClientCapabilityFlags, timeout: Duration?) {
         self.server = server
         self.client = client
         self.timeout = timeout
@@ -54,13 +54,13 @@ struct ElicitationApprover: Approver {
             Risk: \(level)
             \(reasons)
 
-            Accept runs it once. Decline refuses. No answer within \(timeout) counts as Decline.
+            Accept runs it once. Decline refuses.\(timeout.map { " No answer within \($0) counts as Decline." } ?? "")
             """
         let schema = Elicitation.RequestSchema(
             title: "daimon: approve command? (\(level) risk)", description: text, properties: [:], required: [])
         let server = server
         do {
-            let result = try await withTimeout(timeout) {
+            let result = try await withOptionalTimeout(timeout) {
                 try await server.requestElicitation(message: text, requestedSchema: schema)
             }
             switch result.action {

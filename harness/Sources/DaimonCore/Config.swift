@@ -28,7 +28,7 @@ public struct Config: Codable, Equatable, Sendable {
         public var threshold: String?
         /// Whether the on-device model classifies alongside the rules.
         public var useModel: Bool?
-        /// Seconds to wait for an approval answer before treating silence as a denial.
+        /// Seconds to wait for an approval answer before treating silence as a denial; 0 waits forever.
         public var timeoutSeconds: Int?
 
         /// Creates settings; nil fields take defaults.
@@ -116,7 +116,7 @@ public struct Config: Codable, Equatable, Sendable {
             approvalThreshold: approval?.threshold == "never"
                 ? nil : RiskLevel(rawValue: approval?.threshold ?? "") ?? .moderate,
             approvalUsesModel: approval?.useModel ?? true,
-            approvalTimeout: .seconds(approval?.timeoutSeconds ?? 120)
+            approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600)
         )
     }
 
@@ -152,8 +152,8 @@ public struct Config: Codable, Equatable, Sendable {
         public var approvalThreshold: RiskLevel?
         /// Whether the on-device model classifies alongside the rules.
         public var approvalUsesModel: Bool
-        /// How long an approval request may go unanswered before it counts as a denial.
-        public var approvalTimeout: Duration
+        /// How long an approval request may go unanswered before it counts as a denial; nil waits forever.
+        public var approvalTimeout: Duration?
 
         /// The classifier this configuration calls for.
         public var classifier: any RiskClassifier {

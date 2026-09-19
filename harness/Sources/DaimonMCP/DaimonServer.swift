@@ -12,13 +12,20 @@ import MCP
 public struct DaimonServer: Sendable {
     /// Server name reported during the MCP handshake.
     public static let name = "daimon"
-    /// Server version reported during the MCP handshake.
-    public static let version = "0.1.0"
+    /// Server version reported during the MCP handshake; the same single source as `--version`.
+    public static let version = DaimonVersion.current
 
     /// Default instructions, `run_command` limits, and thread capacity.
     private let config: Config.Resolved
     /// Live conversations by `thread_id`.
-    private let threads: ThreadStore<ConversationThread>
+    private let threads: ThreadStore<any RespondingThread>
+    /// Builds a thread for a new `thread_id`; the default wraps an `Agent` on the requested model.
+    public typealias ThreadFactory =
+        @Sendable (
+            _ id: String, _ instructions: String, _ tools: [any FoundationModels.Tool], _ model: ModelSelection,
+            _ audit: AuditLog
+        ) throws -> any RespondingThread
+    private let makeThread: ThreadFactory
     /// Audit log for the server session; threads get sibling logs keyed by thread id.
     private let audit: AuditLog
     /// The MCP server; created up front so approvers can reach the client.
@@ -35,8 +42,15 @@ public struct DaimonServer: Sendable {
     ///   - config: Resolved configuration.
     ///   - audit: Where MCP requests and thread activity are recorded; defaults to nothing.
     ///   - autoApprove: Approve risky commands without elicitation.
-    public init(config: Config.Resolved = Config().resolved, audit: AuditLog? = nil, autoApprove: Bool = false) {
+    ///   - makeThread: How threads are built; tests inject a fake that needs no model.
+    public init(
+        config: Config.Resolved = Config().resolved, audit: AuditLog? = nil, autoApprove: Bool = false,
+        makeThread: @escaping ThreadFactory = { id, instructions, tools, model, audit in
+            try ConversationThread(id: id, instructions: instructions, tools: tools, model: model, audit: audit)
+        }
+    ) {
         self.config = config
+        self.makeThread = makeThread
         threads = ThreadStore(capacity: config.maxThreads)
         self.audit = audit ?? .disabled(session: "mcp")
         self.autoApprove = autoApprove
@@ -153,11 +167,10 @@ public struct DaimonServer: Sendable {
         }
         let instructions = request.instructions ?? config.instructions
         let model = request.model ?? config.model
-        let opened: ThreadStore<ConversationThread>.Opened
+        let opened: ThreadStore<any RespondingThread>.Opened
         do {
             opened = try await threads.findOrCreate(id: id) {
-                try ConversationThread(
-                    id: id, instructions: instructions, tools: tools, model: model, audit: threadAudit)
+                try makeThread(id, instructions, tools, model, threadAudit)
             }
         } catch {
             return failure(String(describing: error))

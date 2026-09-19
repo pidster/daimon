@@ -28,22 +28,13 @@ availability and shapes the API.
 | `docs/` | This documentation and the ADRs |
 | `scripts/check` | The quality gate for both toolchains |
 
-## Repository layout
-
-| Path | Contents |
-| --- | --- |
-| `harness/` | Swift package: the `daimon` binary and `DaimonCore` |
-| `tools/` | Cargo workspace: one crate per Rust tool binary |
-| `docs/` | This documentation and the ADRs |
-| `scripts/check` | The quality gate for both toolchains |
-
 ## Targets
 
 | Target | Kind | Responsibility |
 | --- | --- | --- |
 | `DaimonCore` | library | `Agent`, `ToolRegistry`, `CommandRunner`, tool implementations, typed errors. All model-facing logic lives here. |
 | `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
-| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `mcp`, `logs`. |
+| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `logs`, `doctor`, `mcp`. Session set-up is `Session.begin` in `DaimonCore`. |
 | `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic. |
 
 ## Components
@@ -84,6 +75,14 @@ obscurely. An agent can also start from a saved `Transcript`.
 `DaimonServer` record at their boundaries; the CLI records session start and end. `Diagnostics` wraps
 `os.Logger` per category with optional stderr mirroring. See [logging.md](logging.md) and
 [ADR 0010](decisions/0010-audit-and-diagnostic-logging.md).
+
+### `Session`
+
+`Session.begin` is the one place an entry point's flags become a running configuration: it loads
+`config.json`, applies `--instructions`, `--model`, and `--unsafe`, opens the audit log, builds the
+`ApprovalGate` and `ToolRegistry`, selects `--tool` names, and records `session.start` with the same fields
+for `respond`, `chat`, and `mcp`. The CLI adds only the approver and the stderr note. Tested with an
+injected memory sink.
 
 ### Home, config, transcripts
 

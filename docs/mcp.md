@@ -56,7 +56,7 @@ Run a prompt on the on-device model, with daimon's tools available to it, on a c
 | `thread_id` | string | no | Omit to start a thread (an id is generated). Supply an unused id to name a new thread. Supply a known id to continue it. `[A-Za-z0-9._-]{1,64}`. |
 | `instructions` | string | no | System instructions. Only when a thread starts; an error afterwards. |
 | `tools` | string[] | no | Names of daimon tools to enable. Only when a thread starts. Default: all. |
-| `model` | string | no | `system` (default) or `private-cloud` (data leaves the Mac). Only when a thread starts. |
+| `model` | string | no | `system` (default) or `private-cloud` (alias `pcc`; data leaves the Mac). Only when a thread starts. |
 
 Result content is the reply text. `structuredContent`:
 
@@ -75,7 +75,8 @@ Risky commands (by default `moderate` and above) need approval. If the client ad
 initialize, daimon asks the client's user through the protocol. The command, directory, risk level, and
 reasons appear in the title, the message, and the field descriptions, because clients render different
 parts; the full command leads the description so it is never trimmed. **Accept runs the command once;
-Decline or Cancel refuses it; no answer within `approval.timeoutSeconds` (default 120) refuses it.** The
+Decline or Cancel refuses it; no answer within `approval.timeoutSeconds` (default 600; `0` waits forever)
+refuses it.** The
 dialog has no form fields, because a picker made Claude Code's dialog unresponsive. Otherwise the call
 returns
 `command not approved: … this client does not support elicitation …` with `isError: true`, and the calling

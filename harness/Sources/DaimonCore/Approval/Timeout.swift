@@ -34,3 +34,11 @@ public func withTimeout<T: Sendable>(
         return first
     }
 }
+
+/// `withTimeout` when `duration` is set; runs `operation` unbounded when it is nil.
+public func withOptionalTimeout<T: Sendable>(
+    _ duration: Duration?, _ operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    guard let duration else { return try await operation() }
+    return try await withTimeout(duration, operation)
+}

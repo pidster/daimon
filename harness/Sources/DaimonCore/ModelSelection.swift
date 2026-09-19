@@ -14,7 +14,7 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
     /// The default.
     public static let `default` = ModelSelection.system
 
-    /// Parses `system` or `private-cloud`.
+    /// Parses `system` or `private-cloud` (`pcc` is accepted as a short alias).
     ///
     /// - Throws: `Failure.unknownModel` for anything else.
     public init(parsing text: String) throws {
@@ -65,9 +65,32 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
         /// Human-readable explanation.
         public var description: String {
             switch self {
-            case .unknownModel(let text): "unknown model '\(text)': use system or private-cloud"
+            case .unknownModel(let text): "unknown model '\(text)': use system or private-cloud (alias pcc)"
             case .unavailable(let model, let reason): "model '\(model)' is unavailable: \(reason)"
             }
+        }
+    }
+
+    /// A sentence a user can act on for a system-model unavailability reason.
+    public static func explain(_ reason: SystemLanguageModel.Availability.UnavailableReason) -> String {
+        switch reason {
+        case .appleIntelligenceNotEnabled:
+            "Apple Intelligence is not enabled; turn it on in System Settings and wait for the model to download"
+        case .modelNotReady:
+            "the model is still downloading or preparing; try again in a few minutes"
+        case .deviceNotEligible:
+            "this Mac cannot run the on-device model (Apple silicon is required)"
+        @unknown default:
+            "unavailable (\(reason))"
+        }
+    }
+
+    /// A sentence for a Private Cloud Compute unavailability reason.
+    public static func explain(_ reason: PrivateCloudComputeLanguageModel.Availability.UnavailableReason) -> String {
+        switch reason {
+        case .deviceNotEligible: "this Mac is not eligible for Private Cloud Compute"
+        case .systemNotReady: "Private Cloud Compute is not ready; try again later"
+        @unknown default: "unavailable (\(reason))"
         }
     }
 
@@ -79,13 +102,13 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
         case .system:
             let model = SystemLanguageModel.default
             if case .unavailable(let reason) = model.availability {
-                throw Failure.unavailable(model: description, reason: "\(reason)")
+                throw Failure.unavailable(model: description, reason: Self.explain(reason))
             }
             return ResolvedModel(selection: self, system: model)
         case .privateCloud:
             let model = PrivateCloudComputeLanguageModel()
             if case .unavailable(let reason) = model.availability {
-                throw Failure.unavailable(model: description, reason: "\(reason)")
+                throw Failure.unavailable(model: description, reason: Self.explain(reason))
             }
             return ResolvedModel(selection: self, privateCloud: model)
         }

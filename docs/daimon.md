@@ -1,7 +1,7 @@
 # daimon command reference
 
-`daimon` runs Apple's on-device Foundation Model with tools. It has four subcommands; `respond` is the
-default, so `daimon "<prompt>"` works.
+`daimon` runs Apple's on-device Foundation Model with tools. It has six subcommands (`respond`, `chat`,
+`tools`, `logs`, `doctor`, `mcp`); `respond` is the default, so `daimon "<prompt>"` works.
 
 ## Subcommands
 
@@ -15,7 +15,7 @@ One prompt in, one reply out. The prompt is read from stdin when omitted.
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
-| `-m, --model <model>` | `system` (default, on device) or `private-cloud` (Apple Private Cloud Compute; data leaves the Mac, noted on stderr). Defaults to `config.json`. |
+| `-m, --model <model>` | `system` (default, on device) or `private-cloud` (alias `pcc`; Apple Private Cloud Compute; data leaves the Mac, noted on stderr). Defaults to `config.json`. |
 | `-y, --yes` | Approve risky commands without asking. Without it, `respond` refuses commands at or above the approval threshold. |
 
 ```
@@ -34,6 +34,7 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `--tool <name>` (repeatable) | As for `respond`. |
 | `-r, --resume <name>` | Continue a transcript saved under `~/.daimon/transcripts/<name>.json`. |
 | `--save <name>` | Save the transcript under this name on exit. Defaults to the resumed name. |
+| `--list` | Print the names of saved transcripts and exit. |
 | `--unsafe` | Disable the `run_command` policy and sandbox. |
 | `-m, --model <model>` | As for `respond`. |
 
@@ -112,7 +113,7 @@ State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes 
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
 | `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
 | `audit` | `{ "enabled": true, "maxFileBytes": 10485760, "keepFiles": 5 }` | Audit log switch and rotation. |
-| `approval` | `{ "threshold": "moderate", "useModel": true, "timeoutSeconds": 120 }` | When to ask a human before `run_command`, and how long silence is tolerated before it counts as a refusal; see [approval.md](approval.md). |
+| `approval` | `{ "threshold": "moderate", "useModel": true, "timeoutSeconds": 600 }` | When to ask a human before `run_command`, and how long silence is tolerated before it counts as a refusal (`0` waits forever); see [approval.md](approval.md). |
 
 Environment: `DAIMON_HOME` relocates the directory; `DAIMON_LOG=debug|info|error` mirrors diagnostics to
 stderr.

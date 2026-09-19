@@ -45,8 +45,10 @@ threshold asks the session's `Approver`. `read_file` uses the same gate over the
 with the rule classifier only, so credential paths ask and ordinary reads cost no model call. Session
 approvals are keyed on the exact command line in the exact working directory. Decisions: approve once, approve this exact command for the rest
 of the session, deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
-an answer, so an approver that hears nothing within `approval.timeoutSeconds` (default 120) reports
-`unanswered`, the gate refuses the command and audits the decision as `timed-out`. A denial returns to the
+an answer, so an approver that hears nothing within `approval.timeoutSeconds` (default 600, ten minutes)
+reports `unanswered`, the gate refuses the command and audits the decision as `timed-out`. Set it to `0`
+to wait indefinitely; that trades the safe default for never losing an action to a slow answer, and is the
+owner's call. A denial returns to the
 model as `error: command not approved: …` so it can choose another approach.
 
 | Entry point | Approver | Behaviour |
@@ -65,7 +67,7 @@ model as `error: command not approved: …` so it can choose another approach.
 | --- | --- | --- |
 | `threshold` | `moderate` | Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`. |
 | `useModel` | `true` | Run the model classifier alongside the rules. `false` is faster and deterministic. |
-| `timeoutSeconds` | `120` | How long an approval may go unanswered before it counts as declined. |
+| `timeoutSeconds` | `600` | How long an approval may go unanswered before it counts as declined; `0` waits forever. |
 
 The MCP dialog deliberately has no form fields. Dogfooding from Claude Code showed its dialog becoming
 unresponsive when the form carried a picker, so the dialog is now only text plus Accept and Decline, the
