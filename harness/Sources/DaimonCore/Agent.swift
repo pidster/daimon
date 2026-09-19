@@ -23,6 +23,8 @@ public final class Agent {
     public private(set) var condensations = 0
     /// Where turns, responses, condensations, and errors are recorded.
     public let audit: AuditLog?
+    /// The conversation's turn counter, advanced once per prompt; the approval gate reads it.
+    public let turns: TurnClock
 
     /// Creates an agent on a model.
     ///
@@ -32,15 +34,17 @@ public final class Agent {
     ///   - model: Which model; defaults to the on-device system model.
     ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
     ///   - audit: Where to record turns; nil records nothing.
+    ///   - turns: The conversation's clock; defaults to the audit log's, or a fresh one.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public init(
         instructions: String, tools: [any Tool], model: ModelSelection = .default,
-        contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
+        contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil, turns: TurnClock? = nil
     ) throws {
         self.model = try model.resolve()
         self.tools = tools
         self.contextPolicy = contextPolicy
         self.audit = audit
+        self.turns = turns ?? audit?.turns ?? TurnClock()
         session = self.model.session(tools: tools, instructions: instructions)
     }
 
@@ -52,15 +56,17 @@ public final class Agent {
     ///   - model: Which model; defaults to the on-device system model.
     ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
     ///   - audit: Where to record turns; nil records nothing.
+    ///   - turns: The conversation's clock; defaults to the audit log's, or a fresh one.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public init(
         transcript: Transcript, tools: [any Tool], model: ModelSelection = .default,
-        contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil
+        contextPolicy: ContextPolicy = .default, audit: AuditLog? = nil, turns: TurnClock? = nil
     ) throws {
         self.model = try model.resolve()
         self.tools = tools
         self.contextPolicy = contextPolicy
         self.audit = audit
+        self.turns = turns ?? audit?.turns ?? TurnClock()
         session = self.model.session(tools: tools, transcript: transcript)
     }
 
@@ -134,7 +140,7 @@ public final class Agent {
     nonisolated(nonsending) private func turn(
         _ prompt: String, _ operation: () async throws -> String
     ) async throws -> String {
-        audit?.beginTurn()
+        turns.advance()
         audit?.record(.prompt, details: ["text": .string(prompt)])
         let started = Date()
         let before = condensations

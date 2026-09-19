@@ -147,13 +147,11 @@ public struct CommandRunner: Sendable {
         }
         do {
             try await approval?.clear(command: command, workingDirectory: workingDirectory)
-        } catch let failure as Failure {
-            if case .disapproved(let reason) = failure {
-                decision["verdict"] = "disapproved"
-                decision["reason"] = .string(reason)
-                audit?.record(.policyDecision, details: decision)
-            }
-            throw failure
+        } catch ApprovalGate.Failure.refused(let reason) {
+            decision["verdict"] = "disapproved"
+            decision["reason"] = .string(reason)
+            audit?.record(.policyDecision, details: decision)
+            throw Failure.disapproved(reason)
         }
         decision["verdict"] = "allowed"
         audit?.record(.policyDecision, details: decision)

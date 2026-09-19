@@ -54,6 +54,8 @@ public struct ReadFileTool: Tool {
                 path: arguments.path, offset: arguments.offset ?? 1, limit: arguments.limit ?? defaultLimit
             )
             .rendered
+        } catch ApprovalGate.Failure.refused(let reason) {
+            return "error: read not approved: \(reason)"
         } catch {
             return "error: \(error)"
         }

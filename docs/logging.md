@@ -69,7 +69,7 @@ A session's events group on `session`; a tool call and its result share `call`. 
 
 ### In code
 
-`AuditLog` records events for one session and numbers turns; `AuditSink` is where they go
+`AuditLog` records events for one session and stamps turn numbers from the conversation's `TurnClock`; `AuditSink` is where they go
 (`FileAuditSink`, `MemoryAuditSink` for tests, `NullAuditSink` when disabled). Sibling logs for other
 sessions share a sink via `log(forSession:)`. Events are `AuditEvent` values; add a `Kind` and document it
 here. Tests assert on `MemoryAuditSink.events`.

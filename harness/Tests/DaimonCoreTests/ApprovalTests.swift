@@ -113,7 +113,7 @@ import Testing
         let gate = ApprovalGate(
             classifier: Fixed(level: .moderate), approver: Recording(.denied("nope")), threshold: .moderate,
             audit: AuditLog(session: "s", sink: sink))
-        await #expect(throws: CommandRunner.Failure.disapproved("nope")) {
+        await #expect(throws: ApprovalGate.Failure.refused("nope")) {
             try await gate.clear(command: "touch x", workingDirectory: "/")
         }
         #expect(sink.events.map(\.kind) == [.classifierVerdict, .approvalRequested, .approvalDecided])
@@ -125,7 +125,7 @@ import Testing
         let gate = ApprovalGate(
             classifier: Fixed(level: .moderate), approver: Recording(.unanswered(.seconds(2))), threshold: .moderate,
             audit: AuditLog(session: "s", sink: sink))
-        await #expect(throws: CommandRunner.Failure.self) {
+        await #expect(throws: ApprovalGate.Failure.self) {
             try await gate.clear(command: "touch x", workingDirectory: "/")
         }
         #expect(sink.events.last?.details["decision"] == "timed-out")

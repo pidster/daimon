@@ -40,7 +40,7 @@ prints every miss with the model's reason, and is the place to add any command t
 
 ## The gate
 
-`ApprovalGate` (one per session) classifies, audits the verdict, and if the level is at or above the
+`ApprovalGate` (one per conversation) classifies, audits the verdict, and if the level is at or above the
 threshold asks the session's `Approver`. `read_file` uses the same gate over the equivalent `cat <path>`
 with the rule classifier only, so credential paths ask and ordinary reads cost no model call.
 
@@ -86,7 +86,12 @@ an answer, so the MCP approver that hears nothing within `approval.timeoutSecond
 minutes) reports `unanswered`, the gate refuses the command and audits the decision as `timed-out`. Set it
 to `0` to wait indefinitely. The terminal prompt in `chat` has no timeout: a person is at the keyboard,
 and end of input counts as a refusal. A denial returns to the
-model as `error: command not approved: …` so it can choose another approach.
+model as `error: command not approved: …` (or `error: read not approved: …` from `read_file`) so it can
+choose another approach. The gate itself throws `ApprovalGate.Failure.refused`; each tool renders it.
+
+"This turn" is defined by the conversation's `TurnClock`, which the agent advances once per prompt and
+the gate and the audit log both read, so a once-approval covers the rest of the tool loop whether or
+not an audit log is attached, and the refusals `respond` reports are those of the turn just run.
 
 | Entry point | Approver | Behaviour |
 | --- | --- | --- |

@@ -62,7 +62,7 @@ obscurely. An agent can also start from a saved `Transcript`.
 
 ### Risk classification and approval
 
-`ApprovalGate` (an actor, one per session) runs a `RiskClassifier` (`CompositeRiskClassifier` over
+`ApprovalGate` (an actor, one per conversation) runs a `RiskClassifier` (`CompositeRiskClassifier` over
 `RuleRiskClassifier` and `ModelRiskClassifier`) and, at or above the configured threshold, asks an
 `Approver` (`TerminalApprover`, `DenyingApprover`, `AutoApprover`, or the MCP `ElicitationApprover`).
 `CommandRunner` consults the gate after the policy check. See [approval.md](approval.md) and

@@ -90,7 +90,7 @@ import Testing
         try await second.clear(command: "swift test", workingDirectory: "/repo")
         #expect(sink.events.last?.details["decision"] == "cached-project")
         // A different directory asks again.
-        await #expect(throws: CommandRunner.Failure.self) {
+        await #expect(throws: ApprovalGate.Failure.self) {
             try await second.clear(command: "swift test", workingDirectory: "/other")
         }
         #expect(approver.asked.events.count == 1)
@@ -149,10 +149,10 @@ import Testing
         #expect(recorder.seen.events.map { $0.details["command"]?.stringValue } == ["touch a", "wc -l"])
         #expect(recorder.seen.events.first?.details["pattern"] == "touch *")
         #expect(recorder.seen.events.first?.details["line"] == "ls && touch a | wc -l")
-        await #expect(throws: CommandRunner.Failure.disapproved("rm -r x: no")) {
+        await #expect(throws: ApprovalGate.Failure.refused("rm -r x: no")) {
             try await gate.clear(command: "ls; rm -r x; echo after", workingDirectory: "/")
         }
-        await #expect(throws: CommandRunner.Failure.disapproved("no")) {
+        await #expect(throws: ApprovalGate.Failure.refused("no")) {
             try await gate.clear(command: "rm -r x", workingDirectory: "/")
         }
     }
@@ -173,10 +173,22 @@ import Testing
     @Test func refusalsAreReportedAndCleared() async throws {
         let gate = ApprovalGate(
             classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .moderate)
-        await #expect(throws: CommandRunner.Failure.self) {
+        await #expect(throws: ApprovalGate.Failure.self) {
             try await gate.clear(command: "touch a", workingDirectory: "/")
         }
         #expect(await gate.takeRefusals() == [Refusal(command: "touch a", reason: "no")])
+        #expect(await gate.takeRefusals().isEmpty)
+    }
+
+    @Test func refusalsBelongToTheTurnTheyHappenedIn() async throws {
+        let turns = TurnClock()
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .moderate, turns: turns)
+        turns.advance()
+        await #expect(throws: ApprovalGate.Failure.self) {
+            try await gate.clear(command: "touch a", workingDirectory: "/")
+        }
+        turns.advance()
         #expect(await gate.takeRefusals().isEmpty)
     }
 
@@ -197,10 +209,16 @@ import Testing
         #expect(approver.asked.events.count == 2)
     }
 
-    @Test func onceWithoutAnAuditLogIsPerCall() async throws {
+    @Test func onceFollowsTheClockWithoutAnAuditLog() async throws {
         let approver = Answering(.approved(.once))
-        let gate = ApprovalGate(classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate)
+        let turns = TurnClock()
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate, turns: turns)
+        turns.advance()
         try await gate.clear(command: "touch x", workingDirectory: "/")
+        try await gate.clear(command: "touch x", workingDirectory: "/")
+        #expect(approver.asked.events.count == 1)
+        turns.advance()
         try await gate.clear(command: "touch x", workingDirectory: "/")
         #expect(approver.asked.events.count == 2)
     }

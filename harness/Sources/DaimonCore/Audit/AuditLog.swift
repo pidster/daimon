@@ -11,16 +11,23 @@ public protocol AuditSink: Sendable {
 /// Records audit events for one session.
 ///
 /// Cheap to create: several logs (one per MCP thread, say) can share a sink.
-/// Turn numbers are assigned here so every event in a turn carries the same one.
+/// Turn numbers come from the conversation's `TurnClock` so every event in a turn carries the same one.
 public final class AuditLog: Sendable {
     /// The session id stamped on every event.
     public let session: String
+    /// The conversation's turn counter; the approval gate and the agent share it.
+    public let turns: TurnClock
     private let sink: any AuditSink
-    private let turn = Mutex(0)
 
     /// Creates a log for `session` writing to `sink`.
-    public init(session: String, sink: any AuditSink) {
+    ///
+    /// - Parameters:
+    ///   - session: The id stamped on every event.
+    ///   - sink: Where events go.
+    ///   - turns: The conversation's clock; a fresh one by default.
+    public init(session: String, sink: any AuditSink, turns: TurnClock = TurnClock()) {
         self.session = session
+        self.turns = turns
         self.sink = sink
     }
 
@@ -35,16 +42,11 @@ public final class AuditLog: Sendable {
     }
 
     /// The current turn number (0 before the first turn).
-    public var currentTurn: Int { turn.withLock { $0 } }
+    public var currentTurn: Int { turns.current }
 
     /// Advances to the next turn and returns its number.
     @discardableResult
-    public func beginTurn() -> Int {
-        turn.withLock {
-            $0 += 1
-            return $0
-        }
-    }
+    public func beginTurn() -> Int { turns.advance() }
 
     /// Records an event in the current turn.
     public func record(_ kind: AuditEvent.Kind, call: String? = nil, details: [String: JSONValue] = [:]) {

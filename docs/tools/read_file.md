@@ -30,7 +30,7 @@ The final line is either `[more: call again with offset N]` or `[end of file]`. 
 Paths go through the approval gate's rule classifier as if they were `cat <path>`: credential-like paths
 (`.ssh`, `.aws/credentials`, `.netrc`, keys) are rated dangerous and ask, or are refused where nobody can
 answer, exactly as the command would be. Ordinary files pass without a model call. Refusals come back as
-`error: command not approved: …`.
+`error: read not approved: …`.
 
 ## Limits
 

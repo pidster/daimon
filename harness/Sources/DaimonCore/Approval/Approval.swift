@@ -124,9 +124,23 @@ public struct Refusal: Equatable, Sendable {
 
 /// Classifies a command and asks for approval when it is risky enough.
 ///
-/// One gate per session holds the approvals granted "for this session", keyed
-/// by pattern and directory. Every verdict and decision is audited.
+/// One gate per conversation. Once-approvals and refusals belong to the turn they happened in, as
+/// told by the conversation's `TurnClock`; session approvals are shared through `SessionApprovals`;
+/// project and always approvals live in the `ApprovalStore`. Every verdict and decision is audited.
 public actor ApprovalGate {
+    /// Why a command may not run.
+    public enum Failure: Error, CustomStringConvertible, Equatable {
+        /// The approver (or a standing policy) said no; the reason is for the model.
+        case refused(String)
+
+        /// Human-readable explanation.
+        public var description: String {
+            switch self {
+            case .refused(let reason): "not approved: \(reason)"
+            }
+        }
+    }
+
     /// The lowest level that requires approval; `nil` never asks.
     public let threshold: RiskLevel?
     private let classifier: any RiskClassifier
@@ -135,16 +149,15 @@ public actor ApprovalGate {
     private let store: ApprovalStore?
     private let source: String
     private let sessionApprovals: SessionApprovals
-    /// Refusals since the last `takeRefusals()`.
-    private var refusals: [Refusal] = []
-    /// Once-approvals, valid for the audit turn they were given in.
-    private var turnApprovals: (turn: Int, keys: Set<String>) = (0, [])
+    private let turns: TurnClock
+    /// Per-turn state: once-approvals and refusals, dropped when the clock moves on.
+    private var turnState: (turn: Int, approved: Set<String>, refusals: [Refusal]) = (0, [], [])
 
-    /// Keys approved for the current turn, discarding any from earlier turns.
-    private func currentTurnApprovals() -> Set<String> {
-        guard let turn = audit?.currentTurn else { return [] }
-        if turnApprovals.turn != turn { turnApprovals = (turn, []) }
-        return turnApprovals.keys
+    /// The state for the current turn, discarding an earlier turn's.
+    private func currentTurn() -> Int {
+        let turn = turns.current
+        if turnState.turn != turn { turnState = (turn, [], []) }
+        return turn
     }
 
     /// Session approvals are keyed on the pattern (`head *`) in the exact directory.
@@ -162,9 +175,13 @@ public actor ApprovalGate {
     ///   - store: Standing approvals that outlive the process; nil keeps only session approvals.
     ///   - source: Entry point name recorded on grants.
     ///   - sessionApprovals: Session-scoped approvals; share one instance across gates of one process.
+    ///   - turns: The conversation's clock; defaults to the audit log's, or a clock that never
+    ///     advances, under which "this turn" means the life of the gate.
     public init(
         classifier: any RiskClassifier, approver: any Approver, threshold: RiskLevel?, audit: AuditLog? = nil,
-        store: ApprovalStore? = nil, source: String = "unknown", sessionApprovals: SessionApprovals = SessionApprovals()
+        store: ApprovalStore? = nil, source: String = "unknown",
+        sessionApprovals: SessionApprovals = SessionApprovals(),
+        turns: TurnClock? = nil
     ) {
         self.classifier = classifier
         self.approver = approver
@@ -173,12 +190,14 @@ public actor ApprovalGate {
         self.store = store
         self.source = source
         self.sessionApprovals = sessionApprovals
+        self.turns = turns ?? audit?.turns ?? TurnClock()
     }
 
-    /// Returns and clears the refusals recorded since the last call.
+    /// Returns and clears the refusals recorded in the current turn since the last call.
     public func takeRefusals() -> [Refusal] {
-        defer { refusals.removeAll() }
-        return refusals
+        _ = currentTurn()
+        defer { turnState.refusals.removeAll() }
+        return turnState.refusals
     }
 
     /// Returns normally if reading `path` is acceptable.
@@ -187,7 +206,7 @@ public actor ApprovalGate {
     /// `cat <path>`: credential paths are rated dangerous and ask (or are refused) exactly as the
     /// command would be; ordinary files pass without a model call.
     ///
-    /// - Throws: `CommandRunner.Failure.disapproved` with the reason otherwise.
+    /// - Throws: `Failure.refused` with the reason otherwise.
     public func clear(readingFile path: String, workingDirectory: String) async throws {
         try await clear(
             command: "cat \(path)", workingDirectory: workingDirectory, classifier: RuleRiskClassifier.standard)
@@ -195,7 +214,7 @@ public actor ApprovalGate {
 
     /// Returns normally if the command may run.
     ///
-    /// - Throws: `CommandRunner.Failure.disapproved` with the reason otherwise.
+    /// - Throws: `Failure.refused` with the reason otherwise.
     public func clear(command: String, workingDirectory: String) async throws {
         try await clear(command: command, workingDirectory: workingDirectory, classifier: classifier)
     }
@@ -208,8 +227,8 @@ public actor ApprovalGate {
         for segment in segments {
             do {
                 try await clearSegment(segment, line: line, workingDirectory: workingDirectory, classifier: classifier)
-            } catch CommandRunner.Failure.disapproved(let reason) where segments.count > 1 {
-                throw CommandRunner.Failure.disapproved("\(segment.text): \(reason)")
+            } catch Failure.refused(let reason) where segments.count > 1 {
+                throw Failure.refused("\(segment.text): \(reason)")
             }
         }
     }
@@ -234,7 +253,8 @@ public actor ApprovalGate {
             audit?.record(.approvalDecided, details: base.merging(["decision": "cached"]) { $1 })
             return
         }
-        if currentTurnApprovals().contains(Self.key(segment.pattern, workingDirectory)) {
+        _ = currentTurn()
+        if turnState.approved.contains(Self.key(segment.pattern, workingDirectory)) {
             audit?.record(.approvalDecided, details: base.merging(["decision": "cached-turn"]) { $1 })
             return
         }
@@ -260,8 +280,7 @@ public actor ApprovalGate {
             var details = base.merging(["decision": "approved", "scope": .string(scope.rawValue)]) { $1 }
             if scope != requested { details["downgradedFrom"] = .string(requested.rawValue) }
             if scope == .once {
-                _ = currentTurnApprovals()
-                if audit != nil { turnApprovals.keys.insert(Self.key(segment.pattern, workingDirectory)) }
+                turnState.approved.insert(Self.key(segment.pattern, workingDirectory))
             } else {
                 sessionApprovals.insert(Self.key(segment.pattern, workingDirectory))
             }
@@ -281,14 +300,14 @@ public actor ApprovalGate {
         case .denied(let reason):
             audit?.record(
                 .approvalDecided, details: base.merging(["decision": "denied", "reason": .string(reason)]) { $1 })
-            refusals.append(Refusal(command: segment.text, reason: reason))
-            throw CommandRunner.Failure.disapproved(reason)
+            turnState.refusals.append(Refusal(command: segment.text, reason: reason))
+            throw Failure.refused(reason)
         case .unanswered(let waited):
             let reason = "no answer within \(waited); an unanswered approval counts as declined"
             audit?.record(
                 .approvalDecided, details: base.merging(["decision": "timed-out", "reason": .string(reason)]) { $1 })
-            refusals.append(Refusal(command: segment.text, reason: reason))
-            throw CommandRunner.Failure.disapproved(reason)
+            turnState.refusals.append(Refusal(command: segment.text, reason: reason))
+            throw Failure.refused(reason)
         }
     }
 }
