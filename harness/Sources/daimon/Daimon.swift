@@ -56,8 +56,7 @@ struct Respond: AsyncParsableCommand {
                 reason: "approval required; re-run with --yes, use daimon chat to be asked, or lower approval.threshold"
             ))
         defer { session.end() }
-        let agent = try Agent(
-            instructions: session.instructions, tools: session.tools, model: session.config.model, audit: session.audit)
+        let agent = try session.openAgent()
         if stream {
             try await agent.stream(text) { delta in
                 print(delta, terminator: "")
@@ -161,8 +160,7 @@ struct Mcp: AsyncParsableCommand {
                 autoApprove: yes),
             approver: DenyingApprover(reason: "unused: the MCP server elicits approval itself"))
         defer { session.end() }
-        try await DaimonServer(config: session.config, audit: session.audit, autoApprove: yes, store: session.store)
-            .run()
+        try await DaimonServer(session: session).run()
     }
 }
 
@@ -212,14 +210,10 @@ struct Chat: AsyncParsableCommand {
         try Daimon.home.ensure()
         var agent: Agent
         if let resume {
-            agent = try Agent(
-                transcript: try store.load(resume), tools: session.tools, model: session.config.model,
-                audit: session.audit)
+            agent = try session.openAgent(transcript: try store.load(resume))
             Self.note("resumed '\(resume)' (\(agent.transcript.turnCount) turns)")
         } else {
-            agent = try Agent(
-                instructions: session.instructions, tools: session.tools, model: session.config.model,
-                audit: session.audit)
+            agent = try session.openAgent()
         }
         Self.note("audit log: \(Daimon.home.auditFile.path) session \(session.audit.session)")
         var saveName = save ?? resume

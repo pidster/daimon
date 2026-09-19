@@ -76,15 +76,26 @@ obscurely. An agent can also start from a saved `Transcript`.
 `os.Logger` per category with optional stderr mirroring. See [logging.md](logging.md) and
 [ADR 0010](decisions/0010-audit-and-diagnostic-logging.md).
 
-### `Session`
+### `Session` and `Conversation`
 
 `Session.begin` is the one place an entry point's flags become a running configuration: it loads
 `config.json`, applies `--instructions`, `--model`, and `--unsafe`, opens the audit log and the
-`ApprovalStore`, builds the `ApprovalGate` and `ToolRegistry`, selects `--tool` names, and records
-`session.start` with the same fields for `respond`, `chat`, and `mcp`. The CLI adds only the approver and
-the stderr note. The MCP server uses the session's config, audit log, and store but builds one gate per
-thread (each thread has its own audit session), sharing one `SessionApprovals` so "this session" answers
-cover every thread. Tested with an injected memory sink.
+`ApprovalStore`, creates the `SessionApprovals` set, selects `--tool` names, sets up the session's own
+`Conversation`, and records `session.start` with the same fields for `respond`, `chat`, and `mcp`.
+
+A `Conversation` is one gate plus the tools wired to it, built by one function for every face of daimon.
+The three faces are overlays on this core:
+
+| Face | How it opens its conversation |
+| --- | --- |
+| `respond` | `session.openAgent()` over the session's own conversation |
+| `chat` | `session.openAgent(transcript:)`, the same conversation, resumable |
+| `mcp` | `session.with(approver:)` swaps in elicitation once the server has a transport (a `--yes` session keeps its `AutoApprover`), then `session.openConversation(id:…)` per `thread_id` with its own audit session, gate, tools, and optional instruction, tool, and model overrides |
+
+Every conversation of a session shares its config, `ApprovalStore`, and `SessionApprovals`, so a
+"this project" answer on one MCP thread is written once and a "this session" answer covers every thread.
+The CLI adds only the approver and the stderr note. Tested with an injected memory sink; the MCP tests
+build real sessions over a scratch home and check that two threads share one store.
 
 ### Home, config, transcripts
 

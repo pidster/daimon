@@ -18,16 +18,10 @@ public actor ConversationThread: RespondingThread {
     /// The conversation; isolated to this actor because it is not `Sendable`.
     private let agent: Agent
 
-    /// Creates a thread with its own model session.
-    ///
-    /// - Throws: `ModelSelection.Failure` if the model cannot be used.
-    public init(
-        id: String, instructions: String, tools: [any Tool], model: ModelSelection = .default, audit: AuditLog? = nil
-    )
-        throws
-    {
+    /// Wraps an agent opened by `Session.openConversation`.
+    public init(id: String, agent: Agent) {
         self.id = id
-        agent = try Agent(instructions: instructions, tools: tools, model: model, audit: audit)
+        self.agent = agent
     }
 
     /// Sends one user turn on this thread's session.

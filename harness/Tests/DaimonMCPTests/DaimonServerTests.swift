@@ -1,4 +1,5 @@
 import DaimonCore
+import Foundation
 import MCP
 import Testing
 
@@ -10,9 +11,27 @@ struct FakeThread: RespondingThread {
     func respond(to prompt: String) async throws -> (text: String, condensed: Bool) { (reply + prompt, false) }
 }
 
+/// A session over a scratch home, with a memory audit sink and a denying approver.
+func scratchSession(entryPoint: String = "mcp") throws -> Session {
+    let root = FileManager.default.temporaryDirectory.appending(path: "daimon-mcp-tests-\(UUID().uuidString)")
+    let home = Home(root: root)
+    try home.ensure()
+    return try Session.begin(.init(entryPoint: entryPoint), home: home, approver: DenyingApprover(reason: "test")) {
+        _, _ in
+        MemoryAuditSink()
+    }
+}
+
 @Suite struct DaimonServerTests {
-    let server = DaimonServer()
-    let fakeServer = DaimonServer(config: Config().resolved) { id, _, _, _, _ in FakeThread(reply: "\(id):") }
+    let server: DaimonServer
+    let fakeServer: DaimonServer
+
+    init() throws {
+        server = try DaimonServer(session: try scratchSession())
+        fakeServer = try DaimonServer(session: try scratchSession()) { session, id, _, _, _ in
+            (FakeThread(reply: "\(id):"), nil, session.audit.log(forSession: id))
+        }
+    }
 
     @Test func respondUsesTheThreadFactoryAndReportsCreation() async throws {
         let first = try await fakeServer.call(
@@ -25,31 +44,17 @@ struct FakeThread: RespondingThread {
         #expect(second.structuredContent?.objectValue?["created"] == .bool(false))
     }
 
-    @Test func threadGatesPersistProjectApprovalsAndShareSessionOnes() async throws {
+    @Test func threadsShareTheSessionsStoreAndSessionApprovals() async throws {
         struct Grant: Approver {
             func decide(_ request: ApprovalRequest) async -> ApprovalDecision { .approved(.project) }
         }
-        struct Moderate: RiskClassifier {
-            func classify(command: String, workingDirectory: String) async -> RiskAssessment {
-                RiskAssessment(level: .moderate, reasons: ["x"], sources: ["t"])
-            }
-        }
-        let store = ApprovalStore(url: nil)
-        var config = Config().resolved
-        config.approvalUsesModel = false
-        let server = DaimonServer(config: config, autoApprove: false, store: store) { _, _, _, _, _ in
-            FakeThread(reply: "")
-        }
-        // The server's own approver needs a client; drive the gate it builds with a granting approver instead.
-        let gate = ApprovalGate(
-            classifier: Moderate(), approver: Grant(), threshold: .moderate, store: store, source: "mcp",
-            sessionApprovals: SessionApprovals())
-        try await gate.clear(command: "touch a", workingDirectory: "/repo")
-        #expect(await store.find(pattern: "touch *", directory: "/repo") != nil)
-        // And the gate the server builds carries the same store and source.
-        let built = server.gate(audit: AuditLog.disabled(session: "t"))
-        _ = built
-        #expect(await store.all.first?.source == "mcp")
+        let session = try scratchSession().with(approver: Grant())
+        // Two threads opened from the same session share one store and one session-approval set.
+        let first = try session.conversation(id: "a").conversation
+        try await first.gate.clear(command: "touch a", workingDirectory: "/repo")
+        #expect(await session.store.find(pattern: "touch *", directory: "/repo")?.source == "mcp")
+        let second = try session.with(approver: DenyingApprover(reason: "must not ask")).conversation(id: "b")
+        try await second.conversation.gate.clear(command: "touch b", workingDirectory: "/repo")
     }
 
     @Test func respondReportsAnEmptyRefusalListByDefault() async throws {
