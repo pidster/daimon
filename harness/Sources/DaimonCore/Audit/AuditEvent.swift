@@ -3,7 +3,7 @@ import Foundation
 /// The running daimon's version, stamped on every audit event.
 public enum DaimonVersion {
     /// Semantic version of this build.
-    public static let current = "0.1.2"
+    public static let current = "0.1.3"
 }
 
 /// One line of the audit log.
