@@ -78,7 +78,7 @@ public struct TerminalApprover: Approver {
               in \(request.workingDirectory)
               \(request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n  "))
               remembered as: \(request.pattern)
-            run it? [y]es once / [s]ession / [p]roject (30 days, this directory) / [a]lways (30 days) / [n]o:\u{20}
+            run it? [y]es (this turn) / [s]ession / [p]roject (30 days, this directory) / [a]lways (30 days) / [n]o:\u{20}
             """
         FileHandle.standardError.write(Data(text.utf8))
         guard let line = readLine() else { return .denied("no answer (end of input)") }
@@ -111,6 +111,15 @@ public actor ApprovalGate {
     private let store: ApprovalStore?
     private let source: String
     private var sessionApprovals: Set<String> = []
+    /// Once-approvals, valid for the audit turn they were given in.
+    private var turnApprovals: (turn: Int, keys: Set<String>) = (0, [])
+
+    /// Keys approved for the current turn, discarding any from earlier turns.
+    private func currentTurnApprovals() -> Set<String> {
+        guard let turn = audit?.currentTurn else { return [] }
+        if turnApprovals.turn != turn { turnApprovals = (turn, []) }
+        return turnApprovals.keys
+    }
 
     /// Session approvals are keyed on the pattern (`head *`) in the exact directory.
     private static func key(_ pattern: String, _ workingDirectory: String) -> String {
@@ -191,6 +200,10 @@ public actor ApprovalGate {
             audit?.record(.approvalDecided, details: base.merging(["decision": "cached"]) { $1 })
             return
         }
+        if currentTurnApprovals().contains(Self.key(segment.pattern, workingDirectory)) {
+            audit?.record(.approvalDecided, details: base.merging(["decision": "cached-turn"]) { $1 })
+            return
+        }
         if assessment.level < .dangerous,
             let standing = await store?.find(pattern: segment.pattern, directory: workingDirectory)
         {
@@ -212,7 +225,12 @@ public actor ApprovalGate {
             let scope = (requested.isPersistent && assessment.level == .dangerous) ? .session : requested
             var details = base.merging(["decision": "approved", "scope": .string(scope.rawValue)]) { $1 }
             if scope != requested { details["downgradedFrom"] = .string(requested.rawValue) }
-            if scope != .once { sessionApprovals.insert(Self.key(segment.pattern, workingDirectory)) }
+            if scope == .once {
+                _ = currentTurnApprovals()
+                if audit != nil { turnApprovals.keys.insert(Self.key(segment.pattern, workingDirectory)) }
+            } else {
+                sessionApprovals.insert(Self.key(segment.pattern, workingDirectory))
+            }
             if scope.isPersistent, let store {
                 do {
                     let entry = try await store.grant(

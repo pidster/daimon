@@ -2,7 +2,7 @@ import Foundation
 
 /// How long an approval lasts.
 public enum ApprovalScope: String, Codable, Equatable, Sendable, CaseIterable {
-    /// This one call.
+    /// The rest of this turn: the current prompt's tool loop, however many calls it makes.
     case once
     /// Until the process exits.
     case session

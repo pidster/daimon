@@ -157,11 +157,26 @@ import Testing
         }
     }
 
-    @Test func onceIsNotRemembered() async throws {
+    @Test func onceCoversTheRestOfTheTurnOnly() async throws {
         let approver = Answering(.approved(.once))
+        let sink = MemoryAuditSink()
+        let audit = AuditLog(session: "s", sink: sink)
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate, audit: audit,
             store: ApprovalStore(url: nil))
+        audit.beginTurn()
+        try await gate.clear(command: "touch x", workingDirectory: "/")
+        try await gate.clear(command: "touch y", workingDirectory: "/")  // same pattern, same turn
+        #expect(approver.asked.events.count == 1)
+        #expect(sink.events.last?.details["decision"] == "cached-turn")
+        audit.beginTurn()
+        try await gate.clear(command: "touch z", workingDirectory: "/")  // next turn asks again
+        #expect(approver.asked.events.count == 2)
+    }
+
+    @Test func onceWithoutAnAuditLogIsPerCall() async throws {
+        let approver = Answering(.approved(.once))
+        let gate = ApprovalGate(classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate)
         try await gate.clear(command: "touch x", workingDirectory: "/")
         try await gate.clear(command: "touch x", workingDirectory: "/")
         #expect(approver.asked.events.count == 2)

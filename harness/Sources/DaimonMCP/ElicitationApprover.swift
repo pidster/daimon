@@ -65,7 +65,7 @@ struct ElicitationApprover: Approver {
                     "description": .string("How long to keep approving \(request.pattern)"),
                     "enum": .array(ApprovalScope.allCases.map { .string($0.rawValue) }),
                     "enumNames": .array([
-                        .string("Once"), .string("This session"),
+                        .string("This turn"), .string("This session"),
                         .string("This project (30 days, this directory)"), .string("Always (30 days, any directory)"),
                     ]),
                     "default": .string("once"),

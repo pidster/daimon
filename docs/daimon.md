@@ -48,8 +48,8 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `/quit`, `/exit`, Ctrl-D | Exit, saving if a name is set. |
 
 When the model wants to run a risky command, chat prints it with the reasons and asks on stderr:
-`y` runs it once, `s` for the session, `p` for this project (30 days, this directory), `a` always (30
-days, any directory), `n` refuses.
+`y` approves it for the rest of this turn, `s` for the session, `p` for this project (30 days, this
+directory), `a` always (30 days, any directory), `n` refuses.
 
 Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes cleanly.
 

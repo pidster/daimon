@@ -11,7 +11,8 @@ file under `~/.daimon`.
 
 ## Decision
 
-- An approval carries a scope: `once`, `session` (this process), `project` (this exact command in this
+- An approval carries a scope: `once` (amended 2026-09-19: the rest of the current turn, so one answer
+  covers a prompt's whole tool loop), `session` (this process), `project` (this exact command in this
   exact directory), or `always` (this exact command anywhere). Chat answers `y`, `s`, `p`, `a`, or `n`; the
   MCP dialog offers the same four in a picker with Accept and Decline; `--yes` and `AutoApprover` mean once.
 - `project` and `always` are written to `~/.daimon/approvals.json` (user-only, atomic writes) by

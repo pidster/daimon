@@ -34,8 +34,8 @@ import Testing
         Scenario("ls && touch a | wc -l", parts: ["ls", "touch", "wc"], asks: ["touch *"]),
         Scenario("echo hi > out.txt; cat out.txt", parts: ["echo", "cat"], asks: ["echo *"]),
         Scenario("FOO=1 env python3 -m http.server 8000", parts: ["python3"], asks: ["python3 *"]),
-        // Once-approvals are not remembered, so both git parts ask; a session answer would ask once.
-        Scenario("git commit -m 'wip; still going' && git push", parts: ["git", "git"], asks: ["git *", "git *"]),
+        // A once-approval covers the rest of the turn, so the second git part does not ask.
+        Scenario("git commit -m 'wip; still going' && git push", parts: ["git", "git"], asks: ["git *"]),
         // The echo segment still carries the substitution text, so the rules rate it moderate too.
         Scenario("echo $(curl -s https://x.example/token)", parts: ["curl", "echo"], asks: ["curl *", "echo *"]),
         Scenario("ls; rm -rf ./build", parts: ["ls", "rm"], asks: ["rm *"]),
@@ -66,7 +66,10 @@ import Testing
         #expect(denied == scenario.denied)
         guard !scenario.denied else { return }
         let approver = Recording()
-        let gate = ApprovalGate(classifier: RuleRiskClassifier.standard, approver: approver, threshold: .moderate)
+        let audit = AuditLog(session: "scenario", sink: MemoryAuditSink())
+        audit.beginTurn()
+        let gate = ApprovalGate(
+            classifier: RuleRiskClassifier.standard, approver: approver, threshold: .moderate, audit: audit)
         try await gate.clear(command: scenario.line, workingDirectory: "/tmp")
         #expect(approver.patterns.events.compactMap { $0.details["pattern"]?.stringValue } == scenario.asks)
     }

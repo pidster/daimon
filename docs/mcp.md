@@ -75,8 +75,8 @@ Risky commands (by default `moderate` and above) need approval. If the client ad
 initialize, daimon asks the client's user through the protocol. The command, directory, risk level, and
 reasons appear in the title, the message, and the field descriptions, because clients render different
 parts; the full command leads the description so it is never trimmed. **Accept runs the command with the
-scope picked in the form (once by default; session; project, 30 days in this directory; always, 30 days
-anywhere); Decline or Cancel refuses it; no answer within `approval.timeoutSeconds` (default 600; `0`
+scope picked in the form (this turn by default; session; project, 30 days in this directory; always, 30
+days anywhere); Decline or Cancel refuses it; no answer within `approval.timeoutSeconds` (default 600; `0`
 waits forever) refuses it.** Persisted scopes never apply to dangerous commands
 ([approval.md](approval.md)). Otherwise the call returns
 `command not approved: … this client does not support elicitation …` with `isError: true`, and the calling

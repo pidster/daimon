@@ -53,7 +53,7 @@ the program that actually runs after unwrapping `sudo`, `env`, `time`, and the l
 
 | Scope | Covers | Lives |
 | --- | --- | --- |
-| `once` | this call | until the call ends |
+| `once` | this pattern in this directory | the rest of the current turn: the prompt's whole tool loop, however many calls it makes |
 | `session` | this pattern in this directory | until the process exits |
 | `project` | this pattern in this directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
 | `always` | this pattern in any directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
@@ -73,8 +73,8 @@ model as `error: command not approved: …` so it can choose another approach.
 | Entry point | Approver | Behaviour |
 | --- | --- | --- |
 | `daimon respond` | denying, unless `--yes` | Non-interactive: risky commands are refused with a message naming the three ways forward. `--yes` approves everything. |
-| `daimon chat` | terminal | Prints the command, level, and reasons on stderr; reads `y` (once), `s` (session), `p` (project), `a` (always), or `n`. |
-| `daimon mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol. Accept runs it with the scope picked (once by default, or session, project, always); Decline or silence for `approval.timeoutSeconds` refuses. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
+| `daimon chat` | terminal | Prints the command, level, and reasons on stderr; reads `y` (this turn), `s` (session), `p` (project), `a` (always), or `n`. |
+| `daimon mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol. Accept runs it with the scope picked (this turn by default, or session, project, always); Decline or silence for `approval.timeoutSeconds` refuses. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
 
 ## Configuration
 
