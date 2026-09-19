@@ -16,6 +16,8 @@ func scratchSession(entryPoint: String = "mcp") throws -> Session {
     let root = FileManager.default.temporaryDirectory.appending(path: "daimon-mcp-tests-\(UUID().uuidString)")
     let home = Home(root: root)
     try home.ensure()
+    // Rules only: unit tests never run the on-device classifier (architecture review A1).
+    try Data(#"{"approval": {"useModel": false}}"#.utf8).write(to: home.configFile)
     return try Session.begin(.init(entryPoint: entryPoint), home: home, approver: DenyingApprover(reason: "test")) {
         _, _ in
         MemoryAuditSink()
