@@ -13,10 +13,8 @@ import Synchronization
 public struct CommandRunner: Sendable {
     /// Limits applied to every command this runner executes.
     public struct Options: Sendable, Equatable {
-        /// Directory the command runs in; nil means the process's current directory.
-        public var workingDirectory: String?
         /// Root of the sandbox's writable set. Fixed at the launch directory by default and never taken
-        /// from a per-command `workingDirectory`, so a caller cannot widen the sandbox by choosing where
+        /// from a per-command working directory, so a caller cannot widen the sandbox by choosing where
         /// to run.
         public var writableRoot: String
         /// Wall-clock limit after which the command's process group is sent SIGTERM, then SIGKILL.
@@ -29,10 +27,9 @@ public struct CommandRunner: Sendable {
         /// Creates options. Defaults are a 60-second timeout, 4 KiB per stream, the default policy, and
         /// the current directory as the writable root.
         public init(
-            workingDirectory: String? = nil, writableRoot: String? = nil, timeout: Duration = .seconds(60),
-            maxOutputBytes: Int = 4096, policy: CommandPolicy = .default
+            writableRoot: String? = nil, timeout: Duration = .seconds(60), maxOutputBytes: Int = 4096,
+            policy: CommandPolicy = .default
         ) {
-            self.workingDirectory = workingDirectory
             self.writableRoot = writableRoot ?? FileManager.default.currentDirectoryPath
             self.timeout = timeout
             self.maxOutputBytes = maxOutputBytes
@@ -121,11 +118,14 @@ public struct CommandRunner: Sendable {
 
     /// Runs `command` through `/bin/sh -c` and waits for it to finish or time out.
     ///
-    /// - Parameter command: A POSIX shell command line.
+    /// - Parameters:
+    ///   - command: A POSIX shell command line.
+    ///   - directory: Where to run it; nil means the process's current directory. Changes where the
+    ///     command runs, never what it may write (see `Options.writableRoot`).
     /// - Returns: The exit status and bounded output.
     /// - Throws: `Failure` if the policy rejects the command or it cannot be started.
-    public func run(_ command: String) async throws -> Outcome {
-        let workingDirectory = options.workingDirectory ?? FileManager.default.currentDirectoryPath
+    public func run(_ command: String, in directory: String? = nil) async throws -> Outcome {
+        let workingDirectory = directory ?? FileManager.default.currentDirectoryPath
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
         else { throw Failure.invalidWorkingDirectory(workingDirectory) }

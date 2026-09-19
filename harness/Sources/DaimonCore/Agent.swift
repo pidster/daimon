@@ -111,28 +111,46 @@ public final class Agent {
         }
     }
 
-    /// Sends one user turn and returns the final assistant text.
-    nonisolated(nonsending) public func respond(to prompt: String) async throws -> String {
+    /// What one turn produced.
+    public struct Reply: Sendable, Equatable {
+        /// The final assistant text.
+        public var text: String
+        /// Whether older turns were dropped to fit the context window during this turn.
+        public var condensed: Bool
+
+        /// Creates a reply.
+        public init(text: String, condensed: Bool) {
+            self.text = text
+            self.condensed = condensed
+        }
+    }
+
+    /// Sends one user turn and returns the reply.
+    nonisolated(nonsending) public func respond(to prompt: String) async throws -> Reply {
         try await turn(prompt) { try await session.respond(to: prompt).content }
     }
 
-    /// Sends one user turn, calling `onDelta` with each new fragment of the
-    /// assistant text as it streams, and returns the final text.
+    /// Sends one user turn, calling `onDelta` with each new fragment of the assistant text as it
+    /// streams, and returns the reply.
+    ///
+    /// Snapshots are cumulative. If a retry after mid-stream overflow starts a new answer that does
+    /// not continue the text already shown, a newline separates the two so the caller's output stays
+    /// readable rather than splicing an unrelated suffix onto it.
     @discardableResult
-    nonisolated(nonsending) public func stream(_ prompt: String, onDelta: (String) -> Void) async throws -> String {
+    nonisolated(nonsending) public func stream(_ prompt: String, onDelta: (String) -> Void) async throws -> Reply {
         // `emitted` lives outside the retried closure so a retry after mid-stream overflow continues
         // from what the caller has already seen instead of repeating it.
         var emitted = ""
         return try await turn(prompt) {
             for try await snapshot in session.streamResponse(to: prompt) {
                 let full = snapshot.content
+                guard full != emitted else { continue }
                 if full.hasPrefix(emitted) {
                     onDelta(String(full.dropFirst(emitted.count)))
-                    emitted = full
-                } else if full.count > emitted.count {
-                    onDelta(String(full.dropFirst(emitted.count)))
-                    emitted = full
+                } else {
+                    onDelta("\n" + full)
                 }
+                emitted = full
             }
             return emitted
         }
@@ -141,18 +159,19 @@ public final class Agent {
     /// Records the prompt, runs `operation` with overflow recovery, and records the response or error.
     nonisolated(nonsending) private func turn(
         _ prompt: String, _ operation: () async throws -> String
-    ) async throws -> String {
+    ) async throws -> Reply {
         turns.advance()
         audit?.record(.prompt, details: AuditEvent.Details.prompt(text: prompt))
         let started = Date()
         let before = condensations
         do {
             let text = try await withOverflowRecovery(operation)
+            let reply = Reply(text: text, condensed: condensations > before)
             audit?.record(
                 .response,
                 details: AuditEvent.Details.response(
-                    text: text, condensed: condensations > before, seconds: Date().timeIntervalSince(started)))
-            return text
+                    text: text, condensed: reply.condensed, seconds: Date().timeIntervalSince(started)))
+            return reply
         } catch {
             audit?.error(error, context: "turn")
             Diagnostics.agent.error("turn failed: \(error)")

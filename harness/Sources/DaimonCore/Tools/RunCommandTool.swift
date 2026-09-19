@@ -25,7 +25,7 @@ public struct RunCommandTool: Tool {
         public var workingDirectory: String?
     }
 
-    /// Supplies the timeout, output cap, and default working directory.
+    /// Supplies the policy, timeout, and output cap.
     private let runner: CommandRunner
 
     /// Creates the tool over a runner that supplies timeout and output limits.
@@ -42,12 +42,8 @@ public struct RunCommandTool: Tool {
     /// - Parameter arguments: The command and optional working directory.
     /// - Returns: Exit status and bounded stdout/stderr, formatted for the model.
     public func call(arguments: Arguments) async -> String {
-        var runner = runner
-        if let directory = arguments.workingDirectory {
-            runner.options.workingDirectory = directory
-        }
         do {
-            return try await runner.run(arguments.command).rendered
+            return try await runner.run(arguments.command, in: arguments.workingDirectory).rendered
         } catch {
             return "error: \(error)"
         }

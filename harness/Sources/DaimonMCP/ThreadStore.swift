@@ -4,8 +4,8 @@ import FoundationModels
 
 /// What `DaimonServer.respond` needs from a thread, so tests can substitute one without a model.
 public protocol RespondingThread: Sendable {
-    /// Sends one user turn and returns the reply and whether older turns were dropped to fit.
-    func respond(to prompt: String) async throws -> (text: String, condensed: Bool)
+    /// Sends one user turn and returns the reply.
+    func respond(to prompt: String) async throws -> Agent.Reply
 }
 
 /// One conversation with the on-device model, addressable by id across MCP calls.
@@ -25,12 +25,8 @@ public actor ConversationThread: RespondingThread {
     }
 
     /// Sends one user turn on this thread's session.
-    ///
-    /// - Returns: The reply and whether older turns were dropped to fit the context window.
-    public func respond(to prompt: String) async throws -> (text: String, condensed: Bool) {
-        let before = agent.condensations
-        let text = try await agent.respond(to: prompt)
-        return (text, agent.condensations > before)
+    public func respond(to prompt: String) async throws -> Agent.Reply {
+        try await agent.respond(to: prompt)
     }
 }
 

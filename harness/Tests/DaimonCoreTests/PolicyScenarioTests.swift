@@ -80,13 +80,13 @@ import Testing
         }
         let sink = MemoryAuditSink()
         let runner = CommandRunner(
-            options: .init(workingDirectory: "/private/tmp", policy: .unrestricted),
+            options: .init(policy: .unrestricted),
             audit: AuditLog(session: "s", sink: sink),
             approval: ApprovalGate(
                 classifier: RuleRiskClassifier.standard, approver: Refuse(), threshold: .level(.moderate)))
         let probe = "daimon-scenario-\(UUID().uuidString).txt"
         await #expect(throws: CommandRunner.Failure.self) {
-            try await runner.run("echo first > \(probe) && touch \(probe).second")
+            try await runner.run("echo first > \(probe) && touch \(probe).second", in: "/private/tmp")
         }
         #expect(!FileManager.default.fileExists(atPath: "/private/tmp/\(probe)"))
         #expect(!sink.events.contains { $0.kind == .commandOutcome })

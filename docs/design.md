@@ -51,8 +51,10 @@ Owns one `LanguageModelSession` at a time, created by a `ResolvedModel`, whose `
 availability and throws `ModelSelection.Failure.unavailable` rather than letting the first request fail
 obscurely. An agent can also start from a saved `Transcript`.
 
-- `respond(to:)` returns the complete reply.
-- `stream(_:onDelta:)` invokes a callback with each new fragment and returns the final text. It is a callback
+- `respond(to:)` returns a `Reply`: the text and whether the turn was condensed.
+- `stream(_:onDelta:)` invokes a callback with each new fragment and returns the same `Reply`. Snapshots
+  are cumulative; if a retry after mid-stream overflow starts an answer that does not continue the text
+  already shown, a newline separates the two. It is a callback
   rather than an `AsyncSequence` for a concurrency reason recorded in
   [ADR 0003](decisions/0003-callback-streaming.md).
 - On context overflow the `ContextPolicy` (default: keep the last four turns) rebuilds the session from a

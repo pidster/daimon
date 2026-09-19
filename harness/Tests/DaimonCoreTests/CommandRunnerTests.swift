@@ -20,15 +20,13 @@ import Testing
     }
 
     @Test func honoursWorkingDirectory() async throws {
-        let runner = CommandRunner(options: .init(workingDirectory: "/private/tmp"))
-        let outcome = try await runner.run("pwd")
+        let outcome = try await CommandRunner().run("pwd", in: "/private/tmp")
         #expect(outcome.stdout.trimmingCharacters(in: .newlines) == "/private/tmp")
     }
 
     @Test func rejectsMissingWorkingDirectory() async {
-        let runner = CommandRunner(options: .init(workingDirectory: "/nonexistent/dir"))
         await #expect(throws: CommandRunner.Failure.invalidWorkingDirectory("/nonexistent/dir")) {
-            try await runner.run("true")
+            try await CommandRunner().run("true", in: "/nonexistent/dir")
         }
     }
 
@@ -80,9 +78,8 @@ import Testing
     @Test func sandboxAllowsWritesInWorkingDirectoryAndTemp() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(atPath: dir) }
-        let runner = CommandRunner(options: .init(workingDirectory: dir))
-        let outcome = try await runner.run(
-            "echo hi > here.txt && echo hi > \"$TMPDIR/daimon-sb-probe\" && cat here.txt")
+        let outcome = try await CommandRunner().run(
+            "echo hi > here.txt && echo hi > \"$TMPDIR/daimon-sb-probe\" && cat here.txt", in: dir)
         #expect(outcome.exitStatus == 0, "\(outcome.stderr)")
         #expect(outcome.stdout == "hi\n")
     }
@@ -97,8 +94,8 @@ import Testing
             try? FileManager.default.removeItem(atPath: dir)
             try? FileManager.default.removeItem(atPath: blocked)
         }
-        let runner = CommandRunner(options: .init(workingDirectory: dir, writableRoot: dir))
-        let outcome = try await runner.run("echo x > '\(blocked)'")
+        let runner = CommandRunner(options: .init(writableRoot: dir))
+        let outcome = try await runner.run("echo x > '\(blocked)'", in: dir)
         #expect(outcome.exitStatus != 0)
         #expect(outcome.stderr.contains("Operation not permitted"))
         #expect(!FileManager.default.fileExists(atPath: blocked))
@@ -108,16 +105,16 @@ import Testing
     func sandboxCanBlockNetwork() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(atPath: dir) }
-        var options = CommandRunner.Options(workingDirectory: dir, writableRoot: dir, timeout: .seconds(10))
+        var options = CommandRunner.Options(writableRoot: dir, timeout: .seconds(10))
         options.policy.sandbox.allowNetwork = false
         // A closed local port: without the sandbox this is "Connection refused"; with network denied the
         // kernel refuses the connect call itself, which is the only outcome that proves enforcement.
         let probe = "/usr/bin/python3 -c \"import socket; socket.socket().connect(('127.0.0.1', 1))\""
-        let denied = try await CommandRunner(options: options).run(probe)
+        let denied = try await CommandRunner(options: options).run(probe, in: dir)
         #expect(denied.exitStatus != 0)
         #expect(denied.stderr.contains("Operation not permitted"), "\(denied.stderr)")
         options.policy.sandbox.allowNetwork = true
-        let allowed = try await CommandRunner(options: options).run(probe)
+        let allowed = try await CommandRunner(options: options).run(probe, in: dir)
         #expect(allowed.stderr.contains("Connection refused"), "\(allowed.stderr)")
     }
 
@@ -128,8 +125,8 @@ import Testing
             try? FileManager.default.removeItem(atPath: dir)
             try? FileManager.default.removeItem(atPath: other)
         }
-        let runner = CommandRunner(options: .init(workingDirectory: dir, policy: .unrestricted))
-        let outcome = try await runner.run("echo x > '\(other)/ok.txt'")
+        let runner = CommandRunner(options: .init(policy: .unrestricted))
+        let outcome = try await runner.run("echo x > '\(other)/ok.txt'", in: dir)
         #expect(outcome.exitStatus == 0)
         #expect(FileManager.default.fileExists(atPath: "\(other)/ok.txt"))
     }
@@ -143,10 +140,10 @@ import Testing
         defer { try? FileManager.default.removeItem(at: dir) }
         let sink = MemoryAuditSink()
         let runner = CommandRunner(
-            options: .init(workingDirectory: dir.path, writableRoot: dir.path),
-            audit: AuditLog(session: "s", sink: sink))
+            options: .init(writableRoot: dir.path), audit: AuditLog(session: "s", sink: sink))
         let outcome = try await runner.run(
-            "echo launched >> launches.txt; echo 'sandbox-exec: sandbox_apply: Operation not permitted' >&2; exit 71")
+            "echo launched >> launches.txt; echo 'sandbox-exec: sandbox_apply: Operation not permitted' >&2; exit 71",
+            in: dir.path)
         #expect(outcome.exitStatus == 71)
         let launches = try String(contentsOf: dir.appending(path: "launches.txt"), encoding: .utf8)
         #expect(launches == "launched\n")
@@ -174,10 +171,10 @@ import Testing
         defer { try? FileManager.default.removeItem(at: root) }
         let elsewhere = FileManager.default.homeDirectoryForCurrentUser.path
         // Runs in the home directory (allowed) but the writable root stays the scratch dir, so the write fails.
-        let runner = CommandRunner(options: .init(workingDirectory: elsewhere, writableRoot: root.path))
+        let runner = CommandRunner(options: .init(writableRoot: root.path))
         let blocked = "daimon-root-probe-\(UUID().uuidString).txt"
         defer { try? FileManager.default.removeItem(atPath: "\(elsewhere)/\(blocked)") }
-        let outcome = try await runner.run("pwd; echo x > \(blocked)")
+        let outcome = try await runner.run("pwd; echo x > \(blocked)", in: elsewhere)
         #expect(outcome.stdout.hasPrefix(CommandPolicy.canonical(elsewhere)))
         #expect(outcome.exitStatus != 0)
         #expect(!FileManager.default.fileExists(atPath: "\(elsewhere)/\(blocked)"))

@@ -64,7 +64,7 @@ struct Respond: AsyncParsableCommand {
             }
             print()
         } else {
-            print(try await agent.respond(to: text))
+            print(try await agent.respond(to: text).text)
         }
     }
 
@@ -250,20 +250,18 @@ struct Chat: AsyncParsableCommand {
                 }
             case .new:
                 agent.reset()
-                session.audit.record(.sessionStart, details: ["entryPoint": "chat", "reason": "new"])
                 Self.note("new conversation")
             case .unknown(let command):
                 Self.note("unknown command /\(command); /help lists commands")
             case .message(let text):
                 guard !text.isEmpty else { continue }
-                let before = agent.condensations
                 do {
-                    try await agent.stream(text) { delta in
+                    let reply = try await agent.stream(text) { delta in
                         print(delta, terminator: "")
                         fflush(stdout)
                     }
                     print()
-                    if agent.condensations > before {
+                    if reply.condensed {
                         Self.note("(context was full; older turns were dropped to continue)")
                     }
                 } catch {
