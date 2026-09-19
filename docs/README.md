@@ -14,6 +14,7 @@
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
 | [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
 | [release.md](release.md) | How a release is cut: tag, tarball, GitHub release, Homebrew tap formula |
+| [backlog.md](backlog.md) | Agreed work not yet started: compound-command policy checks, receipts, structured output, condensing tools, sampling |
 | [engineering.md](engineering.md) | Standards, tooling, the pre-commit gate, and CI |
 | [decisions/](decisions/) | Architecture Decision Records, one per significant decision |
 
