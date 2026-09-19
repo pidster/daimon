@@ -53,7 +53,9 @@ Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes
 
 ### `daimon tools`
 
-Prints each registered tool as `name<TAB>description`. See [tools/](tools/README.md).
+Prints each registered tool as `name<TAB>description`. `--json` prints the full catalogue (description,
+JSON Schema arguments, limits, example prompt) and `--markdown` the same as Markdown; these are the texts
+served to MCP clients as `daimon://tools` and `daimon://tools.md`. See [tools/](tools/README.md).
 
 ### `daimon logs`
 

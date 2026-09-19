@@ -40,7 +40,10 @@ public struct DaimonServer: Sendable {
         threads = ThreadStore(capacity: config.maxThreads)
         self.audit = audit ?? .disabled(session: "mcp")
         self.autoApprove = autoApprove
-        server = Server(name: Self.name, version: Self.version, capabilities: .init(tools: .init(listChanged: false)))
+        server = Server(
+            name: Self.name, version: Self.version,
+            capabilities: .init(
+                resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false)))
     }
 
     /// The approver for this server's connection.
@@ -62,6 +65,10 @@ public struct DaimonServer: Sendable {
     public func run() async throws {
         await server.withMethodHandler(ListTools.self) { _ in .init(tools: ToolCatalog.all) }
         await server.withMethodHandler(CallTool.self) { params in try await self.call(params) }
+        await server.withMethodHandler(ListResources.self) { _ in
+            .init(resources: ToolCatalog.resources, nextCursor: nil)
+        }
+        await server.withMethodHandler(ReadResource.self) { params in try self.read(params) }
         Diagnostics.mcp.info("serving on stdio")
         let client = client
         try await server.start(transport: StdioTransport(logger: DiagnosticsLogHandler.logger())) {
@@ -108,6 +115,19 @@ public struct DaimonServer: Sendable {
                 "seconds": .double(Date().timeIntervalSince(started)),
             ])
         return result
+    }
+
+    /// Serves the tool catalogue resources, generated from the live registry.
+    func read(_ params: ReadResource.Parameters) throws -> ReadResource.Result {
+        let registry = ToolRegistry(runner: config.runner)
+        switch params.uri {
+        case ToolCatalog.toolsResourceURI:
+            return .init(contents: [.text(registry.descriptionsJSON, uri: params.uri, mimeType: "application/json")])
+        case ToolCatalog.toolsMarkdownResourceURI:
+            return .init(contents: [.text(registry.descriptionsMarkdown, uri: params.uri, mimeType: "text/markdown")])
+        default:
+            throw MCPError.invalidParams("Unknown resource: \(params.uri)")
+        }
     }
 
     /// A compact JSON rendering of MCP arguments for the audit log.

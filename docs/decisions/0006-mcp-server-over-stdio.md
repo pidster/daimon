@@ -16,7 +16,7 @@ processing. MCP is the boundary those harnesses already speak.
   daimon's registered tools available to it, and (ADR 0007) `close_thread`. A direct `run_command` MCP tool
   existed from this ADR until 2026-09-17 and was removed: daimon's own tools are usable only through the
   model, so every command carries a turn's audit trail and the harness's value is the loop, not a remote
-  shell.
+  shell. Clients learn what the model can do from the `daimon://tools` resources (added 2026-09-19).
 - `respond` was initially stateless. Superseded by [ADR 0007](0007-conversation-threads.md): calls continue a
   thread identified by `thread_id`.
 - Argument validation errors are MCP protocol errors (`invalidParams`); execution failures, including an

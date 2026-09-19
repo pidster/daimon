@@ -111,6 +111,7 @@ connected, say so and ask the user to run `/mcp` rather than falling back to Bas
   `cd harness && swift build -c release` and then restart the harness or run `/mcp`, and offer to run the
   build yourself. The launcher prints the same instructions to stderr. The build is also stale after code
   changes until it is rerun. Use `respond` to delegate small, self-contained tasks to the on-device model
-  (pass back `thread_id` to continue) and `close_thread` when done. Commands the model runs need approval
+  (pass back `thread_id` to continue) and `close_thread` when done. Read the `daimon://tools` resource
+  (or run `daimon tools --markdown`) for the model's tools and the prompt shapes that work. Commands the model runs need approval
   through elicitation; if this client lacks it they are refused.
 - `codex`: `codex mcp-server`, the OpenAI Codex CLI; needs `codex` on `PATH`.

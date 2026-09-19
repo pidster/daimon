@@ -12,7 +12,9 @@ result format) and the limits that protect the context window. `daimon tools` pr
 Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
 registered tool's schema is in the prompt on every turn, so enable only what a task needs.
 
-The MCP tools daimon offers to *other* harnesses are documented in [../mcp.md](../mcp.md).
+MCP clients discover these tools through the `daimon://tools` resource, generated from the registry; the
+limits and example prompt for each come from `ToolRegistry.guidance`, which a test keeps complete. See
+[../mcp.md](../mcp.md).
 
 ## Adding a tool
 
@@ -22,3 +24,4 @@ The MCP tools daimon offers to *other* harnesses are documented in [../mcp.md](.
 3. Bound the result: 4 KiB or page it. See [../context-management.md](../context-management.md).
 4. Append it to `ToolRegistry.init`.
 5. Add a page here and a row above. The description is prompt text; write it for the model.
+6. Add its limits and an example prompt to `ToolRegistry.guidance`; the tests fail until you do.

@@ -92,13 +92,27 @@ struct Respond: AsyncParsableCommand {
     }
 }
 
-/// Prints the registered tools as `name<TAB>description`.
+/// Prints the registered tools as `name<TAB>description`, or the full catalogue as JSON or Markdown.
 struct Tools: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List the tools available to the model.")
 
+    @Flag(name: .long, help: "Print the full catalogue (schemas, limits, example prompts) as JSON.")
+    var json = false
+
+    @Flag(
+        name: .long, help: "Print the full catalogue as Markdown, the same text as the MCP resource daimon://tools.md.")
+    var markdown = false
+
     func run() throws {
-        for tool in ToolRegistry().all {
-            print("\(tool.name)\t\(tool.description)")
+        let registry = ToolRegistry()
+        if json {
+            print(registry.descriptionsJSON)
+        } else if markdown {
+            print(registry.descriptionsMarkdown)
+        } else {
+            for tool in registry.all {
+                print("\(tool.name)\t\(tool.description)")
+            }
         }
     }
 }

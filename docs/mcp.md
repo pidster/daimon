@@ -23,6 +23,27 @@ command = "/path/to/daimon"
 args = ["mcp"]
 ```
 
+## Discovering the model's tools
+
+daimon's own tools are not MCP tools, so a client learns about them from two resources:
+
+| URI | Content |
+| --- | --- |
+| `daimon://tools` | JSON: for each tool its `name`, `description`, `parameters` (JSON Schema generated from the same `@Generable` type the model sees), `limits`, and `examplePrompt`. |
+| `daimon://tools.md` | The same as Markdown, with the prompting rules that work for the on-device model. |
+
+Both are generated from the live registry, so they cannot drift from what the model can actually call.
+`daimon tools --json` and `daimon tools --markdown` print the same text on the command line. The `respond`
+tool description points at `daimon://tools`.
+
+How to prompt for a tool, in short: name it, give exact arguments, say how to report the result, one tool
+per prompt, and restrict `tools` on a new thread to what the task needs. For example:
+
+```
+Use run_command with working directory /path/to/repo to run exactly: swift test 2>&1 | tail -3 .
+Report the exit status and output verbatim, nothing else.
+```
+
 ## Tools
 
 ### `respond`
