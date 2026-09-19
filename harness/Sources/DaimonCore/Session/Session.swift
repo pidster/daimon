@@ -273,6 +273,8 @@ public struct Conversation: Sendable {
     public let instructions: String
     /// The model the agent runs on.
     public let model: ModelSelection
+    /// Where Ollama is, should the model be one of its.
+    let ollama: OllamaSettings
 
     /// Builds the gate and the tool registry for one conversation of `session`.
     ///
@@ -289,7 +291,8 @@ public struct Conversation: Sendable {
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(
-            gate: gate, tools: selection.tools.map { $0 }, audit: audit, instructions: instructions, model: model)
+            gate: gate, tools: selection.tools.map { $0 }, audit: audit, instructions: instructions, model: model,
+            ollama: session.config.ollama)
     }
 
     /// Creates the agent that runs this conversation.
@@ -298,9 +301,10 @@ public struct Conversation: Sendable {
     /// - Returns: The agent, recording to this conversation's audit log and advancing its turn clock.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public func openAgent(transcript: Transcript? = nil) throws -> Agent {
+        let resolved = try model.resolve(ollama: ollama)
         if let transcript {
-            return try Agent(transcript: transcript, tools: tools, model: model, audit: audit)
+            return Agent(transcript: transcript, tools: tools, model: resolved, audit: audit)
         }
-        return try Agent(instructions: instructions, tools: tools, model: model, audit: audit)
+        return Agent(instructions: instructions, tools: tools, model: resolved, audit: audit)
     }
 }

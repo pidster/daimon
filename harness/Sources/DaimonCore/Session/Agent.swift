@@ -69,6 +69,27 @@ public final class Agent {
         session = model.session(tools: tools, instructions: instructions)
     }
 
+    /// Creates an agent that continues a saved conversation on an already resolved model; cannot fail.
+    ///
+    /// - Parameters:
+    ///   - transcript: A transcript previously read from `Agent.transcript`.
+    ///   - tools: Tools the model may call; they must match the names the transcript refers to.
+    ///   - model: The resolved model.
+    ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
+    ///   - audit: Where to record turns; nil records nothing.
+    ///   - turns: The conversation's clock; defaults to the audit log's, or a fresh one.
+    public init(
+        transcript: Transcript, tools: [any Tool], model: ResolvedModel, contextPolicy: ContextPolicy = .default,
+        audit: AuditLog? = nil, turns: TurnClock? = nil
+    ) {
+        self.model = model
+        self.tools = tools
+        self.contextPolicy = contextPolicy
+        self.audit = audit
+        self.turns = turns ?? audit?.turns ?? TurnClock()
+        session = model.session(tools: tools, transcript: transcript)
+    }
+
     /// Creates an agent that continues a saved conversation.
     ///
     /// - Parameters:

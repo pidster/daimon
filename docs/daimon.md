@@ -15,7 +15,7 @@ One prompt in, one reply out. The prompt is read from stdin when omitted.
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
-| `-m, --model <model>` | `system` (default, on device) or `private-cloud` (alias `pcc`; Apple Private Cloud Compute; data leaves the Mac, noted on stderr). Defaults to `config.json`. |
+| `-m, --model <model>` | `system` (default, on device), `private-cloud` (alias `pcc`; Apple Private Cloud Compute; data leaves the Mac, noted on stderr), or `ollama:<name>` (a model served by the local Ollama, such as `ollama:qwen3-coder`; `daimon models` lists them). Defaults to `config.json`. |
 | `-y, --yes` | Approve risky commands without asking. Without it, `respond` refuses commands at or above the approval threshold. |
 
 ```
@@ -75,10 +75,24 @@ Shows the audit log (`~/.daimon/logs/audit.jsonl` and rotated files) as one-line
 
 See [logging.md](logging.md) for the event catalogue.
 
+### `daimon models`
+
+Lists what `--model` and `config.json` can name: `system` and `private-cloud` with their availability as
+the framework reports it, then every model the local Ollama serves (from its `/api/tags`), with parameter
+count and size. The configured default is marked with `*`. If no Ollama answers, the last line says so;
+the Apple models are still listed.
+
+```
+* system	available
+  private-cloud	available
+  ollama:qwen3-coder:latest	30.5B 18.6 GB
+```
+
 ### `daimon doctor`
 
 Checks that this install can work and exits non-zero if anything fails: macOS 27 or later, the on-device
-model available, the configured model available when it is not `system`, `/usr/bin/sandbox-exec` present,
+model available, the configured model available when it is not `system` (for `ollama:<name>`, that the
+server answers and lists the model), `/usr/bin/sandbox-exec` present,
 `config.json` parses, `~/.daimon` writable. Run it first
 when something is wrong. `daimon --version` prints the version.
 
@@ -119,7 +133,8 @@ State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes 
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `instructions` | built-in | Default system instructions for new sessions. |
-| `model` | `system` | `system` or `private-cloud`. See [ADR 0013](decisions/0013-model-selection.md). |
+| `model` | `system` | `system`, `private-cloud`, or `ollama:<name>`. See [ADR 0013](decisions/0013-model-selection.md) and [ADR 0016](decisions/0016-local-runtimes-through-an-executor.md). |
+| `ollama` | `{ "baseURL": "http://127.0.0.1:11434", "timeoutSeconds": 120 }` | Where Ollama serves `ollama:<name>` models and how long one generation request may take. |
 | `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
 | `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |

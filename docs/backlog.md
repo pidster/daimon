@@ -33,12 +33,11 @@ not the differentiator. Items, in order of leverage:
 
 ## Models
 
-- **Locally installed models beyond Apple's.** Spiked and decided on 2026-09-19:
-  [ADR 0016](decisions/0016-local-runtimes-through-an-executor.md). A daimon-supplied executor over
-  Ollama drove the framework's tool loop, streaming, and guided generation with `qwen3-coder`. Next:
-  build the production Ollama model behind a third `ModelSelection`, with config shape, a
-  `daimon models` listing from the runtime, base URL and timeouts, a doctor probe, and mapping the
-  runtime's context overflow onto `LanguageModelError.contextSizeExceeded`.
+- Done 2026-09-19: `ollama:<name>` models through a daimon-supplied executor
+  ([ADR 0016](decisions/0016-local-runtimes-through-an-executor.md)), with `daimon models`, the `ollama`
+  config section, and the doctor check. Open: estimate context use from Ollama's reported usage so the
+  condensing policy can act before the runtime silently truncates; other runtimes (MLX, llama.cpp) as
+  further executors when wanted.
 - **Agent tests without the model.** The scripted executor from the spike (`ExecutorSpikeTests`) can
   drive `Agent`, `ConversationThread`, and `DaimonServer.respond` end to end without Apple's model;
   extend it to replace `FakeThread` and to cover the chat loop.

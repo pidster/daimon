@@ -57,11 +57,13 @@ Ollama's `/api/tags` is a real "what is installed" list.
 
 - Tests can drive `Agent` and the tool loop without any model through a scripted executor, so "tests
   never need the model" now extends to the agent layer; `ExecutorSpikeTests` is the first such test.
-- `OllamaSpikeTests` is gated by `DAIMON_OLLAMA_TESTS=1` and `DAIMON_OLLAMA_MODEL`, like the model eval,
-  and is the reference for the executor until the production one exists.
+- `OllamaLiveTests` is gated by `DAIMON_OLLAMA_TESTS=1` and `DAIMON_OLLAMA_MODEL`, like the model eval;
+  `OllamaModelTests` covers the mapping, bodies, chunks, and the unreachable case without a server.
 - Token counting is not in the protocol; a custom model reports usage through `updateUsage` per turn,
-  and `contextTokens()` stays nil. `ContextPolicy` still recovers from an executor that throws
-  `LanguageModelError.contextSizeExceeded`, so an Ollama executor should map the runtime's context
-  overflow onto that error.
-- Open for the build: the config shape (`model: "ollama:qwen3-coder"` or an object), a `daimon models`
-  listing, timeouts and the base URL, and how the doctor checks the runtime.
+  and `contextTokens()` stays nil. Ollama does not signal context overflow (it truncates to `num_ctx`),
+  so `ContextPolicy`'s recovery never triggers on it; a later change may estimate from the usage it
+  reports.
+- Built the same day: `ModelSelection.ollama(name)` spelled `ollama:<name>`; `config.json`'s `ollama`
+  section (`baseURL`, `timeoutSeconds`); `daimon models`, which lists Apple's two and the server's
+  `/api/tags`; the doctor's configured-model check resolves through the same path. `resolve` for an
+  Ollama model blocks on one `/api/tags` call with a five-second limit.

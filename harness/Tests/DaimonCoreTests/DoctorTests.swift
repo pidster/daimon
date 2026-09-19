@@ -16,11 +16,11 @@ import Testing
     @Test func checksConfigAndHomeWithoutTheModel() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "daimon-doctor-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        let healthy = Doctor.Probes(systemModel: { nil }, configuredModel: { _ in nil })
+        let healthy = Doctor.Probes(systemModel: { nil }, configuredModel: { _, _ in nil })
         let doctor = Doctor(home: Home(root: root), probes: healthy)
         var findings = doctor.run()
         #expect(findings.map(\.name) == ["macOS", "model", "sandbox", "config", "home"])
-        let broken = Doctor.Probes(systemModel: { "not enabled" }, configuredModel: { "\($0) is down" })
+        let broken = Doctor.Probes(systemModel: { "not enabled" }, configuredModel: { model, _ in "\(model) is down" })
         let extra = Doctor(home: Home(root: root), model: .privateCloud, probes: broken).run()
         #expect(extra.map(\.name) == ["macOS", "model", "configured model", "sandbox", "config", "home"])
         #expect(!extra[1].ok && extra[1].detail == "not enabled")

@@ -3,24 +3,32 @@ import FoundationModels
 
 /// Which language model a session runs on.
 ///
-/// Parsed from `config.json`'s `model` or `--model`: `system` (default) or
-/// `private-cloud`. (Custom adapters exist in the framework but are unavailable on macOS.)
+/// Parsed from `config.json`'s `model` or `--model`: `system` (default), `private-cloud`, or
+/// `ollama:<name>` for a model served by a local Ollama (ADR 0016). Custom adapters are obsoleted
+/// in macOS 27.
 public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codable {
     /// Apple's on-device model. Nothing leaves the machine.
     case system
     /// Apple's Private Cloud Compute model. Requests leave the machine under Apple's privacy guarantees.
     case privateCloud
+    /// A model served by Ollama on this Mac, by the name Ollama lists it under.
+    case ollama(String)
 
     /// The default.
     public static let `default` = ModelSelection.system
 
-    /// Parses `system` or `private-cloud` (`pcc` is accepted as a short alias).
+    /// Parses `system`, `private-cloud` (`pcc` is accepted as a short alias), or `ollama:<name>`.
     ///
-    /// - Throws: `Failure.unknownModel` for anything else.
+    /// - Throws: `Failure.unknownModel` for anything else, including an empty Ollama name.
     public init(parsing text: String) throws {
-        switch text.trimmingCharacters(in: .whitespaces) {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        switch trimmed {
         case "system", "": self = .system
         case "private-cloud", "pcc": self = .privateCloud
+        case let other where other.hasPrefix("ollama:"):
+            let name = String(other.dropFirst("ollama:".count)).trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty, !name.contains(where: \.isWhitespace) else { throw Failure.unknownModel(other) }
+            self = .ollama(name)
         case let other: throw Failure.unknownModel(other)
         }
     }
@@ -30,6 +38,7 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
         switch self {
         case .system: "system"
         case .privateCloud: "private-cloud"
+        case .ollama(let name): "ollama:\(name)"
         }
     }
 
@@ -65,7 +74,8 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
         /// Human-readable explanation.
         public var description: String {
             switch self {
-            case .unknownModel(let text): "unknown model '\(text)': use system or private-cloud (alias pcc)"
+            case .unknownModel(let text):
+                "unknown model '\(text)': use system, private-cloud (alias pcc), or ollama:<name>"
             case .unavailable(let model, let reason): "model '\(model)' is unavailable: \(reason)"
             }
         }
@@ -96,9 +106,19 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
 
     /// Checks availability and returns a session maker for this model.
     ///
-    /// - Throws: `Failure.unavailable`.
-    public func resolve() throws -> ResolvedModel {
+    /// - Parameter settings: Where Ollama is, for an `ollama:` selection.
+    /// - Returns: A session maker over the checked model.
+    /// - Throws: `Failure.unavailable`, with an Ollama failure's text as the reason for that runtime.
+    public func resolve(ollama settings: OllamaSettings = .default) throws -> ResolvedModel {
         switch self {
+        case .ollama(let name):
+            let model = OllamaModel(name: name, settings: settings)
+            do {
+                try model.check()
+            } catch let failure as OllamaModel.Failure {
+                throw Failure.unavailable(model: description, reason: failure.description)
+            }
+            return ResolvedModel(selection: self, custom: model)
         case .system:
             let model = SystemLanguageModel.default
             if case .unavailable(let reason) = model.availability {

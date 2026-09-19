@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An on-device, tool-using AI microharness for macOS, written in Swift on Apple's Foundation Models framework
 (the model behind Apple Intelligence and the `fm` CLI). One binary, `daimon`, with two faces: a CLI
-(`respond`, `chat`, `tools`, `logs`, `doctor`, `approvals`) and an MCP server over stdio (`mcp`) that other
+(`respond`, `chat`, `tools`, `models`, `logs`, `doctor`, `approvals`) and an MCP server over stdio (`mcp`) that other
 harnesses delegate local work to. Every command the model runs passes a policy, a Seatbelt sandbox, a risk classifier, and,
 when risky, human approval; everything is written to a verbatim audit log.
 
@@ -58,7 +58,7 @@ subshell); the server exits on EOF. `docs/mcp.md` has a ready-made example.
 ## Architecture in one paragraph
 
 `Agent` wraps one `LanguageModelSession` created by a `ResolvedModel` (`ModelSelection`: `system` or
-`private-cloud`; adapters are unavailable on macOS; ADR 0013); the framework runs the tool loop. `ToolRegistry` is the single
+`private-cloud`, or `ollama:<name>` through daimon's own executor, ADR 0016; adapters are obsoleted on macOS 27, ADR 0013); the framework runs the tool loop. `ToolRegistry` is the single
 list of tools the model sees (`current_date`, `run_command`, `read_file`), each wrapped by `AuditedTool`.
 `CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus on-device
 model classifier, ask at `moderate` and above through an `Approver` per entry point), then runs `/bin/sh -c`

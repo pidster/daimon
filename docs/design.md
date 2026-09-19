@@ -41,10 +41,15 @@ availability and shapes the API.
 
 ### `ModelSelection` and `ResolvedModel`
 
-Any `LanguageModel` can be wrapped by `ResolvedModel(selection:custom:)`, including one whose executor
-talks to a local runtime; see [ADR 0016](decisions/0016-local-runtimes-through-an-executor.md).
+Any `LanguageModel` can be wrapped by `ResolvedModel(selection:custom:)`. `OllamaModel` is the first:
+its `Executor` maps the transcript onto Ollama's chat API (system, user, assistant with tool calls, tool
+messages), sends tool definitions as JSON Schema and an output schema as `format`, and streams chunks back
+as `response` and `toolCalls` events with usage at the end. `resolve` checks the server lists the model
+(blocking briefly, because agents are created synchronously). The framework's tool loop, streaming,
+transcript, and guided generation are unchanged above it. See
+[ADR 0016](decisions/0016-local-runtimes-through-an-executor.md).
 
-`ModelSelection` names the model (`system` or `private-cloud`); `resolve()` checks
+`ModelSelection` names the model (`system`, `private-cloud`, or `ollama:<name>`); `resolve()` checks
 availability and returns a `ResolvedModel`, which erases the concrete `LanguageModel` behind session
 makers and an optional token counter. See [ADR 0013](decisions/0013-model-selection.md).
 

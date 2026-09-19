@@ -21,6 +21,22 @@ public struct Config: Codable, Equatable, Sendable {
     public var audit: AuditConfig?
     /// Risk classification and approval for `run_command`.
     public var approval: ApprovalConfig?
+    /// Where a local Ollama serves `ollama:<name>` models.
+    public var ollama: OllamaConfig?
+
+    /// Ollama settings in the file.
+    public struct OllamaConfig: Codable, Equatable, Sendable {
+        /// The server's base URL; default `http://127.0.0.1:11434`.
+        public var baseURL: String?
+        /// Seconds allowed for one generation request; default 120.
+        public var timeoutSeconds: Int?
+
+        /// Creates settings; nil fields take defaults.
+        public init(baseURL: String? = nil, timeoutSeconds: Int? = nil) {
+            self.baseURL = baseURL
+            self.timeoutSeconds = timeoutSeconds
+        }
+    }
 
     /// Approval settings in the file.
     public struct ApprovalConfig: Codable, Equatable, Sendable {
@@ -70,7 +86,7 @@ public struct Config: Codable, Equatable, Sendable {
     public init(
         instructions: String? = nil, model: ModelSelection? = nil, commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
-        audit: AuditConfig? = nil, approval: ApprovalConfig? = nil
+        audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil
     ) {
         self.instructions = instructions
         self.model = model
@@ -80,6 +96,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.commandPolicy = commandPolicy
         self.audit = audit
         self.approval = approval
+        self.ollama = ollama
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
@@ -119,7 +136,10 @@ public struct Config: Codable, Equatable, Sendable {
             approvalThreshold: approval?.threshold ?? .default,
             approvalUsesModel: approval?.useModel ?? true,
             approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600),
-            approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600)
+            approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600),
+            ollama: OllamaSettings(
+                baseURL: ollama?.baseURL.flatMap(URL.init(string:)) ?? OllamaSettings.default.baseURL,
+                timeout: .seconds(ollama?.timeoutSeconds ?? 120))
         )
     }
 
@@ -145,5 +165,7 @@ public struct Config: Codable, Equatable, Sendable {
         public var approvalTimeout: Duration?
         /// How long a persisted approval lasts.
         public var approvalLifetime: Duration
+        /// Where Ollama is for `ollama:<name>` models.
+        public var ollama: OllamaSettings
     }
 }

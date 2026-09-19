@@ -1,0 +1,362 @@
+import Foundation
+import FoundationModels
+import Synchronization
+
+/// Where Ollama is and how long to wait for it, from `config.json`'s `ollama` section.
+public struct OllamaSettings: Equatable, Sendable {
+    /// The server's base URL.
+    public var baseURL: URL
+    /// Wall-clock limit for one generation request, including streaming.
+    public var timeout: Duration
+
+    /// The Ollama defaults: the local server on port 11434, two minutes per request.
+    public static let `default` = OllamaSettings(baseURL: defaultBaseURL, timeout: .seconds(120))
+
+    /// Ollama's own listen address, `http://127.0.0.1:11434`.
+    public static let defaultBaseURL: URL = {
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = "127.0.0.1"
+        components.port = 11434
+        return components.url ?? URL(filePath: "/")
+    }()
+
+    /// Creates settings.
+    public init(baseURL: URL, timeout: Duration) {
+        self.baseURL = baseURL
+        self.timeout = timeout
+    }
+}
+
+/// A model served by a local Ollama, plugged into `LanguageModelSession` through daimon's own executor
+/// ([ADR 0016](../../../../docs/decisions/0016-local-runtimes-through-an-executor.md)).
+///
+/// The framework keeps the tool loop, streaming, transcript, and guided generation; the executor maps
+/// the transcript onto Ollama's chat API and streams its chunks back as events.
+public struct OllamaModel: LanguageModel, Sendable {
+    /// Why Ollama could not serve.
+    public enum Failure: Error, CustomStringConvertible, Equatable {
+        /// No server answered at the base URL.
+        case unreachable(URL, String)
+        /// The server has no model by that name; the names it has are listed.
+        case noSuchModel(String, installed: [String])
+        /// The server answered with an error status.
+        case serverError(status: Int, body: String)
+        /// A streamed chunk could not be understood.
+        case badResponse(String)
+
+        /// Human-readable explanation.
+        public var description: String {
+            switch self {
+            case .unreachable(let url, let detail): "no Ollama server at \(url): \(detail)"
+            case .noSuchModel(let name, let installed):
+                "Ollama has no model '\(name)'; installed: \(installed.isEmpty ? "none" : installed.joined(separator: ", "))"
+            case .serverError(let status, let body): "Ollama returned HTTP \(status): \(body)"
+            case .badResponse(let detail): "unexpected Ollama response: \(detail)"
+            }
+        }
+    }
+
+    /// One installed model, as `/api/tags` lists it.
+    public struct Installed: Equatable, Sendable, Decodable {
+        /// The name, such as `qwen3-coder:latest`.
+        public var name: String
+        /// Bytes on disk.
+        public var size: Int
+        /// The parameter count as Ollama reports it, such as `30.5B`.
+        public var parameterSize: String?
+
+        private enum CodingKeys: String, CodingKey { case name, size, details }
+        private enum Details: String, CodingKey { case parameter_size }
+
+        /// Creates a record.
+        public init(name: String, size: Int, parameterSize: String?) {
+            self.name = name
+            self.size = size
+            self.parameterSize = parameterSize
+        }
+
+        /// Decodes one entry of the tags list.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            size = try container.decodeIfPresent(Int.self, forKey: .size) ?? 0
+            let details = try? container.nestedContainer(keyedBy: Details.self, forKey: .details)
+            parameterSize = try details?.decodeIfPresent(String.self, forKey: .parameter_size)
+        }
+    }
+
+    /// The model name as Ollama knows it.
+    public let name: String
+    /// Where the server is.
+    public let settings: OllamaSettings
+
+    /// Creates a model; `resolve` on the selection checks it exists first.
+    public init(name: String, settings: OllamaSettings = .default) {
+        self.name = name
+        self.settings = settings
+    }
+
+    /// Tool calling and JSON-schema output, both of which Ollama's chat API supports.
+    public var capabilities: LanguageModelCapabilities { .init([.toolCalling, .guidedGeneration]) }
+    /// The executor's configuration: base URL and timeout, as one hashable string.
+    public var executorConfiguration: Executor.Configuration {
+        .init(baseURL: settings.baseURL, timeoutSeconds: Int(settings.timeout.components.seconds))
+    }
+
+    /// Lists the installed models.
+    ///
+    /// - Throws: `Failure.unreachable`, `Failure.serverError`, or `Failure.badResponse`.
+    public static func installed(at settings: OllamaSettings) async throws -> [Installed] {
+        struct Tags: Decodable { var models: [Installed] }
+        var request = URLRequest(url: settings.baseURL.appending(path: "api/tags"))
+        request.timeoutInterval = 5
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw Failure.unreachable(settings.baseURL, error.localizedDescription)
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
+            throw Failure.serverError(status: status, body: String(decoding: data.prefix(200), as: UTF8.self))
+        }
+        do {
+            return try JSONDecoder().decode(Tags.self, from: data).models
+        } catch {
+            throw Failure.badResponse("\(error)")
+        }
+    }
+
+    /// Whether `name` matches an installed model, allowing the `:latest` tag to be omitted.
+    public static func matches(_ name: String, installed: [Installed]) -> Bool {
+        installed.contains { $0.name == name || $0.name == "\(name):latest" }
+    }
+
+    /// Checks the server is up and has this model, blocking briefly; `ModelSelection.resolve` is
+    /// synchronous because agents are created synchronously.
+    ///
+    /// - Throws: `Failure`.
+    public func check() throws {
+        let installed = try Self.blocking { try await Self.installed(at: settings) }
+        guard Self.matches(name, installed: installed) else {
+            throw Failure.noSuchModel(name, installed: installed.map(\.name))
+        }
+    }
+
+    /// Runs a short async probe to completion from synchronous code.
+    private static func blocking<T: Sendable>(_ operation: @escaping @Sendable () async throws -> T) throws -> T {
+        let slot = Slot<T>()
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            let result: Result<T, any Error>
+            do { result = .success(try await operation()) } catch { result = .failure(error) }
+            slot.result.withLock { $0 = result }
+            done.signal()
+        }
+        done.wait()
+        guard let result = slot.result.withLock({ $0 }) else { throw Failure.badResponse("probe produced no result") }
+        return try result.get()
+    }
+
+    /// A one-shot result slot for `blocking`.
+    private final class Slot<T: Sendable>: Sendable {
+        let result = Mutex<Result<T, any Error>?>(nil)
+    }
+
+    /// Talks to Ollama's `/api/chat` for one generation request and streams the reply back.
+    public struct Executor: LanguageModelExecutor {
+        /// What the executor needs: the server and a per-request limit.
+        public struct Configuration: Hashable, Sendable {
+            /// The server's base URL.
+            public var baseURL: URL
+            /// Seconds allowed for one request, including streaming.
+            public var timeoutSeconds: Int
+
+            /// Creates a configuration.
+            public init(baseURL: URL, timeoutSeconds: Int) {
+                self.baseURL = baseURL
+                self.timeoutSeconds = timeoutSeconds
+            }
+        }
+        /// The model type this executor serves.
+        public typealias Model = OllamaModel
+
+        private let configuration: Configuration
+
+        /// Creates an executor; the framework calls this with the model's `executorConfiguration`.
+        public init(configuration: Configuration) throws {
+            self.configuration = configuration
+        }
+
+        /// One chat message in Ollama's shape.
+        struct Message: Codable, Equatable {
+            var role: String
+            var content: String
+            var tool_calls: [ToolCall]?
+            var tool_name: String?
+
+            /// A tool call the assistant made.
+            struct ToolCall: Codable, Equatable {
+                var function: Function
+                /// The function name and its arguments as an object.
+                struct Function: Codable, Equatable {
+                    var name: String
+                    var arguments: JSONValue
+                }
+            }
+        }
+
+        /// The chat request body.
+        struct ChatRequest: Encodable {
+            var model: String
+            var messages: [Message]
+            var tools: [ToolSpec]?
+            var stream: Bool
+            var format: JSONValue?
+
+            /// A tool definition in Ollama's (OpenAI-style) shape.
+            struct ToolSpec: Encodable {
+                var type = "function"
+                var function: Function
+                /// Name, description, and JSON Schema.
+                struct Function: Encodable {
+                    var name: String
+                    var description: String
+                    var parameters: JSONValue
+                }
+            }
+        }
+
+        /// One streamed line of the reply.
+        struct Chunk: Decodable {
+            var message: Message?
+            var done: Bool?
+            var error: String?
+            var prompt_eval_count: Int?
+            var eval_count: Int?
+        }
+
+        /// Maps the framework transcript onto chat messages: instructions become the system message,
+        /// prompts and responses alternate, tool calls ride on an assistant message, and tool outputs
+        /// are `tool` messages naming the tool.
+        static func messages(from transcript: Transcript) -> [Message] {
+            func text(_ segments: [Transcript.Segment]) -> String {
+                segments.compactMap {
+                    switch $0 {
+                    case .text(let segment): segment.content
+                    case .structure(let segment): segment.content.jsonString
+                    default: nil
+                    }
+                }.joined()
+            }
+            var messages: [Message] = []
+            for entry in transcript {
+                switch entry {
+                case .instructions(let instructions):
+                    messages.append(Message(role: "system", content: text(instructions.segments)))
+                case .prompt(let prompt):
+                    messages.append(Message(role: "user", content: text(prompt.segments)))
+                case .response(let response):
+                    messages.append(Message(role: "assistant", content: text(response.segments)))
+                case .toolCalls(let calls):
+                    let mapped = calls.map { call in
+                        Message.ToolCall(
+                            function: .init(name: call.toolName, arguments: Self.json(call.arguments.jsonString)))
+                    }
+                    messages.append(Message(role: "assistant", content: "", tool_calls: mapped))
+                case .toolOutput(let output):
+                    messages.append(Message(role: "tool", content: text(output.segments), tool_name: output.toolName))
+                default:
+                    break
+                }
+            }
+            return messages
+        }
+
+        /// Parses JSON text into a value, or an empty object.
+        private static func json(_ text: String) -> JSONValue {
+            (try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))) ?? .object([:])
+        }
+
+        /// Re-encodes an `Encodable` (a `GenerationSchema`) as a `JSONValue`.
+        private static func json(_ value: some Encodable) -> JSONValue {
+            guard let data = try? JSONEncoder().encode(value) else { return .object([:]) }
+            return json(String(decoding: data, as: UTF8.self))
+        }
+
+        /// The request body for one generation.
+        static func body(for request: LanguageModelExecutorGenerationRequest, model: String) -> ChatRequest {
+            let tools = request.enabledToolDefinitions.map { definition in
+                ChatRequest.ToolSpec(
+                    function: .init(
+                        name: definition.name, description: definition.description,
+                        parameters: json(definition.parameters))
+                )
+            }
+            return ChatRequest(
+                model: model, messages: messages(from: request.transcript), tools: tools.isEmpty ? nil : tools,
+                stream: true, format: request.schema.map { json($0) })
+        }
+
+        /// Sends the request and streams chunks back as events.
+        ///
+        /// - Throws: `OllamaModel.Failure`.
+        nonisolated(nonsending) public func respond(
+            to request: LanguageModelExecutorGenerationRequest, model: OllamaModel,
+            streamingInto channel: LanguageModelExecutorGenerationChannel
+        ) async throws {
+            var http = URLRequest(url: configuration.baseURL.appending(path: "api/chat"))
+            http.httpMethod = "POST"
+            http.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            http.timeoutInterval = TimeInterval(configuration.timeoutSeconds)
+            http.httpBody = try JSONEncoder().encode(Self.body(for: request, model: model.name))
+            let bytes: URLSession.AsyncBytes
+            let response: URLResponse
+            do {
+                (bytes, response) = try await URLSession.shared.bytes(for: http)
+            } catch {
+                throw Failure.unreachable(configuration.baseURL, error.localizedDescription)
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard status == 200 else {
+                var body = ""
+                for try await line in bytes.lines where body.count < 200 { body += line }
+                throw Failure.serverError(status: status, body: body)
+            }
+            var calls = 0
+            var input = 0
+            var output = 0
+            for try await line in bytes.lines {
+                let chunk: Chunk
+                do {
+                    chunk = try JSONDecoder().decode(Chunk.self, from: Data(line.utf8))
+                } catch {
+                    throw Failure.badResponse(String(line.prefix(200)))
+                }
+                if let error = chunk.error { throw Failure.serverError(status: status, body: error) }
+                if let message = chunk.message {
+                    if !message.content.isEmpty {
+                        await channel.send(.response(action: .appendText(message.content, tokenCount: 1)))
+                    }
+                    for call in message.tool_calls ?? [] {
+                        calls += 1
+                        let encoded = (try? JSONEncoder().encode(call.function.arguments)) ?? Data("{}".utf8)
+                        await channel.send(
+                            .toolCalls(
+                                action: .toolCall(
+                                    id: "\(request.id.uuidString.lowercased())-\(calls)", name: call.function.name,
+                                    action: .appendArguments(String(decoding: encoded, as: UTF8.self), tokenCount: 1))))
+                    }
+                }
+                input = chunk.prompt_eval_count ?? input
+                output = chunk.eval_count ?? output
+            }
+            await channel.send(
+                .response(
+                    action: .updateUsage(
+                        input: .init(totalTokenCount: input, cachedTokenCount: 0),
+                        output: .init(totalTokenCount: output, reasoningTokenCount: 0))))
+        }
+    }
+}

@@ -3,7 +3,8 @@
 **daimon** is a small, on-device AI agent for the Mac. It runs Apple's built-in Foundation Model, the same
 one behind Apple Intelligence and the `fm` command, and gives it tools: it can run shell commands, read
 files, and tell the time, and it can be extended with more. With the default model nothing leaves your
-machine; Apple's Private Cloud Compute model is available as an explicit opt-in. Commands the model runs
+machine; Apple's Private Cloud Compute model is available as an explicit opt-in, and any model served by a
+local Ollama can be chosen with `--model ollama:<name>`. Commands the model runs
 may use the network unless you turn that off.
 
 It has two faces:

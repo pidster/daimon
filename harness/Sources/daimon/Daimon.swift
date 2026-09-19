@@ -11,7 +11,9 @@ struct Daimon: AsyncParsableCommand {
         commandName: "daimon",
         abstract: "An on-device, tool-using AI microharness over Apple's Foundation Models.",
         version: DaimonVersion.current,
-        subcommands: [Respond.self, Chat.self, Tools.self, Mcp.self, Logs.self, DoctorCommand.self, Approvals.self],
+        subcommands: [
+            Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, DoctorCommand.self, Approvals.self,
+        ],
         defaultSubcommand: Respond.self
     )
 }
@@ -319,6 +321,38 @@ struct Logs: ParsableCommand {
     }
 }
 
+/// Lists the models a session can run on: Apple's two and whatever the local Ollama serves.
+struct Models: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "List the models available to --model and config.json.",
+        discussion: "Apple's models are checked with the framework; Ollama's are read from its /api/tags.")
+
+    func run() async throws {
+        let config = try Daimon.usage { try Session.loadConfig(home: Daimon.home) }
+        for selection in [ModelSelection.system, .privateCloud] {
+            let state: String
+            do {
+                _ = try selection.resolve()
+                state = "available"
+            } catch {
+                state = "unavailable: \(error)"
+            }
+            let mark = selection == config.model ? "*" : " "
+            print("\(mark) \(selection)\t\(state)")
+        }
+        do {
+            for model in try await OllamaModel.installed(at: config.ollama) {
+                let selection = ModelSelection.ollama(model.name)
+                let mark = selection == config.model ? "*" : " "
+                let size = ByteCountFormatter.string(fromByteCount: Int64(model.size), countStyle: .file)
+                print("\(mark) \(selection)\t\(model.parameterSize ?? "?") \(size)")
+            }
+        } catch {
+            print("  ollama:*\tunavailable: \(error)")
+        }
+    }
+}
+
 /// Checks that this install can work: OS version, model availability, sandbox, config, home directory.
 struct DoctorCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -326,8 +360,9 @@ struct DoctorCommand: ParsableCommand {
         discussion: "Exits non-zero if any check fails. The first thing to run when something is wrong.")
 
     func run() throws {
-        let model = (try? Session.loadConfig(home: Daimon.home).model) ?? .default
-        let findings = Doctor(home: Daimon.home, model: model).run()
+        let config = try? Session.loadConfig(home: Daimon.home)
+        let findings = Doctor(home: Daimon.home, model: config?.model ?? .default, ollama: config?.ollama ?? .default)
+            .run()
         print("daimon \(DaimonVersion.current)")
         print(Doctor.render(findings))
         guard Doctor.allPassed(findings) else { throw ExitCode.failure }
