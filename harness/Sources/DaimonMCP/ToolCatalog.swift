@@ -108,8 +108,8 @@ public struct RespondRequest: Equatable, Sendable {
     public var prompt: String
     /// Optional session instructions; nil means the server default.
     public var instructions: String?
-    /// Names of daimon tools to enable; empty means all registered tools.
-    public var toolNames: [String]
+    /// Which daimon tools to enable; `.all` means the server's set.
+    public var tools: ToolSelection
     /// Thread to continue or create; nil means start a new thread with a generated id.
     public var threadID: String?
     /// Model for a new thread; nil means the server default.
@@ -130,12 +130,15 @@ public struct RespondRequest: Equatable, Sendable {
         }
         if let raw = arguments?["tools"] {
             guard let items = raw.arrayValue else { throw MCPError.invalidParams("'tools' must be an array") }
-            toolNames = try items.map {
-                guard let name = $0.stringValue else { throw MCPError.invalidParams("'tools' items must be strings") }
-                return name
-            }
+            tools = ToolSelection(
+                try items.map {
+                    guard let name = $0.stringValue else {
+                        throw MCPError.invalidParams("'tools' items must be strings")
+                    }
+                    return name
+                })
         } else {
-            toolNames = []
+            tools = .all
         }
         if let raw = arguments?["thread_id"] {
             guard let id = raw.stringValue else { throw MCPError.invalidParams("'thread_id' must be a string") }

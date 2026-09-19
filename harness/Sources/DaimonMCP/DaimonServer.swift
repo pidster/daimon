@@ -28,7 +28,7 @@ public struct DaimonServer: Sendable {
     public typealias ThreadFactory =
         @Sendable (
             _ session: Session, _ approver: any Approver, _ id: String, _ instructions: String?,
-            _ toolNames: [String]?, _ model: ModelSelection?
+            _ tools: ToolSelection, _ model: ModelSelection?
         ) throws -> OpenThread
     private let makeThread: ThreadFactory
     /// Asks the client's user through elicitation; `--yes` sessions bypass it inside the gate.
@@ -43,9 +43,9 @@ public struct DaimonServer: Sendable {
     ///   - makeThread: How threads are built; tests inject a fake that needs no model.
     public init(
         session: Session,
-        makeThread: @escaping ThreadFactory = { session, approver, id, instructions, toolNames, model in
+        makeThread: @escaping ThreadFactory = { session, approver, id, instructions, tools, model in
             let conversation = try session.conversation(
-                id: id, approver: approver, instructions: instructions, toolNames: toolNames, model: model)
+                id: id, approver: approver, instructions: instructions, tools: tools, model: model)
             return OpenThread(
                 thread: ConversationThread(id: id, agent: try conversation.openAgent()), gate: conversation.gate,
                 audit: conversation.audit)
@@ -148,8 +148,7 @@ public struct DaimonServer: Sendable {
         do {
             opened = try await threads.findOrCreate(id: id) {
                 try makeThread(
-                    session, approver, id, request.instructions, request.toolNames.isEmpty ? nil : request.toolNames,
-                    request.model)
+                    session, approver, id, request.instructions, request.tools, request.model)
             }
         } catch {
             return failure(String(describing: error))
@@ -158,7 +157,7 @@ public struct DaimonServer: Sendable {
             evicted.thread.audit.record(.sessionEnd, details: ["reason": "evicted"])
             Diagnostics.mcp.info("evicted thread \(evicted.id) to make room for \(id)")
         }
-        if !opened.created, request.instructions != nil || !request.toolNames.isEmpty || request.model != nil {
+        if !opened.created, request.instructions != nil || request.tools != .all || request.model != nil {
             return failure("instructions, tools, and model apply only when a thread is created; \(id) already exists")
         }
         do {

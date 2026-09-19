@@ -25,7 +25,7 @@ public struct Config: Codable, Equatable, Sendable {
     /// Approval settings in the file.
     public struct ApprovalConfig: Codable, Equatable, Sendable {
         /// Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`.
-        public var threshold: String?
+        public var threshold: ApprovalThreshold?
         /// Whether the on-device model classifies alongside the rules.
         public var useModel: Bool?
         /// Seconds to wait for an approval answer before treating silence as a denial; 0 waits forever.
@@ -35,7 +35,8 @@ public struct Config: Codable, Equatable, Sendable {
 
         /// Creates settings; nil fields take defaults.
         public init(
-            threshold: String? = nil, useModel: Bool? = nil, timeoutSeconds: Int? = nil, persistDays: Int? = nil
+            threshold: ApprovalThreshold? = nil, useModel: Bool? = nil, timeoutSeconds: Int? = nil,
+            persistDays: Int? = nil
         ) {
             self.threshold = threshold
             self.useModel = useModel
@@ -83,15 +84,12 @@ public struct Config: Codable, Equatable, Sendable {
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
     ///
-    /// - Throws: `DecodingError` for malformed JSON, `CommandPolicy.Failure` for a bad pattern,
-    ///   or file-system errors other than "missing".
+    /// - Throws: `DecodingError` for malformed JSON or an unknown `approval.threshold`,
+    ///   `CommandPolicy.Failure` for a bad pattern, or file-system errors other than "missing".
     public static func load(from url: URL) throws -> Config {
         guard FileManager.default.fileExists(atPath: url.path) else { return Config() }
         let config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
         try config.commandPolicy?.validate()
-        if let threshold = config.approval?.threshold, threshold != "never", RiskLevel(rawValue: threshold) == nil {
-            throw Failure.invalidApprovalThreshold(threshold)
-        }
         return config
     }
 
@@ -118,26 +116,11 @@ public struct Config: Codable, Equatable, Sendable {
             auditEnabled: audit?.enabled ?? true,
             auditLimits: FileAuditSink.Limits(
                 maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5),
-            approvalThreshold: approval?.threshold == "never"
-                ? nil : RiskLevel(rawValue: approval?.threshold ?? "") ?? .moderate,
+            approvalThreshold: approval?.threshold ?? .default,
             approvalUsesModel: approval?.useModel ?? true,
             approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600),
             approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600)
         )
-    }
-
-    /// Why a config file is unusable beyond JSON syntax.
-    public enum Failure: Error, CustomStringConvertible, Equatable {
-        /// `approval.threshold` is not a risk level or `never`.
-        case invalidApprovalThreshold(String)
-
-        /// Human-readable explanation.
-        public var description: String {
-            switch self {
-            case .invalidApprovalThreshold(let value):
-                "invalid approval.threshold '\(value)': use safe, moderate, dangerous, or never"
-            }
-        }
     }
 
     /// Configuration with every default filled in.
@@ -154,8 +137,8 @@ public struct Config: Codable, Equatable, Sendable {
         public var auditEnabled: Bool
         /// Rotation limits for the audit file.
         public var auditLimits: FileAuditSink.Limits
-        /// Ask for approval at this level and above; nil never asks.
-        public var approvalThreshold: RiskLevel?
+        /// From which level a human is asked.
+        public var approvalThreshold: ApprovalThreshold
         /// Whether the on-device model classifies alongside the rules.
         public var approvalUsesModel: Bool
         /// How long an approval request may go unanswered before it counts as a denial; nil waits forever.

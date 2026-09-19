@@ -23,7 +23,7 @@ import Testing
         defer { try? FileManager.default.removeItem(at: home.root) }
         let (session, sink) = try begin(
             .init(
-                entryPoint: "respond", instructions: "override", model: .privateCloud, toolNames: ["current_date"],
+                entryPoint: "respond", instructions: "override", model: .privateCloud, tools: .named(["current_date"]),
                 unsafe: true, autoApprove: true, resume: "chat1"), home: home)
         #expect(session.instructions == "override")
         #expect(session.config.model == .privateCloud)
@@ -59,7 +59,7 @@ import Testing
         let home = try temporaryHome()
         defer { try? FileManager.default.removeItem(at: home.root) }
         #expect(throws: Session.Failure.unknownTools(["nope"])) {
-            try begin(.init(entryPoint: "respond", toolNames: ["current_date", "nope"]), home: home)
+            try begin(.init(entryPoint: "respond", tools: .named(["current_date", "nope"])), home: home)
         }
         try Data("{bad".utf8).write(to: home.configFile)
         #expect(throws: Session.Failure.self) { try Session.loadConfig(home: home) }
@@ -100,7 +100,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: home.root) }
         let (session, sink) = try begin(.init(entryPoint: "mcp", unsafe: true), home: home)
         let conversation = try session.conversation(
-            id: "thread-1", approver: DenyingApprover(reason: "x"), instructions: "be brief", toolNames: ["read_file"],
+            id: "thread-1", approver: DenyingApprover(reason: "x"), instructions: "be brief",
+            tools: .named(["read_file"]),
             model: .privateCloud)
         #expect(conversation.instructions == "be brief")
         #expect(conversation.model == .privateCloud)

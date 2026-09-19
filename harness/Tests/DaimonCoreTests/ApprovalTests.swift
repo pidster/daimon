@@ -93,7 +93,7 @@ import Testing
         let approver = Recording(.denied("should not be asked"))
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .safe), approver: approver, threshold: .moderate,
+            classifier: Fixed(level: .safe), approver: approver, threshold: .level(.moderate),
             audit: AuditLog(session: "s", sink: sink))
         try await gate.clear(command: "ls", workingDirectory: "/")
         #expect(approver.asked.events.isEmpty)
@@ -103,7 +103,7 @@ import Testing
 
     @Test func nilThresholdOnlyAudits() async throws {
         let approver = Recording(.denied("no"))
-        let gate = ApprovalGate(classifier: Fixed(level: .dangerous), approver: approver, threshold: nil)
+        let gate = ApprovalGate(classifier: Fixed(level: .dangerous), approver: approver, threshold: .never)
         try await gate.clear(command: "rm -rf /", workingDirectory: "/")
         #expect(approver.asked.events.isEmpty)
     }
@@ -111,7 +111,7 @@ import Testing
     @Test func atThresholdAsksAndDenialThrows() async {
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: Recording(.denied("nope")), threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: Recording(.denied("nope")), threshold: .level(.moderate),
             audit: AuditLog(session: "s", sink: sink))
         await #expect(throws: ApprovalGate.Failure.refused("nope")) {
             try await gate.clear(command: "touch x", workingDirectory: "/")
@@ -123,7 +123,8 @@ import Testing
     @Test func unansweredApprovalIsAuditedAsTimedOutAndDenied() async {
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: Recording(.unanswered(.seconds(2))), threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: Recording(.unanswered(.seconds(2))),
+            threshold: .level(.moderate),
             audit: AuditLog(session: "s", sink: sink))
         await #expect(throws: ApprovalGate.Failure.self) {
             try await gate.clear(command: "touch x", workingDirectory: "/")
@@ -136,7 +137,7 @@ import Testing
         let approver = Recording(.approved(.session))
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .dangerous), approver: approver, threshold: .moderate,
+            classifier: Fixed(level: .dangerous), approver: approver, threshold: .level(.moderate),
             audit: AuditLog(session: "s", sink: sink))
         try await gate.clear(command: "git push", workingDirectory: "/a")
         try await gate.clear(command: "git push", workingDirectory: "/a")
@@ -149,20 +150,22 @@ import Testing
 
     @Test func runnerConsultsTheGateAfterPolicy() async throws {
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "batch"), threshold: .moderate)
+            classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "batch"),
+            threshold: .level(.moderate))
         let runner = CommandRunner(options: .init(policy: .unrestricted), approval: gate)
         await #expect(throws: CommandRunner.Failure.disapproved("batch")) { try await runner.run("echo hi") }
         let open = CommandRunner(
             options: .init(policy: .unrestricted),
             approval: ApprovalGate(
-                classifier: Fixed(level: .moderate), approver: AutoApprover(), threshold: .moderate))
+                classifier: Fixed(level: .moderate), approver: AutoApprover(), threshold: .level(.moderate)))
         #expect(try await open.run("printf hi").stdout == "hi")
     }
 
     @Test func disapprovedCommandsRecordOneDisapprovedDecision() async {
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "batch"), threshold: .moderate)
+            classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "batch"),
+            threshold: .level(.moderate))
         let runner = CommandRunner(
             options: .init(policy: .unrestricted), audit: AuditLog(session: "s", sink: sink), approval: gate)
         await #expect(throws: CommandRunner.Failure.self) { try await runner.run("echo hi") }
@@ -184,14 +187,22 @@ import Testing
     }
 
     @Test func configResolvesApproval() throws {
-        #expect(Config().resolved.approvalThreshold == .moderate)
+        #expect(Config().resolved.approvalThreshold == .level(.moderate))
         #expect(Config().resolved.approvalUsesModel)
-        #expect(Config(approval: .init(threshold: "never")).resolved.approvalThreshold == nil)
+        #expect(Config(approval: .init(threshold: .never)).resolved.approvalThreshold == .never)
         #expect(
-            Config(approval: .init(threshold: "dangerous", useModel: false)).resolved.approvalThreshold == .dangerous)
+            Config(approval: .init(threshold: .level(.dangerous), useModel: false)).resolved.approvalThreshold
+                == .level(.dangerous))
         let file = FileManager.default.temporaryDirectory.appending(path: "daimon-approval-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
         try Data(#"{"approval":{"threshold":"loud"}}"#.utf8).write(to: file)
-        #expect(throws: Config.Failure.invalidApprovalThreshold("loud")) { try Config.load(from: file) }
+        #expect(throws: DecodingError.self) { try Config.load(from: file) }
+        #expect(ApprovalThreshold(rawValue: "loud") == nil)
+        #expect(ApprovalThreshold(rawValue: "never") == .never)
+        #expect(ApprovalThreshold.level(.safe).requiresApproval(at: .safe))
+        #expect(!ApprovalThreshold.never.requiresApproval(at: .dangerous))
+        let file2 = file.deletingLastPathComponent().appending(path: "threshold.json")
+        try Data(#"{"approval":{"threshold":"dangerous"}}"#.utf8).write(to: file2)
+        #expect(try Config.load(from: file2).approval?.threshold == .level(.dangerous))
     }
 }

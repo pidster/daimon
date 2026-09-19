@@ -69,7 +69,7 @@ import Testing
         let audit = AuditLog(session: "scenario", sink: MemoryAuditSink())
         audit.beginTurn()
         let gate = ApprovalGate(
-            classifier: RuleRiskClassifier.standard, approver: approver, threshold: .moderate, audit: audit)
+            classifier: RuleRiskClassifier.standard, approver: approver, threshold: .level(.moderate), audit: audit)
         try await gate.clear(command: scenario.line, workingDirectory: "/tmp")
         #expect(approver.patterns.events.compactMap { $0.details["pattern"]?.stringValue } == scenario.asks)
     }
@@ -82,7 +82,8 @@ import Testing
         let runner = CommandRunner(
             options: .init(workingDirectory: "/private/tmp", policy: .unrestricted),
             audit: AuditLog(session: "s", sink: sink),
-            approval: ApprovalGate(classifier: RuleRiskClassifier.standard, approver: Refuse(), threshold: .moderate))
+            approval: ApprovalGate(
+                classifier: RuleRiskClassifier.standard, approver: Refuse(), threshold: .level(.moderate)))
         let probe = "daimon-scenario-\(UUID().uuidString).txt"
         await #expect(throws: CommandRunner.Failure.self) {
             try await runner.run("echo first > \(probe) && touch \(probe).second")

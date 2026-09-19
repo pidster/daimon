@@ -141,8 +141,8 @@ public actor ApprovalGate {
         }
     }
 
-    /// The lowest level that requires approval; `nil` never asks.
-    public let threshold: RiskLevel?
+    /// From which level a human is asked.
+    public let threshold: ApprovalThreshold
     private let classifier: any RiskClassifier
     private let approver: any Approver
     private let audit: AuditLog?
@@ -170,7 +170,7 @@ public actor ApprovalGate {
     /// - Parameters:
     ///   - classifier: Produces the assessment.
     ///   - approver: Decides when the level is at or above `threshold`.
-    ///   - threshold: Ask at this level and above; nil disables asking (still audits verdicts).
+    ///   - threshold: From which level to ask; `.never` still audits verdicts.
     ///   - audit: Where verdicts and decisions are recorded.
     ///   - store: Standing approvals that outlive the process; nil keeps only session approvals.
     ///   - source: Entry point name recorded on grants.
@@ -178,7 +178,7 @@ public actor ApprovalGate {
     ///   - turns: The conversation's clock; defaults to the audit log's, or a clock that never
     ///     advances, under which "this turn" means the life of the gate.
     public init(
-        classifier: any RiskClassifier, approver: any Approver, threshold: RiskLevel?, audit: AuditLog? = nil,
+        classifier: any RiskClassifier, approver: any Approver, threshold: ApprovalThreshold, audit: AuditLog? = nil,
         store: ApprovalStore? = nil, source: String = "unknown",
         sessionApprovals: SessionApprovals = SessionApprovals(),
         turns: TurnClock? = nil
@@ -248,7 +248,7 @@ public actor ApprovalGate {
                 "sources": .array(assessment.sources.map { .string($0) }),
                 "seconds": .double(Date().timeIntervalSince(started)),
             ]) { $1 })
-        guard let threshold, assessment.level >= threshold else { return }
+        guard threshold.requiresApproval(at: assessment.level) else { return }
         if sessionApprovals.contains(Self.key(segment.pattern, workingDirectory)) {
             audit?.record(.approvalDecided, details: base.merging(["decision": "cached"]) { $1 })
             return

@@ -25,13 +25,13 @@ import Testing
         ])
         #expect(request.prompt == "hi")
         #expect(request.instructions == "be brief")
-        #expect(request.toolNames == ["current_date"])
+        #expect(request.tools == .named(["current_date"]))
     }
 
     @Test func respondRequestDefaults() throws {
         let request = try RespondRequest(arguments: ["prompt": .string("hi")])
         #expect(request.instructions == nil)
-        #expect(request.toolNames.isEmpty)
+        #expect(request.tools == .all)
     }
 
     @Test func respondRequestRejectsMissingPrompt() {

@@ -77,7 +77,7 @@ import Testing
         let sink = MemoryAuditSink()
         let approver = Answering(.approved(.project))
         let first = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate),
             audit: AuditLog(session: "s", sink: sink), store: store, source: "test")
         try await first.clear(command: "swift test", workingDirectory: "/repo")
         #expect(sink.events.last?.details["decision"] == "approved")
@@ -85,7 +85,8 @@ import Testing
         #expect(sink.events.last?.details["approvalID"] != nil)
         // A new gate (new process) with the same store does not ask.
         let second = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: Answering(.denied("should not ask")), threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("should not ask")),
+            threshold: .level(.moderate),
             audit: AuditLog(session: "s2", sink: sink), store: store, source: "test")
         try await second.clear(command: "swift test", workingDirectory: "/repo")
         #expect(sink.events.last?.details["decision"] == "cached-project")
@@ -100,7 +101,7 @@ import Testing
         let store = ApprovalStore(url: nil)
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .dangerous), approver: Answering(.approved(.always)), threshold: .moderate,
+            classifier: Fixed(level: .dangerous), approver: Answering(.approved(.always)), threshold: .level(.moderate),
             audit: AuditLog(session: "s", sink: sink), store: store, source: "test")
         try await gate.clear(command: "rm -rf build", workingDirectory: "/repo")
         #expect(sink.events.last?.details["scope"] == "session")
@@ -114,7 +115,7 @@ import Testing
     @Test func approvalsAreRememberedPerPatternNotPerArguments() async throws {
         let approver = Answering(.approved(.session))
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate),
             store: ApprovalStore(url: nil))
         try await gate.clear(command: "head -x 1 -y 2 -z 3", workingDirectory: "/")
         try await gate.clear(command: "head -n 5 other.txt", workingDirectory: "/")
@@ -144,7 +145,7 @@ import Testing
             }
         }
         let recorder = Recorder()
-        let gate = ApprovalGate(classifier: ByName(), approver: recorder, threshold: .moderate)
+        let gate = ApprovalGate(classifier: ByName(), approver: recorder, threshold: .level(.moderate))
         try await gate.clear(command: "ls && touch a | wc -l", workingDirectory: "/")
         #expect(recorder.seen.events.map { $0.details["command"]?.stringValue } == ["touch a", "wc -l"])
         #expect(recorder.seen.events.first?.details["pattern"] == "touch *")
@@ -161,9 +162,11 @@ import Testing
         let shared = SessionApprovals()
         let approver = Answering(.approved(.session))
         let first = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate, sessionApprovals: shared)
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate),
+            sessionApprovals: shared)
         let second = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: Answering(.denied("should not ask")), threshold: .moderate,
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("should not ask")),
+            threshold: .level(.moderate),
             sessionApprovals: shared)
         try await first.clear(command: "touch a", workingDirectory: "/repo")
         try await second.clear(command: "touch b", workingDirectory: "/repo")
@@ -172,7 +175,7 @@ import Testing
 
     @Test func refusalsAreReportedAndCleared() async throws {
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .moderate)
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .level(.moderate))
         await #expect(throws: ApprovalGate.Failure.self) {
             try await gate.clear(command: "touch a", workingDirectory: "/")
         }
@@ -183,7 +186,8 @@ import Testing
     @Test func refusalsBelongToTheTurnTheyHappenedIn() async throws {
         let turns = TurnClock()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .moderate, turns: turns)
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .level(.moderate),
+            turns: turns)
         turns.advance()
         await #expect(throws: ApprovalGate.Failure.self) {
             try await gate.clear(command: "touch a", workingDirectory: "/")
@@ -197,7 +201,7 @@ import Testing
         let sink = MemoryAuditSink()
         let audit = AuditLog(session: "s", sink: sink)
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate, audit: audit,
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate), audit: audit,
             store: ApprovalStore(url: nil))
         audit.beginTurn()
         try await gate.clear(command: "touch x", workingDirectory: "/")
@@ -213,7 +217,7 @@ import Testing
         let approver = Answering(.approved(.once))
         let turns = TurnClock()
         let gate = ApprovalGate(
-            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate, turns: turns)
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate), turns: turns)
         turns.advance()
         try await gate.clear(command: "touch x", workingDirectory: "/")
         try await gate.clear(command: "touch x", workingDirectory: "/")

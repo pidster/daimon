@@ -51,7 +51,7 @@ struct Respond: AsyncParsableCommand {
         let session = try Daimon.begin(
             .init(
                 entryPoint: "respond", instructions: instructions, model: try model.map(Daimon.parseModel),
-                toolNames: toolNames, unsafe: unsafe, autoApprove: yes))
+                tools: ToolSelection(toolNames), unsafe: unsafe, autoApprove: yes))
         defer { session.end() }
         let agent = try session.openAgent(
             approver: DenyingApprover(
@@ -203,7 +203,7 @@ struct Chat: AsyncParsableCommand {
         let session = try Daimon.begin(
             .init(
                 entryPoint: "chat", instructions: instructions, model: try model.map(Daimon.parseModel),
-                toolNames: toolNames, unsafe: unsafe, resume: resume))
+                tools: ToolSelection(toolNames), unsafe: unsafe, resume: resume))
         defer { session.end() }
         try Daimon.home.ensure()
         var agent: Agent

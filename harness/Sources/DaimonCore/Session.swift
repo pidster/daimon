@@ -17,8 +17,8 @@ public struct Session: Sendable {
         public var instructions: String?
         /// Model override; nil takes `config.json`'s.
         public var model: ModelSelection?
-        /// Tools to enable; empty means all.
-        public var toolNames: [String]
+        /// Which tools to enable.
+        public var tools: ToolSelection
         /// Disable the command policy and sandbox.
         public var unsafe: Bool
         /// Approve risky commands without asking.
@@ -28,13 +28,13 @@ public struct Session: Sendable {
 
         /// Creates a request.
         public init(
-            entryPoint: String, instructions: String? = nil, model: ModelSelection? = nil, toolNames: [String] = [],
+            entryPoint: String, instructions: String? = nil, model: ModelSelection? = nil, tools: ToolSelection = .all,
             unsafe: Bool = false, autoApprove: Bool = false, resume: String? = nil
         ) {
             self.entryPoint = entryPoint
             self.instructions = instructions
             self.model = model
-            self.toolNames = toolNames
+            self.tools = tools
             self.unsafe = unsafe
             self.autoApprove = autoApprove
             self.resume = resume
@@ -148,7 +148,7 @@ public struct Session: Sendable {
                 "note: model \(config.model) runs on Apple's Private Cloud Compute; prompts and tool output leave this Mac"
             )
         }
-        let toolNames = try Self.resolve(toolNames: request.toolNames, runner: config.runner)
+        let toolNames = try Self.resolve(request.tools, runner: config.runner)
         let sessionID = String(UUID().uuidString.prefix(8)).lowercased()
         let sink: any AuditSink = config.auditEnabled ? try dependencies.makeSink(home, config) : NullAuditSink()
         let audit = AuditLog(session: sessionID, sink: sink)
@@ -167,15 +167,15 @@ public struct Session: Sendable {
             classifier: dependencies.makeClassifier(config))
     }
 
-    /// The full tool list for an empty selection, or the names as given once each is known.
+    /// The whole registry for `.all`, or the names as given once each is known.
     ///
     /// - Throws: `Failure.unknownTools`.
-    private static func resolve(toolNames: [String], runner: CommandRunner.Options) throws -> [String] {
+    private static func resolve(_ selection: ToolSelection, runner: CommandRunner.Options) throws -> [String] {
         let registry = ToolRegistry(runner: runner)
-        guard !toolNames.isEmpty else { return registry.all.map(\.name) }
-        let unknown = registry.select(toolNames).unknown
+        let names = selection.resolved(or: registry.all.map(\.name))
+        let unknown = registry.select(names).unknown
         guard unknown.isEmpty else { throw Failure.unknownTools(unknown) }
-        return toolNames
+        return names
     }
 
     /// Opens the session's own conversation: `respond` and `chat` call this once.
@@ -200,18 +200,18 @@ public struct Session: Sendable {
     ///   - id: The conversation's id; its audit events carry it as the session.
     ///   - approver: How the face asks a human; replaced by `AutoApprover` when the request said `--yes`.
     ///   - instructions: Instructions override; nil takes the session's.
-    ///   - toolNames: Tool selection; nil takes the session's.
+    ///   - tools: Tool selection; `.all` takes the session's.
     ///   - model: Model override; nil takes the session's.
     /// - Returns: The conversation, ready to open.
     /// - Throws: `Failure.unknownTools`.
     public func conversation(
-        id: String, approver: any Approver, instructions: String? = nil, toolNames: [String]? = nil,
+        id: String, approver: any Approver, instructions: String? = nil, tools: ToolSelection = .all,
         model: ModelSelection? = nil
     ) throws -> Conversation {
         let audit = self.audit.log(forSession: id)
         let conversation = try Conversation.setUp(
             session: self, audit: audit, approver: approver, instructions: instructions ?? self.instructions,
-            toolNames: toolNames ?? self.toolNames, model: model ?? config.model)
+            toolNames: tools.resolved(or: toolNames), model: model ?? config.model)
         audit.record(
             .sessionStart,
             details: [

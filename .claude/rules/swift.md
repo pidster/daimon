@@ -42,7 +42,7 @@ paths:
 ## Errors
 
 - Typed `enum … : Error, CustomStringConvertible, Equatable`, one per subsystem (`CommandRunner.Failure`,
-  `FileReader.Failure`, `Config.Failure`). No `fatalError` or `print` in `DaimonCore` or `DaimonMCP`; the
+  `FileReader.Failure`, `Session.Failure`). No `fatalError` or `print` in `DaimonCore` or `DaimonMCP`; the
   CLI target is the only place that renders to stderr, and never to stdout while serving MCP.
 
 ## Tests
