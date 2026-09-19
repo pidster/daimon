@@ -48,6 +48,27 @@ public final class Agent {
         session = self.model.session(tools: tools, instructions: instructions)
     }
 
+    /// Creates an agent on an already resolved model, such as a custom one; cannot fail.
+    ///
+    /// - Parameters:
+    ///   - instructions: System-level guidance the model follows for the whole session.
+    ///   - tools: Tools the model may call; each must have a unique `name`.
+    ///   - model: The resolved model.
+    ///   - contextPolicy: Overflow handling; defaults to condensing to the last four turns.
+    ///   - audit: Where to record turns; nil records nothing.
+    ///   - turns: The conversation's clock; defaults to the audit log's, or a fresh one.
+    public init(
+        instructions: String, tools: [any Tool], model: ResolvedModel, contextPolicy: ContextPolicy = .default,
+        audit: AuditLog? = nil, turns: TurnClock? = nil
+    ) {
+        self.model = model
+        self.tools = tools
+        self.contextPolicy = contextPolicy
+        self.audit = audit
+        self.turns = turns ?? audit?.turns ?? TurnClock()
+        session = model.session(tools: tools, instructions: instructions)
+    }
+
     /// Creates an agent that continues a saved conversation.
     ///
     /// - Parameters:

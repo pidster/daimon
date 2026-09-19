@@ -79,7 +79,8 @@ only through `respond`. Details: `docs/design.md`.
 - **Gate.** `scripts/check` must pass before every commit; the hook runs it. Strict lint, warnings as
   errors, strict concurrency, no escape hatches. Language rules are in `.claude/rules/`.
 - **Tests never need the model.** `ModelEvalTests` is the one model-dependent suite and runs only via
-  `scripts/check eval`.
+  `scripts/check eval`; `OllamaSpikeTests` runs only under `DAIMON_OLLAMA_TESTS=1`. To exercise the agent
+  and tool loop without a model, use a scripted `LanguageModel` (see `ExecutorSpikeTests`, ADR 0016).
 - **Bound every tool result** (4 KiB or paged); the model's window is about 4k tokens. Keep tool
   descriptions short. See `docs/context-management.md`.
 - **Audit new behaviour.** New event kinds go in `AuditEvent.Kind` and `docs/logging.md`.

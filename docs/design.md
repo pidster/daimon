@@ -41,6 +41,9 @@ availability and shapes the API.
 
 ### `ModelSelection` and `ResolvedModel`
 
+Any `LanguageModel` can be wrapped by `ResolvedModel(selection:custom:)`, including one whose executor
+talks to a local runtime; see [ADR 0016](decisions/0016-local-runtimes-through-an-executor.md).
+
 `ModelSelection` names the model (`system` or `private-cloud`); `resolve()` checks
 availability and returns a `ResolvedModel`, which erases the concrete `LanguageModel` behind session
 makers and an optional token counter. See [ADR 0013](decisions/0013-model-selection.md).

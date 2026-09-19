@@ -1,6 +1,6 @@
 # ADR 0013: Sessions run on a selectable model; system is the default and the only one that stays on device
 
-Date: 2026-09-17. Status: accepted.
+Date: 2026-09-17. Status: accepted. Amended by [ADR 0016](0016-local-runtimes-through-an-executor.md) (custom executors).
 
 ## Context
 

@@ -148,6 +148,23 @@ public struct ResolvedModel: Sendable {
         countTokens = nil
     }
 
+    /// Wraps any `LanguageModel`, such as one backed by a daimon-supplied executor over a local runtime.
+    /// Token counting is not part of the protocol, so `tokenCount(for:)` returns nil.
+    ///
+    /// - Parameters:
+    ///   - selection: What to report as the selection in audit events.
+    ///   - model: The model; its executor does the generation.
+    public init(selection: ModelSelection, custom model: some LanguageModel) {
+        self.selection = selection
+        makeFromInstructions = { tools, instructions in
+            LanguageModelSession(model: model, tools: tools, instructions: instructions)
+        }
+        makeFromTranscript = { tools, transcript in
+            LanguageModelSession(model: model, tools: tools, transcript: transcript)
+        }
+        countTokens = nil
+    }
+
     /// A new session with instructions.
     public func session(tools: [any Tool], instructions: String) -> LanguageModelSession {
         makeFromInstructions(tools, instructions)
