@@ -33,8 +33,11 @@ on every run:
 
 - Seatbelt refuses a nested profile that differs from the outer one. `swift build` needs
   `--disable-sandbox` under daimon's sandbox, and daimon running inside a sandbox (as it does when it runs
-  its own tests through MCP) detects the refusal and falls back to the outer sandbox. Documented in
-  `docs/tools/run_command.md`; found by dogfooding.
+  its own tests through MCP) runs commands under the outer sandbox instead. Amended 2026-09-19 after
+  review: nesting is decided once per process by a probe command, never from a user command's output, and
+  a command is never launched twice; the writable root is the launch directory, never a per-command
+  working directory; commands run in their own process group so timeouts kill the whole tree. Documented
+  in `docs/tools/run_command.md`.
 - `sandbox-exec` is deprecated by Apple but still shipped and relied on by major tools. If it disappears,
   the pattern layer remains and the sandbox flag becomes a no-op to be handled in a new ADR.
 - Reads are unrestricted. Confining reads is possible with the same mechanism but was not asked for.

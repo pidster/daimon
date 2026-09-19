@@ -17,13 +17,13 @@ public struct ToolRegistry: Sendable {
             all = [
                 AuditedTool(CurrentDateTool(), audit: audit),
                 AuditedTool(RunCommandTool(runner: commandRunner), audit: audit),
-                AuditedTool(ReadFileTool(reader: reader), audit: audit),
+                AuditedTool(ReadFileTool(reader: reader, approval: approval), audit: audit),
             ]
         } else {
             all = [
                 CurrentDateTool(),
                 RunCommandTool(runner: commandRunner),
-                ReadFileTool(reader: reader),
+                ReadFileTool(reader: reader, approval: approval),
             ]
         }
     }

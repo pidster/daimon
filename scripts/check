@@ -45,7 +45,16 @@ test_() {
         echo "==> test (swift, runner suites inside an outer sandbox): already nested, skipped"
     else
         echo "==> test (swift, runner suites inside an outer sandbox)"
-        (cd harness && sandbox-exec -p '(version 1) (allow default)' swift test --disable-sandbox --filter 'CommandRunner|NestedSandbox' 2>&1 | grep -E 'Test run with|✘' | tail -3)
+        log="$(mktemp)"
+        if (cd harness && sandbox-exec -p '(version 1) (allow default)' swift test --disable-sandbox --filter 'CommandRunner|NestedSandbox' >"$log" 2>&1); then
+            grep -E 'Test run with' "$log" | tail -1
+        else
+            grep -E 'Test run with|✘|error' "$log" | tail -8
+            rm -f "$log"
+            echo "nested-sandbox test step failed" >&2
+            exit 1
+        fi
+        rm -f "$log"
     fi
     if have_crates; then
         echo "==> test (rust)"

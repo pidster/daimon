@@ -111,12 +111,19 @@ public final class Agent {
     /// assistant text as it streams, and returns the final text.
     @discardableResult
     nonisolated(nonsending) public func stream(_ prompt: String, onDelta: (String) -> Void) async throws -> String {
-        try await turn(prompt) {
-            var emitted = ""
+        // `emitted` lives outside the retried closure so a retry after mid-stream overflow continues
+        // from what the caller has already seen instead of repeating it.
+        var emitted = ""
+        return try await turn(prompt) {
             for try await snapshot in session.streamResponse(to: prompt) {
                 let full = snapshot.content
-                onDelta(full.hasPrefix(emitted) ? String(full.dropFirst(emitted.count)) : full)
-                emitted = full
+                if full.hasPrefix(emitted) {
+                    onDelta(String(full.dropFirst(emitted.count)))
+                    emitted = full
+                } else if full.count > emitted.count {
+                    onDelta(String(full.dropFirst(emitted.count)))
+                    emitted = full
+                }
             }
             return emitted
         }

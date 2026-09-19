@@ -93,12 +93,13 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
         return .allowed
     }
 
-    /// The Seatbelt profile for a command run in `workingDirectory`.
+    /// The Seatbelt profile with `writableRoot` as the writable project directory.
     ///
     /// Everything is allowed except writes outside the writable set and,
     /// when `allowNetwork` is false, all networking. Paths are canonicalised.
-    public func seatbeltProfile(workingDirectory: String, temporaryDirectory: String, home: String) -> String {
-        var writable = [workingDirectory, temporaryDirectory, "/private/tmp"]
+    /// The root is fixed by the harness, never by a per-command working directory.
+    public func seatbeltProfile(writableRoot: String, temporaryDirectory: String, home: String) -> String {
+        var writable = [writableRoot, temporaryDirectory, "/private/tmp"]
         writable += sandbox.writablePaths.map { $0.hasPrefix("~") ? home + $0.dropFirst() : $0 }
         let subpaths = writable.map { Self.canonical($0) }.map { "(subpath \(Self.quote($0)))" }
         var lines = [

@@ -460,3 +460,10 @@ Ordered by severity; effort S (under an hour), M (half a day), L (a day or more)
 - [ ] Q5 Precompile policy and rule regexes (S)
 - [ ] Q6 Share the human-readable unavailability message between `ModelSelection.Failure` and `Doctor` (S)
 - [ ] Q7 Update `ToolCatalog.respond`'s description now that the model is selectable (S)
+
+
+## Status
+
+2026-09-19: D1, D2, D3, D5, D6, D7, D8, D9, T1, T2, T3, O1, O2, O6 addressed (commit "Close the
+high-severity review findings"). D4 is moot: the direct MCP `run_command` tool was removed on 2026-09-18.
+Remaining items stand as listed in the Todo.

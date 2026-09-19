@@ -31,20 +31,31 @@ public struct ReadFileTool: Tool {
     private let reader: FileReader
     /// Lines per page when the model does not ask for a limit.
     private let defaultLimit: Int
+    /// Asks before reading credential-like paths; nil never asks.
+    private let approval: ApprovalGate?
 
     /// Creates the tool over a reader that supplies the byte budget.
-    public init(reader: FileReader = FileReader(), defaultLimit: Int = 100) {
+    public init(reader: FileReader = FileReader(), defaultLimit: Int = 100, approval: ApprovalGate? = nil) {
         self.reader = reader
         self.defaultLimit = defaultLimit
+        self.approval = approval
     }
 
     /// Reads the requested page and renders it for the model.
     ///
     /// - Parameter arguments: Path and optional line range.
     /// - Returns: Numbered lines followed by a continuation or end-of-file marker.
-    /// - Throws: `FileReader.Failure` for missing, directory, or binary files, or a bad range.
-    public func call(arguments: Arguments) async throws -> String {
-        try reader.read(path: arguments.path, offset: arguments.offset ?? 1, limit: arguments.limit ?? defaultLimit)
+    ///   Refusals and read errors are returned as text so the model can react.
+    public func call(arguments: Arguments) async -> String {
+        do {
+            try await approval?.clear(
+                readingFile: arguments.path, workingDirectory: FileManager.default.currentDirectoryPath)
+            return try reader.read(
+                path: arguments.path, offset: arguments.offset ?? 1, limit: arguments.limit ?? defaultLimit
+            )
             .rendered
+        } catch {
+            return "error: \(error)"
+        }
     }
 }

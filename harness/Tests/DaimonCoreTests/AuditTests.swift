@@ -89,6 +89,22 @@ import Testing
         #expect(AuditQuery.events(in: try Data(contentsOf: url)).map(\.session) == ["a", "b"])
     }
 
+    @Test func concurrentSinksAppendWithoutOverwriting() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-audit-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "audit.jsonl")
+        let a = AuditLog(session: "a", sink: try FileAuditSink(url: url))
+        let b = AuditLog(session: "b", sink: try FileAuditSink(url: url))
+        for i in 0..<20 {
+            a.record(.prompt, details: ["text": .string("a\(i)")])
+            b.record(.prompt, details: ["text": .string("b\(i)")])
+        }
+        let events = AuditQuery.events(in: try Data(contentsOf: url))
+        #expect(events.count == 40)
+        #expect(events.filter { $0.session == "a" }.count == 20)
+    }
+
     @Test func queryFilters() {
         let events = [
             AuditEvent(session: "a", kind: .prompt), AuditEvent(session: "a", kind: .toolCall, details: ["tool": "x"]),

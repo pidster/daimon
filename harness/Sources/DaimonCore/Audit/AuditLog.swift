@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Synchronization
 
@@ -174,16 +175,17 @@ public final class FileAuditSink: AuditSink {
         url.deletingPathExtension().appendingPathExtension("\(index).\(url.pathExtension)")
     }
 
+    /// Opens for appending with `O_APPEND`, so concurrent daimons (an MCP server plus a CLI run)
+    /// interleave whole lines instead of overwriting each other, and creates the file user-only.
     private static func open(_ url: URL) throws -> FileHandle {
-        let manager = FileManager.default
-        if !manager.fileExists(atPath: url.path) {
-            guard manager.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
-                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
-            }
-        } else {
-            try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        let descriptor = Darwin.open(url.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o600)
+        guard descriptor >= 0 else {
+            throw CocoaError(
+                .fileWriteUnknown,
+                userInfo: [NSFilePathErrorKey: url.path, NSLocalizedDescriptionKey: String(cString: strerror(errno))])
         }
-        return try FileHandle(forWritingTo: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
     }
 }
 

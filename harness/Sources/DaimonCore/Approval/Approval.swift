@@ -99,6 +99,11 @@ public actor ApprovalGate {
     private let audit: AuditLog?
     private var sessionApprovals: Set<String> = []
 
+    /// Session approvals are keyed on the exact command line in the exact directory.
+    private static func key(_ command: String, _ workingDirectory: String) -> String {
+        "\(workingDirectory)\u{0}\(command)"
+    }
+
     /// Creates a gate.
     ///
     /// - Parameters:
@@ -113,10 +118,25 @@ public actor ApprovalGate {
         self.audit = audit
     }
 
+    /// Returns normally if reading `path` is acceptable.
+    ///
+    /// Reads are cheap and frequent, so only the rule classifier runs, over the equivalent
+    /// `cat <path>`: credential paths are rated dangerous and ask (or are refused) exactly as the
+    /// command would be; ordinary files pass without a model call.
+    ///
+    /// - Throws: `CommandRunner.Failure.disapproved` with the reason otherwise.
+    public func clear(readingFile path: String, workingDirectory: String) async throws {
+        try await clear(command: "cat \(path)", workingDirectory: workingDirectory, classifier: RuleRiskClassifier())
+    }
+
     /// Returns normally if the command may run.
     ///
     /// - Throws: `CommandRunner.Failure.disapproved` with the reason otherwise.
     public func clear(command: String, workingDirectory: String) async throws {
+        try await clear(command: command, workingDirectory: workingDirectory, classifier: classifier)
+    }
+
+    private func clear(command: String, workingDirectory: String, classifier: any RiskClassifier) async throws {
         let started = Date()
         let assessment = await classifier.classify(command: command, workingDirectory: workingDirectory)
         audit?.record(
@@ -128,7 +148,7 @@ public actor ApprovalGate {
                 "seconds": .double(Date().timeIntervalSince(started)),
             ])
         guard let threshold, assessment.level >= threshold else { return }
-        if sessionApprovals.contains(command) {
+        if sessionApprovals.contains(Self.key(command, workingDirectory)) {
             audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "cached"])
             return
         }
@@ -140,7 +160,7 @@ public actor ApprovalGate {
         case .approved:
             audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "approved"])
         case .approvedForSession:
-            sessionApprovals.insert(command)
+            sessionApprovals.insert(Self.key(command, workingDirectory))
             audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "approvedForSession"])
         case .denied(let reason):
             audit?.record(

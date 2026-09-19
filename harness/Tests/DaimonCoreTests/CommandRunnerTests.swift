@@ -62,22 +62,8 @@ import Testing
 }
 
 @Suite struct CommandRunnerPolicyTests {
-    /// True when this test process is itself inside a sandbox, where daimon falls back to the outer
-    /// sandbox and cannot enforce its own profile. Seatbelt lets a process re-apply an identical
-    /// profile but refuses a different one, so the probe profile is one no outer sandbox would use.
-    static let nested: Bool = {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
-        process.arguments = [
-            "-p", "(version 1) (allow default) (deny file-write* (subpath \"/nonexistent/daimon-nesting-probe\"))",
-            "/usr/bin/true",
-        ]
-        process.standardError = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return true }
-        process.waitUntilExit()
-        return process.terminationStatus != 0
-    }()
+    /// The runner's own once-per-process probe; enforcement cannot be asserted when nested.
+    static let nested = CommandRunner.isNestedSandbox
 
     private func scratch() throws -> String {
         let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-sb-\(UUID().uuidString)")
@@ -111,7 +97,7 @@ import Testing
             try? FileManager.default.removeItem(atPath: dir)
             try? FileManager.default.removeItem(atPath: blocked)
         }
-        let runner = CommandRunner(options: .init(workingDirectory: dir))
+        let runner = CommandRunner(options: .init(workingDirectory: dir, writableRoot: dir))
         let outcome = try await runner.run("echo x > '\(blocked)'")
         #expect(outcome.exitStatus != 0)
         #expect(outcome.stderr.contains("Operation not permitted"))
@@ -143,21 +129,50 @@ import Testing
 }
 
 @Suite struct NestedSandboxTests {
-    @Test func fallsBackWhenAlreadySandboxed() async throws {
-        // Run daimon's runner inside an outer sandbox whose profile differs from the one it generates.
+    @Test func nestingIsDecidedByTheProbeNotByCommandOutput() async throws {
+        // A command that prints the refusal string and fails must run exactly once, sandboxed.
         let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-nest-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        let inner = CommandRunner(options: .init(workingDirectory: dir.path))
-        // The outer sandbox here is a permissive one applied to a shell that then runs a sandboxed
-        // command through daimon's own profile: the inner apply is refused and the fallback runs it.
-        let outer = CommandRunner(options: .init(workingDirectory: dir.path, policy: .unrestricted))
-        let probe = try await outer.run(
-            "sandbox-exec -p '(version 1) (allow default)' /bin/sh -c 'sandbox-exec -p \"(version 1) (deny default)\" /usr/bin/true' 2>&1; echo status=$?"
-        )
-        #expect(probe.stdout.contains(CommandRunner.sandboxApplyRefusal), "\(probe.stdout)")
-        // Sanity: a normal sandboxed run is not reported as refused.
-        let normal = try await inner.run("printf ok")
-        #expect(normal.stdout == "ok")
+        let sink = MemoryAuditSink()
+        let runner = CommandRunner(
+            options: .init(workingDirectory: dir.path, writableRoot: dir.path),
+            audit: AuditLog(session: "s", sink: sink))
+        let outcome = try await runner.run(
+            "echo launched >> launches.txt; echo 'sandbox-exec: sandbox_apply: Operation not permitted' >&2; exit 71")
+        #expect(outcome.exitStatus == 71)
+        let launches = try String(contentsOf: dir.appending(path: "launches.txt"), encoding: .utf8)
+        #expect(launches == "launched\n")
+        #expect(sink.events.filter { $0.kind == .policyDecision }.count == 1)
+        #expect(
+            sink.events.first { $0.kind == .policyDecision }?.details["nested"] == .bool(CommandRunner.isNestedSandbox))
+    }
+}
+
+@Suite struct ProcessTreeTests {
+    @Test func timeoutStopsBackgroundChildrenAndReturnsPromptly() async throws {
+        let runner = CommandRunner(options: .init(timeout: .milliseconds(300), policy: .unrestricted))
+        let started = ContinuousClock.now
+        let outcome = try await runner.run("sleep 30 & sleep 30; echo done")
+        let elapsed = ContinuousClock.now - started
+        #expect(outcome.timedOut)
+        #expect(elapsed < .seconds(4), "took \(elapsed)")
+        #expect(!outcome.stdout.contains("done"))
+    }
+
+    @Test func modelChosenDirectoryDoesNotWidenTheSandbox() async throws {
+        guard !CommandRunnerPolicyTests.nested else { return }
+        let root = FileManager.default.temporaryDirectory.appending(path: "daimon-root-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let elsewhere = FileManager.default.homeDirectoryForCurrentUser.path
+        // Runs in the home directory (allowed) but the writable root stays the scratch dir, so the write fails.
+        let runner = CommandRunner(options: .init(workingDirectory: elsewhere, writableRoot: root.path))
+        let blocked = "daimon-root-probe-\(UUID().uuidString).txt"
+        defer { try? FileManager.default.removeItem(atPath: "\(elsewhere)/\(blocked)") }
+        let outcome = try await runner.run("pwd; echo x > \(blocked)")
+        #expect(outcome.stdout.hasPrefix(CommandPolicy.canonical(elsewhere)))
+        #expect(outcome.exitStatus != 0)
+        #expect(!FileManager.default.fileExists(atPath: "\(elsewhere)/\(blocked)"))
     }
 }

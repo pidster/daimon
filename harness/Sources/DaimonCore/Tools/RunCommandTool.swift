@@ -3,8 +3,9 @@ import FoundationModels
 
 /// Lets the model run a shell command on this machine.
 ///
-/// There is no sandbox: the command runs with the harness's own privileges.
-/// Restrict exposure with the CLI's `--tool` selection when that matters.
+/// The command passes the `CommandPolicy`, the approval gate, and runs under
+/// the Seatbelt sandbox rooted at the harness's launch directory; a
+/// model-chosen working directory changes where it runs, never what it may write.
 public struct RunCommandTool: Tool {
     /// The identifier the model uses to request this tool.
     public let name = "run_command"

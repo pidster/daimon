@@ -56,9 +56,9 @@ makers and an optional token counter. See [ADR 0013](decisions/0013-model-select
 
 ### `Agent`
 
-Owns one `LanguageModelSession` at a time, created by a `ResolvedModel`. Construction checks `SystemLanguageModel.default.availability` and
-throws `AgentError.modelUnavailable(reason)` rather than letting the first request fail obscurely. An agent
-can also start from a saved `Transcript`.
+Owns one `LanguageModelSession` at a time, created by a `ResolvedModel`, whose `resolve()` checks
+availability and throws `ModelSelection.Failure.unavailable` rather than letting the first request fail
+obscurely. An agent can also start from a saved `Transcript`.
 
 - `respond(to:)` returns the complete reply.
 - `stream(_:onDelta:)` invokes a callback with each new fragment and returns the final text. It is a callback
@@ -115,11 +115,12 @@ the requested line, and stops when the page or its byte budget is full, so cost 
 the file. The rendering ends with an offset hint the model follows to continue.
 
 `RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which checks the
-`CommandPolicy` patterns, runs `/bin/sh -c` (under `sandbox-exec` with a generated Seatbelt profile when
-the sandbox is enabled) with a timeout, captures stdout and stderr separately through pipe readability
-handlers into `Mutex`-guarded buffers, kills on timeout via the pid (SIGTERM, then SIGKILL), and keeps only
-the tail of each stream. The rendering (`Outcome.rendered`) is what the model sees; policy denials are
-rendered too rather than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
+`CommandPolicy` patterns, consults `ApprovalGate` (rules plus on-device model classifier, ask at
+`moderate` and above through an `Approver` per entry point), then spawns `/bin/sh -c` in its own process
+group (`posix_spawn`) under `sandbox-exec` with a profile rooted at the launch directory, captures stdout
+and stderr separately, kills the whole group on timeout, and keeps only the tail of each stream. The
+rendering (`Outcome.rendered`) is what the model sees; policy denials and refusals are rendered too rather
+than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 
 ### MCP server
 

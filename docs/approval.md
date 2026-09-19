@@ -39,7 +39,9 @@ prints every miss with the model's reason, and is the place to add any command t
 ## The gate
 
 `ApprovalGate` (one per session) classifies, audits the verdict, and if the level is at or above the
-threshold asks the session's `Approver`. Decisions: approve once, approve this exact command for the rest
+threshold asks the session's `Approver`. `read_file` uses the same gate over the equivalent `cat <path>`
+with the rule classifier only, so credential paths ask and ordinary reads cost no model call. Session
+approvals are keyed on the exact command line in the exact working directory. Decisions: approve once, approve this exact command for the rest
 of the session, deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
 an answer, so an approver that hears nothing within `approval.timeoutSeconds` (default 120) reports
 `unanswered`, the gate refuses the command and audits the decision as `timed-out`. A denial returns to the

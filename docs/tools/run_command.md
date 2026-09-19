@@ -90,11 +90,28 @@ Seatbelt lets a process re-apply an identical profile but refuses a different on
 - Tools that apply their own sandbox cannot run inside daimon's. Run SwiftPM as
   `swift build --disable-sandbox` and `swift test --disable-sandbox`; Cargo needs nothing.
 - When daimon itself runs inside a sandbox (for example daimon running its own tests through its MCP
-  server), its `sandbox-exec` is refused. `CommandRunner` detects that refusal on the untruncated stderr,
-  records a `policy.decision` with `nested: true`, and runs the command plainly, because the outer sandbox
-  is already confining it. The refusal cannot be produced from outside a sandbox, so this cannot be used
-  to escape one. Tests that assert enforcement skip when nested; `scripts/check` runs the runner suites
-  inside an outer sandbox on every commit.
+  server), its `sandbox-exec` would be refused. daimon decides this **once per process** with a probe
+  command of its own (`CommandRunner.isNestedSandbox`), records `nested: true` on each `policy.decision`,
+  and runs commands plainly because the outer sandbox is already confining them. The decision never
+  depends on a command's output and a command is never launched twice: an earlier version keyed on the
+  refusal text in stderr, which a command could print to get itself re-run unsandboxed (found by review,
+  fixed 2026-09-19). Tests that assert enforcement skip when nested; `scripts/check` runs the runner
+  suites inside an outer sandbox on every commit and fails if they fail.
+
+### Writable root and working directory
+
+The sandbox's writable set is rooted at the directory daimon was launched in (`Options.writableRoot`),
+plus the temporary directory, `/private/tmp`, and configured paths. A `workingDirectory` chosen by the
+model changes where the command runs, never what it may write: a command run in `/Users/me` with the
+root at the project can read there but its writes fail. Before 2026-09-19 the per-command directory was
+the writable root, so `workingDirectory: "/"` made everything writable.
+
+### Process tree and timeouts
+
+Commands are spawned in their own process group (`posix_spawn` with `POSIX_SPAWN_SETPGROUP`), stdin from
+`/dev/null`. On timeout the whole group gets SIGTERM, then SIGKILL two seconds later, so background
+children (`sleep 30 &`, a server the model started) die with the shell instead of holding the output pipe
+open. Output capture after exit is bounded by one second in case a descendant escaped the group.
 
 Reads are not restricted; omit the tool (`--tool current_date`, or the MCP `respond` `tools` argument)
 where even that is too much. There is no direct MCP `run_command`; other harnesses reach it only through
