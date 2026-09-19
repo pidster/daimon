@@ -45,7 +45,7 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
-| `/quit`, `/exit`, Ctrl-D | Exit, saving if a name is set. |
+| `/quit`, `/exit`, a bare `exit` or `quit`, Ctrl-D | Exit, saving if a name is set. |
 
 When the model wants to run a risky command, chat prints it with the reasons and asks on stderr:
 `y` approves it for the rest of this turn, `s` for the session, `p` for this project (30 days, this

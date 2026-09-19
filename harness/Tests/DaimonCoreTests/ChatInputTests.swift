@@ -6,6 +6,10 @@ import Testing
     @Test func parsesCommandsAndMessages() {
         #expect(ChatInput(line: "/quit") == .quit)
         #expect(ChatInput(line: " /exit ") == .quit)
+        #expect(ChatInput(line: "exit") == .quit)
+        #expect(ChatInput(line: " Quit ") == .quit)
+        #expect(ChatInput(line: "q") == .quit)
+        #expect(ChatInput(line: "exit now") == .message("exit now"))
         #expect(ChatInput(line: "/help") == .help)
         #expect(ChatInput(line: "/?") == .help)
         #expect(ChatInput(line: "/tools") == .tools)

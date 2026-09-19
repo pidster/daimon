@@ -18,9 +18,14 @@ public enum ChatInput: Equatable, Sendable {
     case unknown(String)
 
     /// Parses a raw line. Leading and trailing whitespace is ignored; a line
-    /// starting with `/` is a command, anything else is a message.
+    /// starting with `/` is a command, a bare `exit`, `quit`, or `q` ends the
+    /// session, and anything else is a message.
     public init(line: String) {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if ["exit", "quit", "q"].contains(trimmed.lowercased()) {
+            self = .quit
+            return
+        }
         guard trimmed.hasPrefix("/") else {
             self = .message(trimmed)
             return
@@ -46,6 +51,6 @@ public enum ChatInput: Equatable, Sendable {
         /tokens        show how much of the context window the conversation uses
         /save [name]   save the transcript to ~/.daimon/transcripts
         /new           start a fresh conversation with the same instructions and tools
-        /quit          exit (also /exit, Ctrl-D)
+        /quit          exit (also /exit, a bare exit or quit, Ctrl-D)
         """
 }
