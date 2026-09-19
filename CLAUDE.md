@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An on-device, tool-using AI microharness for macOS, written in Swift on Apple's Foundation Models framework
 (the model behind Apple Intelligence and the `fm` CLI). One binary, `daimon`, with two faces: a CLI
-(`respond`, `chat`, `tools`, `logs`) and an MCP server over stdio (`mcp`) that other harnesses delegate
-local work to. Every command the model runs passes a policy, a Seatbelt sandbox, a risk classifier, and,
+(`respond`, `chat`, `tools`, `logs`, `doctor`, `approvals`) and an MCP server over stdio (`mcp`) that other
+harnesses delegate local work to. Every command the model runs passes a policy, a Seatbelt sandbox, a risk classifier, and,
 when risky, human approval; everything is written to a verbatim audit log.
 
 `docs/README.md` is the map. Read the page for the area you are touching before changing it; the decision
@@ -101,7 +101,7 @@ and audited as a turn. Prompt shape that works: `Use run_command with working di
 exactly: <command> . Report the exit status and output verbatim, nothing else.` Put commit messages in a
 file and commit with `git commit -q -F <path>` so the command stays short. Use a `thread_id` such as
 `git` and pass `tools: ["run_command"]` so the model has nothing else to reach for. Expect an approval
-dialog for commands that change repository state; choose "Approve for this session" for repeated shapes.
+dialog for commands that change repository state; choose "This session" for repeated shapes.
 The pre-commit hook then runs inside daimon's sandbox, which `scripts/check` detects. If daimon is not
 connected, say so and ask the user to run `/mcp` rather than falling back to Bash.
 

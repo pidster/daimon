@@ -61,8 +61,12 @@ Run a prompt on the on-device model, with daimon's tools available to it, on a c
 Result content is the reply text. `structuredContent`:
 
 ```json
-{ "thread_id": "…", "created": true, "condensed": false, "text": "…" }
+{ "thread_id": "…", "created": true, "condensed": false, "text": "…", "refusals": [] }
 ```
+
+`refusals` lists every command the gate refused during the turn, as `{ "command", "reason" }`, so a
+harness can detect a refusal structurally instead of parsing the model's prose. The result is not
+`isError` in that case: the model answered, and its answer says what it could not do.
 
 `condensed` is true when older turns were dropped to fit the window on this call. Threads live in memory for
 the server's lifetime; the least recently used is evicted beyond `maxThreads` (32), which is audited as a
@@ -71,16 +75,19 @@ in order; different threads run concurrently.
 
 ## Approval
 
-Risky commands (by default `moderate` and above) need approval. If the client advertised elicitation at
-initialize, daimon asks the client's user through the protocol. The command, directory, risk level, and
+Commands the model runs inside `respond` that are risky (by default `moderate` and above) need approval.
+If the client advertised elicitation at initialize, daimon asks the client's user through the protocol. The command, directory, risk level, and
 reasons appear in the title, the message, and the field descriptions, because clients render different
 parts; the full command leads the description so it is never trimmed. **Accept runs the command with the
 scope picked in the form (this turn by default; session; project, 30 days in this directory; always, 30
 days anywhere); Decline or Cancel refuses it; no answer within `approval.timeoutSeconds` (default 600; `0`
 waits forever) refuses it.** Persisted scopes never apply to dangerous commands
-([approval.md](approval.md)). Otherwise the call returns
-`command not approved: … this client does not support elicitation …` with `isError: true`, and the calling
-harness should run the command itself or start daimon with `--yes`. See [approval.md](approval.md).
+([approval.md](approval.md)). Approvals given here share the process: a "this session" answer covers every
+thread, and "project" and "always" are written to `~/.daimon/approvals.json` exactly as from the CLI.
+Without elicitation, the model's tool call is refused with
+`command not approved: … this client does not support elicitation …`; the reply reports that in prose and
+`structuredContent.refusals` carries it structurally. The calling harness should run the command itself
+or start daimon with `--yes`. See [approval.md](approval.md).
 
 | Argument | Type | Required |
 | --- | --- | --- |

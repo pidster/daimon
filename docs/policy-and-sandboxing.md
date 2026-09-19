@@ -1,4 +1,8 @@
-# Policy and sandboxing: what is available and what daimon should do
+# Policy and sandboxing: the survey behind the design
+
+This page is the investigation that preceded the implementation and is kept as history. For what daimon
+does today read [trust.md](trust.md), [tools/run_command.md](tools/run_command.md), and
+[approval.md](approval.md).
 
 Status: investigated 2026-09-17; all five layers are implemented. Layers 2 and 4:
 [ADR 0009](decisions/0009-command-policy-and-sandbox.md). Layer 3, generalised into risk classification

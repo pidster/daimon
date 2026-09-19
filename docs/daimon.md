@@ -45,13 +45,15 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
-| `/quit`, `/exit`, a bare `exit` or `quit`, Ctrl-D | Exit, saving if a name is set. |
+| `/quit`, `/exit`, `/q`, a bare `exit`, `quit`, or `q`, Ctrl-D | Exit, saving if a name is set. |
+| `/help`, `/?` | List commands. |
 
 When the model wants to run a risky command, chat prints it with the reasons and asks on stderr:
 `y` approves it for the rest of this turn, `s` for the session, `p` for this project (30 days, this
 directory), `a` always (30 days, any directory), `n` refuses.
 
-Status lines go to stderr, replies to stdout, so `daimon chat 2>/dev/null` pipes cleanly.
+Status lines and the `> ` prompt go to stderr, replies to stdout, so `daimon chat 2>/dev/null` prints only
+what the model said. A *turn* is one message from you and everything the model does to answer it.
 
 ### `daimon tools`
 
@@ -120,7 +122,7 @@ State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes 
 | `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
 | `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |
 | `maxThreads` | 32 | Live MCP conversation threads before the least recently used is evicted. |
-| `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. |
+| `commandPolicy` | see [tools/run_command.md](tools/run_command.md) | Deny/allow patterns and sandbox settings for `run_command`. Partial objects are fine: `{"commandPolicy":{"sandbox":{"allowNetwork":false}}}` keeps every other default. |
 | `audit` | `{ "enabled": true, "maxFileBytes": 10485760, "keepFiles": 5 }` | Audit log switch and rotation. |
 | `approval` | `{ "threshold": "moderate", "useModel": true, "timeoutSeconds": 600, "persistDays": 30 }` | When to ask a human before `run_command`, how long silence is tolerated before it counts as a refusal (`0` waits forever), and how long persisted approvals last; see [approval.md](approval.md). |
 
@@ -144,9 +146,9 @@ carry `condensed: true`. See [context-management.md](context-management.md).
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Success. |
-| 1 | Runtime failure, such as the model being unavailable or a malformed `config.json`. |
-| 64 | Usage error: bad flags, unknown `--tool`, empty stdin prompt. |
+| 0 | Success, including a reply in which the model reports that a command was refused; the refusal itself is in the audit log (`daimon logs --kind approval.decided`). |
+| 1 | Runtime failure, such as the model being unavailable. |
+| 64 | Usage error: bad flags, unknown `--tool`, empty stdin prompt, malformed `config.json`. |
 
 ## Requirements
 

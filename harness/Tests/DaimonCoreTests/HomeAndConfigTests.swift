@@ -79,6 +79,9 @@ import Testing
         ])
         try store.save(transcript, as: "chat1")
         #expect(try store.list() == ["chat1"])
+        let permissions =
+            try FileManager.default.attributesOfItem(atPath: store.url(for: "chat1").path)[.posixPermissions] as? Int
+        #expect(permissions == 0o600)
         #expect(try store.load("chat1").count == 3)
         #expect(throws: TranscriptStore.Failure.notFound("nope")) { try store.load("nope") }
     }

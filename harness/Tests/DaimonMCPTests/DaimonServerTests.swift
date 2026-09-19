@@ -25,6 +25,12 @@ struct FakeThread: RespondingThread {
         #expect(second.structuredContent?.objectValue?["created"] == .bool(false))
     }
 
+    @Test func respondReportsAnEmptyRefusalListByDefault() async throws {
+        let result = try await fakeServer.call(
+            .init(name: "respond", arguments: ["prompt": .string("hi"), "thread_id": .string("r")]))
+        #expect(result.structuredContent?.objectValue?["refusals"] == .array([]))
+    }
+
     @Test func settingsOnAnExistingThreadAreRefused() async throws {
         _ = try await fakeServer.call(
             .init(name: "respond", arguments: ["prompt": .string("hi"), "thread_id": .string("u")]))

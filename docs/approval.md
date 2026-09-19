@@ -81,12 +81,11 @@ A dangerous verdict is never persisted: `project` or `always` is downgraded to `
 says so. Remembered approvals only decide whether to ask; deny patterns, the sandbox, and the classifier
 run on every part every time, so `rm *` never covers `rm -rf build`, and each use is audited with the
 approval id.
-`daimon approvals` lists them, `daimon approvals revoke <id>` and `clear` remove them. Decisions: approve once, approve this exact command for the rest
-of the session, deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
-an answer, so an approver that hears nothing within `approval.timeoutSeconds` (default 600, ten minutes)
-reports `unanswered`, the gate refuses the command and audits the decision as `timed-out`. Set it to `0`
-to wait indefinitely; that trades the safe default for never losing an action to a slow answer, and is the
-owner's call. A denial returns to the
+`daimon approvals` lists them, `daimon approvals revoke <id>` and `clear` remove them. Decisions: approve with a scope (see below), deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
+an answer, so the MCP approver that hears nothing within `approval.timeoutSeconds` (default 600, ten
+minutes) reports `unanswered`, the gate refuses the command and audits the decision as `timed-out`. Set it
+to `0` to wait indefinitely. The terminal prompt in `chat` has no timeout: a person is at the keyboard,
+and end of input counts as a refusal. A denial returns to the
 model as `error: command not approved: …` so it can choose another approach.
 
 | Entry point | Approver | Behaviour |

@@ -44,7 +44,7 @@ configured under `commandPolicy` in `config.json`:
 | `allow` | `[]` | Regexes; when non-empty the command must match one. Deny wins. |
 | `sandbox.enabled` | `true` | Run under `sandbox-exec`. |
 | `sandbox.allowNetwork` | `true` | Set `false` to deny all networking inside the sandbox. |
-| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the working directory, `$TMPDIR`, and `/private/tmp`. `~` expands. |
+| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the directory daimon was launched in, `$TMPDIR`, and `/private/tmp`. A command's own `workingDirectory` never widens this. `~` expands. |
 
 Inside the sandbox everything is readable and executable, but writes outside the writable set fail with
 `Operation not permitted`. A denied pattern comes back to the model as `error: command denied by policy: …`

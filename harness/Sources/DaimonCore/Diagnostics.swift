@@ -54,10 +54,12 @@ public enum Diagnostics {
         public func error(_ message: @autoclosure () -> String) { emit(.error, message()) }
 
         private func emit(_ level: Level, _ message: String) {
+            // Messages can contain command lines and paths, so unified logging redacts them unless the
+            // system's private-data logging is enabled; the DAIMON_LOG stderr mirror shows them in full.
             switch level {
-            case .debug: logger.debug("\(message, privacy: .public)")
-            case .info: logger.info("\(message, privacy: .public)")
-            case .error: logger.error("\(message, privacy: .public)")
+            case .debug: logger.debug("\(message, privacy: .private)")
+            case .info: logger.info("\(message, privacy: .private)")
+            case .error: logger.error("\(message, privacy: .private)")
             }
             if let threshold = Diagnostics.stderrLevel, level >= threshold {
                 FileHandle.standardError.write(Data("daimon[\(name)] \(message)\n".utf8))

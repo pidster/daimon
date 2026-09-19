@@ -161,7 +161,8 @@ struct Mcp: AsyncParsableCommand {
                 autoApprove: yes),
             approver: DenyingApprover(reason: "unused: the MCP server elicits approval itself"))
         defer { session.end() }
-        try await DaimonServer(config: session.config, audit: session.audit, autoApprove: yes).run()
+        try await DaimonServer(config: session.config, audit: session.audit, autoApprove: yes, store: session.store)
+            .run()
     }
 }
 
@@ -225,8 +226,7 @@ struct Chat: AsyncParsableCommand {
         Self.note("daimon chat. /help for commands, /quit or Ctrl-D to exit.")
 
         loop: while true {
-            print("> ", terminator: "")
-            fflush(stdout)
+            FileHandle.standardError.write(Data("> ".utf8))
             guard let line = readLine() else { break loop }
             switch ChatInput(line: line) {
             case .quit:
@@ -324,7 +324,12 @@ struct Logs: ParsableCommand {
             }
             kinds.append(parsed)
         }
-        let config = try Session.loadConfig(home: Daimon.home)
+        let config: Config.Resolved
+        do {
+            config = try Session.loadConfig(home: Daimon.home)
+        } catch let failure as Session.Failure {
+            throw ValidationError("\(failure)")
+        }
         var files = Array(
             FileAuditSink.rotatedFiles(for: Daimon.home.auditFile, keep: config.auditLimits.keepFiles).reversed())
         files.append(Daimon.home.auditFile)

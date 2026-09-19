@@ -6,7 +6,9 @@ the `fm` command family, but adds what `fm` lacks: user-defined tools the model 
 
 ## Definition
 
-- **On-device**: every inference runs on the local Apple silicon model. No network calls for generation.
+- **On-device**: by default every inference runs on the local Apple silicon model with no network calls
+  for generation; Apple's Private Cloud Compute is an explicit per-session opt-in
+  ([ADR 0013](decisions/0013-model-selection.md)).
 - **Tool-using**: the model can request tools by name with typed arguments, the harness executes them, and the
   results feed back into the model's reasoning until it produces an answer.
 - **Microharness**: the smallest correct agent loop, not a framework. One session, a registry of tools, a
@@ -31,7 +33,7 @@ It has two faces:
 
 ## Non-goals (for now)
 
-- Remote or third-party models.
+- Third-party models.
 - MCP transports other than stdio.
 - Thread persistence across server restarts.
 - A plugin system, scripting language, or configuration files for tools.

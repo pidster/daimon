@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// A simple command awaiting a human decision.
 public struct ApprovalRequest: Equatable, Sendable {
@@ -98,10 +99,33 @@ public struct TerminalApprover: Approver {
     }
 }
 
+/// Session-scoped approvals shared by every gate in a process, so an answer of "this session" given
+/// on one MCP thread covers the others.
+public final class SessionApprovals: Sendable {
+    private let keys = Mutex<Set<String>>([])
+
+    /// Creates an empty set.
+    public init() {}
+
+    /// Whether `key` was approved for the session.
+    func contains(_ key: String) -> Bool { keys.withLock { $0.contains(key) } }
+
+    /// Records `key` as approved for the session.
+    func insert(_ key: String) { keys.withLock { _ = $0.insert(key) } }
+}
+
+/// One refusal within a turn, reported to callers so a refusal is detectable without parsing prose.
+public struct Refusal: Equatable, Sendable {
+    /// The simple command that was refused.
+    public var command: String
+    /// Why.
+    public var reason: String
+}
+
 /// Classifies a command and asks for approval when it is risky enough.
 ///
 /// One gate per session holds the approvals granted "for this session", keyed
-/// by the exact command line. Every verdict and decision is audited.
+/// by pattern and directory. Every verdict and decision is audited.
 public actor ApprovalGate {
     /// The lowest level that requires approval; `nil` never asks.
     public let threshold: RiskLevel?
@@ -110,7 +134,9 @@ public actor ApprovalGate {
     private let audit: AuditLog?
     private let store: ApprovalStore?
     private let source: String
-    private var sessionApprovals: Set<String> = []
+    private let sessionApprovals: SessionApprovals
+    /// Refusals since the last `takeRefusals()`.
+    private var refusals: [Refusal] = []
     /// Once-approvals, valid for the audit turn they were given in.
     private var turnApprovals: (turn: Int, keys: Set<String>) = (0, [])
 
@@ -135,9 +161,10 @@ public actor ApprovalGate {
     ///   - audit: Where verdicts and decisions are recorded.
     ///   - store: Standing approvals that outlive the process; nil keeps only session approvals.
     ///   - source: Entry point name recorded on grants.
+    ///   - sessionApprovals: Session-scoped approvals; share one instance across gates of one process.
     public init(
         classifier: any RiskClassifier, approver: any Approver, threshold: RiskLevel?, audit: AuditLog? = nil,
-        store: ApprovalStore? = nil, source: String = "unknown"
+        store: ApprovalStore? = nil, source: String = "unknown", sessionApprovals: SessionApprovals = SessionApprovals()
     ) {
         self.classifier = classifier
         self.approver = approver
@@ -145,6 +172,13 @@ public actor ApprovalGate {
         self.audit = audit
         self.store = store
         self.source = source
+        self.sessionApprovals = sessionApprovals
+    }
+
+    /// Returns and clears the refusals recorded since the last call.
+    public func takeRefusals() -> [Refusal] {
+        defer { refusals.removeAll() }
+        return refusals
     }
 
     /// Returns normally if reading `path` is acceptable.
@@ -247,11 +281,13 @@ public actor ApprovalGate {
         case .denied(let reason):
             audit?.record(
                 .approvalDecided, details: base.merging(["decision": "denied", "reason": .string(reason)]) { $1 })
+            refusals.append(Refusal(command: segment.text, reason: reason))
             throw CommandRunner.Failure.disapproved(reason)
         case .unanswered(let waited):
             let reason = "no answer within \(waited); an unanswered approval counts as declined"
             audit?.record(
                 .approvalDecided, details: base.merging(["decision": "timed-out", "reason": .string(reason)]) { $1 })
+            refusals.append(Refusal(command: segment.text, reason: reason))
             throw CommandRunner.Failure.disapproved(reason)
         }
     }

@@ -2,8 +2,9 @@
 
 **daimon** is a small, on-device AI agent for the Mac. It runs Apple's built-in Foundation Model, the same
 one behind Apple Intelligence and the `fm` command, and gives it tools: it can run shell commands, read
-files, and tell the time, and it can be extended with more. By default nothing leaves your machine; Apple's
-Private Cloud Compute model is available as an explicit opt-in.
+files, and tell the time, and it can be extended with more. With the default model nothing leaves your
+machine; Apple's Private Cloud Compute model is available as an explicit opt-in. Commands the model runs
+may use the network unless you turn that off.
 
 It has two faces:
 
@@ -12,9 +13,10 @@ It has two faces:
   locally: run a build, summarise a file, classify some text.
 
 It is deliberately a *microharness*: the smallest correct agent loop, not a framework. What makes it worth
-using is the care around that loop. Every command the model wants to run passes a policy, runs inside a
-kernel-enforced sandbox, is classified for risk, and needs your approval when it matters. Everything that
-happens is written to an audit log you can read back.
+using is the care around that loop. Every command the model wants to run passes a deny list, runs inside a
+sandbox that confines what it can write, is classified for risk, and needs your approval when it matters.
+Everything that happens is written to an audit log you can read back, and anything it remembers can be
+listed and revoked. [trust.md](docs/trust.md) states exactly what it can and cannot do to your Mac.
 
 ## Quick start
 
@@ -24,14 +26,16 @@ Requirements: an Apple silicon Mac on macOS 27 or later with Apple Intelligence 
 brew install pidster/tap/daimon
 daimon doctor                     # checks the model, sandbox, config, and home directory
 daimon "What is the date in Tokyo?"
-daimon "Run the tests in $PWD and tell me if they pass"
-daimon chat --save today          # interactive; type /help for commands
+daimon chat                       # interactive; ask it to run your tests; type /help for commands
+daimon --yes "Run the tests in $PWD and tell me if they pass"   # non-interactive: approve risky commands
 daimon logs --last 20             # what just happened, from the audit log
+daimon approvals                  # what it has been told to remember; revoke or clear here
 ```
 
-The first time the model wants to run something risky, `chat` asks you; plain `daimon` refuses unless you
-pass `--yes`. State lives in `~/.daimon`: an optional `config.json`, saved chat transcripts, and the audit
-log.
+Running tests is a "moderate" action, so `chat` asks you before doing it; plain `daimon "…"` cannot ask
+and refuses unless you pass `--yes`. State lives in `~/.daimon`: an optional `config.json`, saved chat
+transcripts, remembered approvals, and the audit log. Upgrade with `brew upgrade daimon`, remove with
+`brew uninstall daimon` and `rm -rf ~/.daimon`.
 
 To let another harness use it, register it as an MCP server. For Claude Code, in `.mcp.json`:
 
@@ -39,7 +43,7 @@ To let another harness use it, register it as an MCP server. For Claude Code, in
 {
     "mcpServers": {
         "daimon": {
-            "command": "/path/to/daimon",
+            "command": "/opt/homebrew/bin/daimon",
             "args": ["mcp"]
         }
     }
@@ -60,6 +64,7 @@ Everything is under [docs/](docs/README.md). Start with the one that matches you
 | Use the command line: subcommands, flags, `config.json`, exit codes | [daimon.md](docs/daimon.md) |
 | See what the model can do and the limits on each tool | [tools/](docs/tools/README.md) |
 | Connect it to another harness over MCP | [mcp.md](docs/mcp.md) |
+| Know what it can do to your Mac, what it remembers, and how to undo | [trust.md](docs/trust.md) |
 | Know how commands are confined and when you are asked | [tools/run_command.md](docs/tools/run_command.md), [approval.md](docs/approval.md) |
 | Read or query the audit log, or debug daimon itself | [logging.md](docs/logging.md) |
 | Understand how the code is put together | [design.md](docs/design.md) |

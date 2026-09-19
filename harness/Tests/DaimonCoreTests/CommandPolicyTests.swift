@@ -71,3 +71,19 @@ import Testing
         #expect(Config().resolved.runner.policy == .default)
     }
 }
+
+@Suite struct CommandPolicyDecodingTests {
+    @Test func partialObjectsTakeDefaults() throws {
+        let policy = try JSONDecoder().decode(
+            CommandPolicy.self, from: Data(#"{"sandbox":{"allowNetwork":false}}"#.utf8))
+        #expect(policy.deny == CommandPolicy.defaultDeny)
+        #expect(policy.allow.isEmpty)
+        #expect(policy.sandbox.enabled)
+        #expect(!policy.sandbox.allowNetwork)
+        #expect(policy.sandbox.writablePaths == CommandPolicy.Sandbox.defaultWritablePaths)
+        #expect(try JSONDecoder().decode(CommandPolicy.self, from: Data("{}".utf8)) == .default)
+        let config = try JSONDecoder().decode(Config.self, from: Data(#"{"commandPolicy":{"deny":[]}}"#.utf8))
+        #expect(config.commandPolicy?.deny == [])
+        #expect(config.commandPolicy?.sandbox == CommandPolicy.Sandbox())
+    }
+}

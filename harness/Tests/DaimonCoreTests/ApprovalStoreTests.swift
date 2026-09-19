@@ -157,6 +157,29 @@ import Testing
         }
     }
 
+    @Test func sessionApprovalsCanBeSharedAcrossGates() async throws {
+        let shared = SessionApprovals()
+        let approver = Answering(.approved(.session))
+        let first = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate, sessionApprovals: shared)
+        let second = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("should not ask")), threshold: .moderate,
+            sessionApprovals: shared)
+        try await first.clear(command: "touch a", workingDirectory: "/repo")
+        try await second.clear(command: "touch b", workingDirectory: "/repo")
+        #expect(approver.asked.events.count == 1)
+    }
+
+    @Test func refusalsAreReportedAndCleared() async throws {
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: Answering(.denied("no")), threshold: .moderate)
+        await #expect(throws: CommandRunner.Failure.self) {
+            try await gate.clear(command: "touch a", workingDirectory: "/")
+        }
+        #expect(await gate.takeRefusals() == [Refusal(command: "touch a", reason: "no")])
+        #expect(await gate.takeRefusals().isEmpty)
+    }
+
     @Test func onceCoversTheRestOfTheTurnOnly() async throws {
         let approver = Answering(.approved(.once))
         let sink = MemoryAuditSink()

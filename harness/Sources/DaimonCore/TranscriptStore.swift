@@ -41,7 +41,9 @@ public struct TranscriptStore: Sendable {
     public func save(_ transcript: Transcript, as name: String) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(transcript).write(to: try url(for: name), options: .atomic)
+        let file = try url(for: name)
+        try encoder.encode(transcript).write(to: file, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
 
     /// Reads the transcript saved under `name`.

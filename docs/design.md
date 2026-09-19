@@ -79,10 +79,12 @@ obscurely. An agent can also start from a saved `Transcript`.
 ### `Session`
 
 `Session.begin` is the one place an entry point's flags become a running configuration: it loads
-`config.json`, applies `--instructions`, `--model`, and `--unsafe`, opens the audit log, builds the
-`ApprovalGate` and `ToolRegistry`, selects `--tool` names, and records `session.start` with the same fields
-for `respond`, `chat`, and `mcp`. The CLI adds only the approver and the stderr note. Tested with an
-injected memory sink.
+`config.json`, applies `--instructions`, `--model`, and `--unsafe`, opens the audit log and the
+`ApprovalStore`, builds the `ApprovalGate` and `ToolRegistry`, selects `--tool` names, and records
+`session.start` with the same fields for `respond`, `chat`, and `mcp`. The CLI adds only the approver and
+the stderr note. The MCP server uses the session's config, audit log, and store but builds one gate per
+thread (each thread has its own audit session), sharing one `SessionApprovals` so "this session" answers
+cover every thread. Tested with an injected memory sink.
 
 ### Home, config, transcripts
 

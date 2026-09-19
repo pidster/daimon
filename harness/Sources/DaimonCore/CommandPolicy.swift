@@ -33,6 +33,17 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
 
         /// Caches that build tools expect to write: SwiftPM and Cargo registries.
         public static let defaultWritablePaths = ["~/Library/Caches", "~/.cargo/registry", "~/.cargo/git"]
+
+        private enum CodingKeys: String, CodingKey { case enabled, allowNetwork, writablePaths }
+
+        /// Decodes a partial object; missing fields take their defaults.
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            allowNetwork = try container.decodeIfPresent(Bool.self, forKey: .allowNetwork) ?? true
+            writablePaths =
+                try container.decodeIfPresent([String].self, forKey: .writablePaths) ?? Sandbox.defaultWritablePaths
+        }
     }
 
     /// The outcome of checking a command line against the patterns.
@@ -60,6 +71,17 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     /// The default: sandbox on with network allowed, no allow list, and a deny list of
     /// obviously destructive or privilege-escalating shapes.
     public static let `default` = CommandPolicy()
+
+    private enum CodingKeys: String, CodingKey { case deny, allow, sandbox }
+
+    /// Decodes a partial object; missing fields take their defaults, so `{"sandbox":{"allowNetwork":false}}`
+    /// is a complete policy.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        deny = try container.decodeIfPresent([String].self, forKey: .deny) ?? CommandPolicy.defaultDeny
+        allow = try container.decodeIfPresent([String].self, forKey: .allow) ?? []
+        sandbox = try container.decodeIfPresent(Sandbox.self, forKey: .sandbox) ?? Sandbox()
+    }
 
     /// No patterns and no sandbox. What `--unsafe` selects.
     public static let unrestricted = CommandPolicy(deny: [], allow: [], sandbox: Sandbox(enabled: false))

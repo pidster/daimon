@@ -3,6 +3,7 @@ import Foundation
 import FoundationModels
 import Logging
 import MCP
+import Synchronization
 
 /// Serves daimon's capabilities to MCP clients over stdio.
 ///
@@ -19,6 +20,8 @@ public struct DaimonServer: Sendable {
     private let config: Config.Resolved
     /// Live conversations by `thread_id`.
     private let threads: ThreadStore<any RespondingThread>
+    /// Each thread's gate, kept so a turn's refusals can be reported in the result.
+    private let gates = GateRegistry()
     /// Builds a thread for a new `thread_id`; the default wraps an `Agent` on the requested model.
     public typealias ThreadFactory =
         @Sendable (
@@ -34,6 +37,10 @@ public struct DaimonServer: Sendable {
     private let client = ClientCapabilityFlags()
     /// Approve every risky command without asking (`--yes`).
     private let autoApprove: Bool
+    /// Standing approvals shared by every thread; nil keeps only in-process approvals.
+    private let store: ApprovalStore?
+    /// "This session" approvals, shared across threads of this server process.
+    private let sessionApprovals = SessionApprovals()
 
     /// Creates a server from resolved configuration: default instructions for
     /// `respond`, limits for `run_command`, and the thread capacity.
@@ -42,14 +49,17 @@ public struct DaimonServer: Sendable {
     ///   - config: Resolved configuration.
     ///   - audit: Where MCP requests and thread activity are recorded; defaults to nothing.
     ///   - autoApprove: Approve risky commands without elicitation.
+    ///   - store: Standing approvals (`~/.daimon/approvals.json`); nil keeps only in-process approvals.
     ///   - makeThread: How threads are built; tests inject a fake that needs no model.
     public init(
         config: Config.Resolved = Config().resolved, audit: AuditLog? = nil, autoApprove: Bool = false,
+        store: ApprovalStore? = nil,
         makeThread: @escaping ThreadFactory = { id, instructions, tools, model, audit in
             try ConversationThread(id: id, instructions: instructions, tools: tools, model: model, audit: audit)
         }
     ) {
         self.config = config
+        self.store = store
         self.makeThread = makeThread
         threads = ThreadStore(capacity: config.maxThreads)
         self.audit = audit ?? .disabled(session: "mcp")
@@ -154,7 +164,8 @@ public struct DaimonServer: Sendable {
     private func respond(_ request: RespondRequest) async -> CallTool.Result {
         let id = request.threadID ?? UUID().uuidString.lowercased()
         let threadAudit = audit.log(forSession: id)
-        let registry = ToolRegistry(runner: config.runner, audit: threadAudit, approval: gate(audit: threadAudit))
+        let threadGate = gates.gate(for: id) { gate(audit: threadAudit) }
+        let registry = ToolRegistry(runner: config.runner, audit: threadAudit, approval: threadGate)
         let tools: [any FoundationModels.Tool]
         if request.toolNames.isEmpty {
             tools = registry.all
@@ -191,11 +202,14 @@ public struct DaimonServer: Sendable {
         }
         do {
             let reply = try await opened.thread.respond(to: request.prompt)
+            let refusals = await threadGate.takeRefusals()
             return .init(
                 content: [.text(text: reply.text, annotations: nil, _meta: nil)],
                 structuredContent: .object([
                     "thread_id": .string(id), "created": .bool(opened.created), "condensed": .bool(reply.condensed),
                     "text": .string(reply.text),
+                    "refusals": .array(
+                        refusals.map { .object(["command": .string($0.command), "reason": .string($0.reason)]) }),
                 ]),
                 isError: false
             )
@@ -210,6 +224,7 @@ public struct DaimonServer: Sendable {
     private func closeThread(_ request: CloseThreadRequest) async -> CallTool.Result {
         do {
             try await threads.close(request.threadID)
+            gates.remove(request.threadID)
             audit.log(forSession: request.threadID).record(.sessionEnd, details: ["reason": "closed"])
             return success("closed \(request.threadID)")
         } catch {
@@ -225,5 +240,25 @@ public struct DaimonServer: Sendable {
     /// A text result with `isError: true`, the MCP shape for execution failures.
     private func failure(_ message: String) -> CallTool.Result {
         .init(content: [.text(text: message, annotations: nil, _meta: nil)], isError: true)
+    }
+}
+
+/// Per-thread approval gates, shared safely across the server's concurrent requests.
+final class GateRegistry: Sendable {
+    private let gates = Mutex<[String: ApprovalGate]>([:])
+
+    /// The gate for `id`, creating it with `make` on first use.
+    func gate(for id: String, make: () -> ApprovalGate) -> ApprovalGate {
+        gates.withLock { gates in
+            if let existing = gates[id] { return existing }
+            let made = make()
+            gates[id] = made
+            return made
+        }
+    }
+
+    /// Forgets the gate for a closed thread.
+    func remove(_ id: String) {
+        gates.withLock { $0[id] = nil }
     }
 }

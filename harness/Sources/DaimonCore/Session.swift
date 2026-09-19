@@ -58,6 +58,8 @@ public struct Session: Sendable {
     public let audit: AuditLog
     /// The approval gate shared by the session's tools.
     public let gate: ApprovalGate
+    /// Standing approvals, for entry points that build further gates (the MCP server, per thread).
+    public let store: ApprovalStore
     /// The tools the model may use.
     public let tools: [any Tool]
     /// The instructions in force.
@@ -128,7 +130,8 @@ public struct Session: Sendable {
                 "unsafe": .bool(request.unsafe), "autoApprove": .bool(request.autoApprove),
                 "resume": request.resume.map { .string($0) } ?? .null,
             ])
-        return Session(config: config, audit: audit, gate: gate, tools: tools, instructions: config.instructions)
+        return Session(
+            config: config, audit: audit, gate: gate, store: store, tools: tools, instructions: config.instructions)
     }
 
     /// Records `session.end`.

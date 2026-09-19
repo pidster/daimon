@@ -450,3 +450,23 @@ decision.
 - Checked the Homebrew tap and release tags over HTTPS (read-only).
 - Not exercised: Private Cloud Compute, log rotation, context condensation, the eval suite, a real
   elicitation-capable client, Codex configuration, Gatekeeper behaviour.
+
+
+## Status
+
+2026-09-19: all five High items and the Medium items addressed in the commit "Act on the documentation
+review: fix MCP approvals, partial policies, and the trust story":
+
+- Code: MCP threads now share the process's `ApprovalStore` and a `SessionApprovals` set (persisted and
+  session approvals work over MCP); `structuredContent.refusals` reports refused commands structurally;
+  `commandPolicy` and `sandbox` decode partial objects with defaults; transcripts are written 0600;
+  unified-log diagnostics are private; a malformed `config.json` is exit 64 from every subcommand; the
+  chat prompt goes to stderr; `daimon approvals --help` speaks of patterns.
+- Docs: new `docs/trust.md` and README front-door corrections (sandbox confines writes, network on by
+  default, working quick-start examples, approvals and undo, Homebrew path, upgrade and uninstall);
+  `mcp.md` refusal shape and orphan table; `run_command.md` writable-root wording; `approval.md` timeout
+  scoping and stale decision list; `policy-and-sandboxing.md` marked historical; `objective.md` amended
+  for ADR 0013; `design.md` Session versus server; index regrouped with `reviews/`; `daimon.md` exit
+  codes, subcommand count, `chat` piping, config partials, `/q`, and "turn".
+
+Remaining Low items stand as listed in the Todo.
