@@ -58,6 +58,25 @@ the program that actually runs after unwrapping `sudo`, `env`, `time`, and the l
 | `project` | this pattern in this directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
 | `always` | this pattern in any directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
 
+### The order of checks
+
+For each simple command in a line, the gate does the following, in this order, stopping at the first
+step that decides:
+
+1. Classify it with the rules and the model.
+2. If the verdict is below the threshold, run it. Nothing else is consulted.
+3. Check the session cache for this pattern in this directory.
+4. Check the turn cache for a once-approval given earlier in this turn.
+5. Check the persistent file for a `project` entry in this directory or an `always` entry, **but only if
+   the verdict is not dangerous**.
+6. Ask the approver.
+
+Step 5's exception is deliberate: a dangerous verdict skips the persistent file and always asks, so a
+stored `rm *` never covers `rm -rf build` and a stored `git *` never covers `git push --force`. The session
+and turn caches do apply to dangerous commands, because those were answered in this process by a person
+who saw the command; the persistent file may be weeks old. And because classification always comes first,
+a stored approval decides only whether to ask, never whether the command is acceptable.
+
 A dangerous verdict is never persisted: `project` or `always` is downgraded to `session` and the audit
 says so. Remembered approvals only decide whether to ask; deny patterns, the sandbox, and the classifier
 run on every part every time, so `rm *` never covers `rm -rf build`, and each use is audited with the
