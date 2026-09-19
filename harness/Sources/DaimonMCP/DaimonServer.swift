@@ -100,7 +100,7 @@ public struct DaimonServer: Sendable {
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
             default:
-                throw MCPError.methodNotFound("Unknown tool: \(params.name)")
+                throw MCPError.invalidParams("Unknown tool: \(params.name)")
             }
         } catch {
             audit.error(error, call: call, context: "mcp \(params.name)")
@@ -138,59 +138,56 @@ public struct DaimonServer: Sendable {
 
     /// Finds or creates the thread, runs the prompt, and reports the thread id and whether it was condensed.
     private func respond(_ request: RespondRequest) async -> CallTool.Result {
-        let thread: ConversationThread
-        var created = false
-        if let id = request.threadID, let existing = await threads.find(id) {
-            guard request.instructions == nil, request.toolNames.isEmpty, request.model == nil else {
-                return failure(
-                    "instructions, tools, and model apply only when a thread is created; \(id) already exists")
-            }
-            thread = existing
+        let id = request.threadID ?? UUID().uuidString.lowercased()
+        let threadAudit = audit.log(forSession: id)
+        let registry = ToolRegistry(runner: config.runner, audit: threadAudit, approval: gate(audit: threadAudit))
+        let tools: [any FoundationModels.Tool]
+        if request.toolNames.isEmpty {
+            tools = registry.all
         } else {
-            let id = request.threadID ?? UUID().uuidString.lowercased()
-            let threadAudit = audit.log(forSession: id)
-            let registry = ToolRegistry(runner: config.runner, audit: threadAudit, approval: gate(audit: threadAudit))
-            let tools: [any FoundationModels.Tool]
-            if request.toolNames.isEmpty {
-                tools = registry.all
-            } else {
-                let selection = registry.select(request.toolNames)
-                guard selection.unknown.isEmpty else {
-                    return failure("Unknown tool(s): \(selection.unknown.joined(separator: ", "))")
-                }
-                tools = selection.tools
+            let selection = registry.select(request.toolNames)
+            guard selection.unknown.isEmpty else {
+                return failure("Unknown tool(s): \(selection.unknown.joined(separator: ", "))")
             }
-            let instructions = request.instructions ?? config.instructions
-            let model = request.model ?? config.model
-            do {
-                thread = try await threads.create(id: id) {
-                    try ConversationThread(
-                        id: id, instructions: instructions, tools: tools, model: model, audit: threadAudit)
-                }
-                threadAudit.record(
-                    .sessionStart,
-                    details: [
-                        "entryPoint": "mcp-thread", "instructions": .string(instructions),
-                        "tools": .array(tools.map { .string($0.name) }), "model": .string(model.description),
-                    ])
-                created = true
-            } catch {
-                return failure(String(describing: error))
+            tools = selection.tools
+        }
+        let instructions = request.instructions ?? config.instructions
+        let model = request.model ?? config.model
+        let opened: ThreadStore<ConversationThread>.Opened
+        do {
+            opened = try await threads.findOrCreate(id: id) {
+                try ConversationThread(
+                    id: id, instructions: instructions, tools: tools, model: model, audit: threadAudit)
             }
+        } catch {
+            return failure(String(describing: error))
+        }
+        if opened.created {
+            if let evicted = opened.evicted {
+                audit.log(forSession: evicted).record(.sessionEnd, details: ["reason": "evicted"])
+                Diagnostics.mcp.info("evicted thread \(evicted) to make room for \(id)")
+            }
+            threadAudit.record(
+                .sessionStart,
+                details: [
+                    "entryPoint": "mcp-thread", "instructions": .string(instructions),
+                    "tools": .array(tools.map { .string($0.name) }), "model": .string(model.description),
+                ])
+        } else if request.instructions != nil || !request.toolNames.isEmpty || request.model != nil {
+            return failure("instructions, tools, and model apply only when a thread is created; \(id) already exists")
         }
         do {
-            let reply = try await thread.respond(to: request.prompt)
+            let reply = try await opened.thread.respond(to: request.prompt)
             return .init(
                 content: [.text(text: reply.text, annotations: nil, _meta: nil)],
                 structuredContent: .object([
-                    "thread_id": .string(thread.id), "created": .bool(created), "condensed": .bool(reply.condensed),
+                    "thread_id": .string(id), "created": .bool(opened.created), "condensed": .bool(reply.condensed),
                     "text": .string(reply.text),
                 ]),
                 isError: false
             )
         } catch LanguageModelError.contextSizeExceeded {
-            return failure(
-                "thread \(thread.id) has exhausted the model's context window; close it and start a new one")
+            return failure("thread \(id) has exhausted the model's context window; close it and start a new one")
         } catch {
             return failure(String(describing: error))
         }

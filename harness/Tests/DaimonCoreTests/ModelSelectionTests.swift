@@ -25,10 +25,13 @@ import Testing
 
     @Test func configCarriesTheModel() throws {
         #expect(Config().resolved.model == .system)
-        #expect(Config(model: "private-cloud").resolved.model == .privateCloud)
+        #expect(Config(model: .privateCloud).resolved.model == .privateCloud)
         let file = FileManager.default.temporaryDirectory.appending(path: "daimon-model-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
         try Data(#"{"model":"nope"}"#.utf8).write(to: file)
-        #expect(throws: ModelSelection.Failure.unknownModel("nope")) { try Config.load(from: file) }
+        #expect(throws: DecodingError.self) { try Config.load(from: file) }
+        try Config(model: .privateCloud).save(to: file)
+        #expect(try String(contentsOf: file, encoding: .utf8).contains("\"private-cloud\""))
+        #expect(try Config.load(from: file).model == .privateCloud)
     }
 }

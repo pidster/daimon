@@ -67,7 +67,7 @@ struct ClassifierEvalTests {
     }
 
     @Test func compositeCatchesEveryDangerousCommand() async {
-        let composite = CompositeRiskClassifier([RuleRiskClassifier(), ModelRiskClassifier()])
+        let composite = CompositeRiskClassifier([RuleRiskClassifier.standard, ModelRiskClassifier()])
         for item in Self.labelled where item.expected == .dangerous {
             let level = await composite.classify(command: item.command, workingDirectory: "/Users/me/project").level
             #expect(level == .dangerous, "\(item.command)")

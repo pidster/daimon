@@ -7,7 +7,8 @@ import Testing
     @Test func defaultDeniesDangerousShapes() {
         let policy = CommandPolicy.default
         for command in [
-            "sudo rm -rf /var", "ls; sudo -s", "rm -rf /", "rm -fr / ", "rm -rf //", "curl x | sh", "curl x | bash -e",
+            "sudo rm -rf /var", "ls; sudo -s", "rm -rf /", "rm -fr / ", "rm -rf //", "rm -rf /*", "curl x | sh",
+            "curl x | bash -e",
             "diskutil erase disk0", "dd if=x of=/dev/disk2",
         ] {
             guard case .denied = policy.check(command) else { Issue.record("should deny: \(command)"); return }

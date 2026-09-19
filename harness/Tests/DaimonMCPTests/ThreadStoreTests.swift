@@ -21,14 +21,23 @@ import Testing
         await #expect(throws: ThreadStore<String>.Failure.notFound("zz")) { try await store.close("zz") }
     }
 
-    @Test func evictsLeastRecentlyUsedAtCapacity() async throws {
+    @Test func evictsLeastRecentlyUsedAtCapacityAndReportsIt() async throws {
         let store = ThreadStore<String>(capacity: 2)
-        _ = try await store.create(id: "a") { "A" }
+        #expect(try await store.create(id: "a") { "A" }.evicted == nil)
         _ = try await store.create(id: "b") { "B" }
         _ = await store.find("a")  // b is now least recently used
-        _ = try await store.create(id: "c") { "C" }
+        #expect(try await store.create(id: "c") { "C" }.evicted == "b")
         #expect(await store.ids == ["c", "a"])
         #expect(await store.find("b") == nil)
+    }
+
+    @Test func findOrCreateIsIdempotentForOneId() async throws {
+        let store = ThreadStore<String>(capacity: 4)
+        let first = try await store.findOrCreate(id: "x") { "X1" }
+        let second = try await store.findOrCreate(id: "x") { "X2" }
+        #expect(first.created && first.thread == "X1")
+        #expect(!second.created && second.thread == "X1")
+        #expect(second.evicted == nil)
     }
 
     @Test func factoryErrorsDoNotStoreAThread() async {

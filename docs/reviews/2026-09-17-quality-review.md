@@ -469,5 +469,8 @@ high-severity review findings"). D4 is moot: the direct MCP `run_command` tool w
 T4, T5, T6 addressed 2026-09-19 (commit "Close the remaining medium review findings"): the elicitation
 approver is driven through an in-process MCP client and server for accept, decline, cancel, silence, and
 the no-elicitation client; the network test asserts the kernel's "Operation not permitted" rather than any
-failure; every default rule and deny pattern is compiled by a test. All medium items are now closed; the
-low items stand as listed in the Todo.
+failure; every default rule and deny pattern is compiled by a test. All medium items are now closed.
+
+2026-09-19, later: D10 through D20, Q4, and Q5 addressed (commit "Close the low-severity correctness
+findings from the review"). Remaining: O3, O4, O5, O7 through O13, T7 through T11, Q2, Q3, Q6, Q7 (doc
+drift, code hygiene, test debt).

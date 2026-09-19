@@ -126,7 +126,8 @@ public actor ApprovalGate {
     ///
     /// - Throws: `CommandRunner.Failure.disapproved` with the reason otherwise.
     public func clear(readingFile path: String, workingDirectory: String) async throws {
-        try await clear(command: "cat \(path)", workingDirectory: workingDirectory, classifier: RuleRiskClassifier())
+        try await clear(
+            command: "cat \(path)", workingDirectory: workingDirectory, classifier: RuleRiskClassifier.standard)
     }
 
     /// Returns normally if the command may run.

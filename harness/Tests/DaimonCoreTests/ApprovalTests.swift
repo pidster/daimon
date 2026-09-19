@@ -13,7 +13,7 @@ import Testing
     }
 
     @Test func rulesClassifyTheLabelledSet() async {
-        let rules = RuleRiskClassifier()
+        let rules = RuleRiskClassifier.standard
         let cases: [(String, RiskLevel)] = [
             ("ls -la", .safe), ("cat README.md", .safe), ("git status", .safe), ("grep -rn TODO Sources", .safe),
             ("find . -name '*.swift' | wc -l", .safe), ("echo hello", .safe), ("ls | shasum", .safe),
@@ -36,13 +36,20 @@ import Testing
         }
     }
 
+    @Test func invalidRulePatternIsAThrownError() {
+        #expect(throws: RuleRiskClassifier.InvalidRule(pattern: "(")) {
+            try RuleRiskClassifier(rules: [.init("(", .safe, "broken")])
+        }
+        #expect(RuleRiskClassifier.standard.rules.count == RuleRiskClassifier.defaultRules.count)
+    }
+
     @Test func everyDefaultRuleAndDenyPatternCompiles() throws {
         for rule in RuleRiskClassifier.defaultRules {
-            #expect(throws: Never.self, "\(rule.pattern)") { _ = try Regex(rule.pattern) }
+            #expect(throws: Never.self, "\(rule.pattern)") { _ = try NSRegularExpression(pattern: rule.pattern) }
             #expect(!rule.reason.isEmpty)
         }
         for pattern in CommandPolicy.defaultDeny {
-            #expect(throws: Never.self, "\(pattern)") { _ = try Regex(pattern) }
+            #expect(throws: Never.self, "\(pattern)") { _ = try NSRegularExpression(pattern: pattern) }
         }
     }
 
@@ -148,6 +155,19 @@ import Testing
             approval: ApprovalGate(
                 classifier: Fixed(level: .moderate), approver: AutoApprover(), threshold: .moderate))
         #expect(try await open.run("printf hi").stdout == "hi")
+    }
+
+    @Test func disapprovedCommandsRecordOneDisapprovedDecision() async {
+        let sink = MemoryAuditSink()
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "batch"), threshold: .moderate)
+        let runner = CommandRunner(
+            options: .init(policy: .unrestricted), audit: AuditLog(session: "s", sink: sink), approval: gate)
+        await #expect(throws: CommandRunner.Failure.self) { try await runner.run("echo hi") }
+        let decisions = sink.events.filter { $0.kind == .policyDecision }
+        #expect(decisions.count == 1)
+        #expect(decisions.first?.details["verdict"] == "disapproved")
+        #expect(!sink.events.contains { $0.kind == .commandOutcome })
     }
 
     @Test func terminalAnswersParse() {

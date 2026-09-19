@@ -65,7 +65,8 @@ Result content is the reply text. `structuredContent`:
 ```
 
 `condensed` is true when older turns were dropped to fit the window on this call. Threads live in memory for
-the server's lifetime; the least recently used is evicted beyond `maxThreads` (32). Calls on one thread run
+the server's lifetime; the least recently used is evicted beyond `maxThreads` (32), which is audited as a
+`session.end` with reason `evicted`. Naming a new `thread_id` from two concurrent calls creates it once. Calls on one thread run
 in order; different threads run concurrently.
 
 ## Approval
@@ -100,7 +101,8 @@ thread's turns under the `thread_id` as its own session. See [logging.md](loggin
 
 ## Errors
 
-- Malformed arguments (missing `prompt`, bad `thread_id`) are JSON-RPC `invalidParams` errors.
+- Malformed arguments (missing `prompt`, bad `thread_id`) and unknown tool names are JSON-RPC
+  `invalidParams` errors.
 - Execution failures (model unavailable, unknown tool name, unknown thread, command could not start) are tool
   results with `isError: true` and the message as text.
 

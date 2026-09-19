@@ -37,7 +37,7 @@ answer, exactly as the command would be. Ordinary files pass without a model cal
 | Limit | Default | Configure |
 | --- | --- | --- |
 | Bytes of line content per page | 4 KiB; the page ends early and the marker points at the next line | `FileReader(maxBytes:)` (not yet in `config.json`) |
-| Line length | A single line longer than the budget is cut to the budget | same |
+| Line length | A single line longer than the budget is cut to the budget, on a character boundary | same |
 | Binary files | Rejected if the first chunk contains a NUL byte | not configurable |
 | Directories, missing files, `offset`/`limit` below 1 | Errors | |
 

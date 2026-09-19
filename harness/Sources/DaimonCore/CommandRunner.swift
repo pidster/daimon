@@ -126,26 +126,34 @@ public struct CommandRunner: Sendable {
     /// - Throws: `Failure` if the policy rejects the command or it cannot be started.
     public func run(_ command: String) async throws -> Outcome {
         let workingDirectory = options.workingDirectory ?? FileManager.default.currentDirectoryPath
-        let verdict = options.policy.check(command)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
+        else { throw Failure.invalidWorkingDirectory(workingDirectory) }
         let sandboxed = options.policy.sandbox.enabled && !Self.isNestedSandbox
         var decision: [String: JSONValue] = [
             "command": .string(command), "workingDirectory": .string(workingDirectory),
             "sandbox": .bool(sandboxed), "network": .bool(options.policy.sandbox.allowNetwork),
             "nested": .bool(options.policy.sandbox.enabled && Self.isNestedSandbox),
         ]
-        if case .denied(let reason) = verdict {
+        if case .denied(let reason) = options.policy.check(command) {
             decision["verdict"] = "denied"
             decision["reason"] = .string(reason)
             audit?.record(.policyDecision, details: decision)
             Diagnostics.policy.info("denied: \(reason): \(command)")
             throw Failure.denied(reason)
         }
+        do {
+            try await approval?.clear(command: command, workingDirectory: workingDirectory)
+        } catch let failure as Failure {
+            if case .disapproved(let reason) = failure {
+                decision["verdict"] = "disapproved"
+                decision["reason"] = .string(reason)
+                audit?.record(.policyDecision, details: decision)
+            }
+            throw failure
+        }
         decision["verdict"] = "allowed"
         audit?.record(.policyDecision, details: decision)
-        try await approval?.clear(command: command, workingDirectory: workingDirectory)
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
-        else { throw Failure.invalidWorkingDirectory(workingDirectory) }
 
         let started = Date()
         let outcome = try await launch(command, in: workingDirectory, sandboxed: sandboxed)

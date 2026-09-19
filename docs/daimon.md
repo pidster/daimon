@@ -91,8 +91,9 @@ Serves the Model Context Protocol over stdio until the client closes the pipe. S
 
 ## Home directory and configuration
 
-State lives in `~/.daimon`, or `$DAIMON_HOME` when set. It is created on first use by `chat`; other
-subcommands only read from it.
+State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes there creates it: `respond`,
+`chat`, and `mcp` write the audit log (unless `audit.enabled` is false), `chat` writes transcripts, and
+`doctor` probes that it is writable. `tools` and `logs` never create it.
 
 | Path | Contents |
 | --- | --- |

@@ -25,10 +25,43 @@ public struct RuleRiskClassifier: RiskClassifier {
 
     /// The rules in use.
     public let rules: [Rule]
+    private let compiled: [(regex: NSRegularExpression, rule: Rule)]
 
-    /// Creates a classifier over `rules` (default: `defaultRules`).
-    public init(rules: [Rule] = RuleRiskClassifier.defaultRules) {
+    /// A rule whose pattern does not compile.
+    public struct InvalidRule: Error, Equatable, CustomStringConvertible {
+        /// The offending pattern.
+        public let pattern: String
+        /// Human-readable explanation.
+        public var description: String { "invalid risk rule pattern: \(pattern)" }
+    }
+
+    /// Creates a classifier over `rules`, compiling every pattern once.
+    ///
+    /// - Throws: `InvalidRule` naming the first pattern that does not compile.
+    public init(rules: [Rule]) throws {
         self.rules = rules
+        compiled = try rules.map { rule in
+            do {
+                return (try RegexCache.regex(rule.pattern), rule)
+            } catch {
+                throw InvalidRule(pattern: rule.pattern)
+            }
+        }
+    }
+
+    /// The built-in rules. A test compiles every default pattern, so this cannot fail in practice; a
+    /// pattern that somehow did would be dropped with an error in diagnostics rather than crash.
+    public static let standard: RuleRiskClassifier = {
+        if let classifier = try? RuleRiskClassifier(rules: defaultRules) { return classifier }
+        let usable = defaultRules.filter { (try? RegexCache.regex($0.pattern)) != nil }
+        Diagnostics.policy.error(
+            "dropping \(defaultRules.count - usable.count) default risk rule(s) that do not compile")
+        return (try? RuleRiskClassifier(rules: usable)) ?? RuleRiskClassifier(compiled: [])
+    }()
+
+    private init(compiled: [(regex: NSRegularExpression, rule: Rule)]) {
+        rules = compiled.map(\.rule)
+        self.compiled = compiled
     }
 
     /// A word boundary at the start of a simple command in a pipeline or list.
@@ -86,8 +119,7 @@ public struct RuleRiskClassifier: RiskClassifier {
     public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
         var level = RiskLevel.safe
         var reasons: [String] = []
-        for rule in rules {
-            guard let regex = try? Regex(rule.pattern), command.contains(regex) else { continue }
+        for (regex, rule) in compiled where regex.matches(anywhereIn: command) {
             level = max(level, rule.level)
             if !reasons.contains(rule.reason) { reasons.append(rule.reason) }
         }

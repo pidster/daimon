@@ -5,7 +5,7 @@ import FoundationModels
 ///
 /// Parsed from `config.json`'s `model` or `--model`: `system` (default) or
 /// `private-cloud`. (Custom adapters exist in the framework but are unavailable on macOS.)
-public enum ModelSelection: Equatable, Sendable, CustomStringConvertible {
+public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codable {
     /// Apple's on-device model. Nothing leaves the machine.
     case system
     /// Apple's Private Cloud Compute model. Requests leave the machine under Apple's privacy guarantees.
@@ -31,6 +31,22 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible {
         case .system: "system"
         case .privateCloud: "private-cloud"
         }
+    }
+
+    /// Decodes from the canonical spelling.
+    public init(from decoder: Decoder) throws {
+        let text = try decoder.singleValueContainer().decode(String.self)
+        do {
+            try self.init(parsing: text)
+        } catch {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "\(error)"))
+        }
+    }
+
+    /// Encodes as the canonical spelling.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(description)
     }
 
     /// Whether prompts and transcripts are sent off the machine.

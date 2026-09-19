@@ -95,23 +95,30 @@ public struct FileReader: Sendable {
                 truncatedByBytes = true
                 return true
             }
-            lines.append(String(decoding: line.prefix(maxBytes), as: UTF8.self))
+            lines.append(Self.utf8Prefix(line, maxBytes: maxBytes))
             bytesUsed += line.count
             return lines.count == limit
         }
 
         var hasMore = false
+        var filled = false
         chunks: while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
             if !checkedForBinary {
                 checkedForBinary = true
                 if chunk.contains(0) { throw Failure.binary(path) }
             }
-            for line in scanner.feed(chunk) where consume(line) {
-                hasMore = true
+            let batch = scanner.feed(chunk)
+            for (index, line) in batch.enumerated() where consume(line) {
+                filled = true
+                // More only if something follows: further lines in this batch, an unterminated tail,
+                // or bytes still unread in the file.
+                hasMore =
+                    index + 1 < batch.count || scanner.hasPending
+                    || ((try? handle.read(upToCount: 1))?.isEmpty == false)
                 break chunks
             }
         }
-        if !hasMore, let last = scanner.finish(), consume(last) {
+        if !filled, let last = scanner.finish(), consume(last) {
             hasMore = lineNumber > offset + lines.count - 1
         }
         return Window(
@@ -123,6 +130,9 @@ public struct FileReader: Sendable {
 struct LineScanner {
     /// Bytes after the last newline seen, carried into the next feed.
     private var pending = Data()
+
+    /// Whether an unterminated partial line is buffered.
+    var hasPending: Bool { !pending.isEmpty }
 
     /// Feeds a chunk and returns the complete lines it closed, without their newlines.
     mutating func feed(_ chunk: Data) -> [Data] {
@@ -141,5 +151,19 @@ struct LineScanner {
     mutating func finish() -> Data? {
         defer { pending = Data() }
         return pending.isEmpty ? nil : pending
+    }
+}
+
+extension FileReader {
+    /// The longest prefix of `data` within `maxBytes` that ends on a UTF-8 scalar boundary.
+    static func utf8Prefix(_ data: Data, maxBytes: Int) -> String {
+        guard data.count > maxBytes else { return String(decoding: data, as: UTF8.self) }
+        var cut = maxBytes
+        // Step back over up to three continuation bytes and a lead byte that would be left incomplete.
+        for _ in 0..<4 {
+            if let text = String(data: data.prefix(cut), encoding: .utf8) { return text }
+            cut -= 1
+        }
+        return String(decoding: data.prefix(cut), as: UTF8.self)
     }
 }

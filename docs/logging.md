@@ -36,12 +36,12 @@ sensitive; it is why it is user-only.
 | Kind | Details | Written by |
 | --- | --- | --- |
 | `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`), `instructions`, `tools`, `model`, `unsafe`, `autoApprove`, `resume`, `reason` (`new`) | CLI, MCP |
-| `session.end` | `reason` when closed explicitly | CLI, MCP `close_thread` |
+| `session.end` | `reason`: `closed` (explicit), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
 | `prompt` | `text` | `Agent` |
 | `response` | `text`, `condensed`, `seconds` | `Agent` |
 | `tool.call` | `tool`, `arguments` (JSON as the model produced it) | `AuditedTool` |
 | `tool.result` | `tool`, `output`, `bytes`, `seconds` | `AuditedTool` |
-| `policy.decision` | `command`, `workingDirectory`, `verdict` (`allowed`/`denied`), `reason`, `sandbox`, `network`, `nested` | `CommandRunner` |
+| `policy.decision` | `command`, `workingDirectory`, `verdict` (`allowed`, `denied` by pattern, `disapproved` by the gate), `reason`, `sandbox`, `network`, `nested`; recorded once, after the directory check, patterns, and approval | `CommandRunner` |
 | `command.outcome` | `command`, `exitStatus`, `timedOut`, `truncated`, `stdout`, `stderr`, `seconds` | `CommandRunner` |
 | `context.condensation` | `turnsBefore`, `turnsAfter`, `contextSize`, `tokenCount` | `Agent` |
 | `mcp.request` | `tool`, `arguments` | `DaimonServer` |

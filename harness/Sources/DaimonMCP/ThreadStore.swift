@@ -70,19 +70,42 @@ public actor ThreadStore<Thread: Sendable> {
     /// Ids of live threads, most recently used first.
     public var ids: [String] { recency.reversed() }
 
+    /// The outcome of `findOrCreate`.
+    public struct Opened: Sendable {
+        /// The thread, found or new.
+        public let thread: Thread
+        /// Whether it was created by this call.
+        public let created: Bool
+        /// The id evicted to make room, if any.
+        public let evicted: String?
+    }
+
     /// Creates and stores a thread, evicting the least recently used one if at capacity.
     ///
+    /// - Returns: The thread and the evicted id, if any.
     /// - Throws: `Failure.alreadyExists`, or whatever `make` throws.
-    public func create(id: String, _ make: () throws -> Thread) throws -> Thread {
+    public func create(id: String, _ make: () throws -> Thread) throws -> (thread: Thread, evicted: String?) {
         guard threads[id] == nil else { throw Failure.alreadyExists(id) }
         let thread = try make()
+        var evicted: String?
         if threads.count >= capacity, let oldest = recency.first {
             threads[oldest] = nil
             recency.removeFirst()
+            evicted = oldest
         }
         threads[id] = thread
         recency.append(id)
-        return thread
+        return (thread, evicted)
+    }
+
+    /// Finds the thread with `id`, marking it used, or creates it in one actor step so concurrent
+    /// callers naming the same new id cannot race each other into `alreadyExists`.
+    ///
+    /// - Throws: Whatever `make` throws.
+    public func findOrCreate(id: String, _ make: () throws -> Thread) throws -> Opened {
+        if let existing = find(id) { return Opened(thread: existing, created: false, evicted: nil) }
+        let made = try create(id: id, make)
+        return Opened(thread: made.thread, created: true, evicted: made.evicted)
     }
 
     /// Returns the thread with `id`, marking it most recently used, or nil.

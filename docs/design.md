@@ -89,8 +89,8 @@ obscurely. An agent can also start from a saved `Transcript`.
 
 `Home` resolves `$DAIMON_HOME` or `~/.daimon` and lays out `config.json`, `logs/`, and `transcripts/`.
 `Config` is optional JSON (instructions, `run_command` limits, MCP thread capacity) with defaults applied by
-`resolved`. `TranscriptStore` saves and loads transcripts as `<name>.json`. Read-only commands never create
-the directory; `chat` calls `Home.ensure()`.
+`resolved`. `TranscriptStore` saves and loads transcripts as `<name>.json`. Commands that write (audit log,
+transcripts, the doctor's write probe) call `Home.ensure()`; `tools` and `logs` never create the directory.
 
 ### `ToolRegistry`
 

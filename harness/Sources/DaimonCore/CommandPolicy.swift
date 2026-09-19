@@ -67,7 +67,7 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     /// Shapes rejected by default. Illustrative, not exhaustive; the sandbox is the real barrier.
     public static let defaultDeny: [String] = [
         #"(^|[\s;&|(])sudo(\s|$)"#,
-        #"(^|[\s;&|(])rm\s+(-[A-Za-z]*r[A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*r)\S*\s+/+(\s|$)"#,
+        #"(^|[\s;&|(])rm\s+(-[A-Za-z]*r[A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*r)\S*\s+/+\*?(\s|$)"#,
         #"\|\s*(ba|z|da)?sh(\s|$)"#,
         #"(^|[\s;&|(])(mkfs|diskutil\s+erase|newfs_)"#,
         #"(^|[\s;&|(])dd\s.*\bof=/dev/"#,
@@ -78,7 +78,7 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     /// - Throws: `Failure.invalidPattern` naming the first bad pattern.
     public func validate() throws {
         for pattern in deny + allow {
-            do { _ = try Regex(pattern) } catch { throw Failure.invalidPattern(pattern) }
+            do { _ = try RegexCache.regex(pattern) } catch { throw Failure.invalidPattern(pattern) }
         }
     }
 
@@ -128,8 +128,8 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     }
 
     private static func matches(_ pattern: String, _ command: String) -> Bool {
-        guard let regex = try? Regex(pattern) else { return false }
-        return command.contains(regex)
+        guard let regex = try? RegexCache.regex(pattern) else { return false }
+        return regex.matches(anywhereIn: command)
     }
 
     /// Resolves symlinks with `realpath(3)` (for example `/var` to `/private/var`) and strips a
@@ -138,15 +138,17 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     static func canonical(_ path: String) -> String {
         var existing = path
         var remainder: [String] = []
-        while existing.count > 1, realpath(existing, nil) == nil {
+        var resolved = existing
+        while true {
+            if let real = realpath(existing, nil) {
+                resolved = String(cString: real)
+                free(real)
+                break
+            }
+            guard existing.count > 1 else { break }
             let url = URL(fileURLWithPath: existing)
             remainder.insert(url.lastPathComponent, at: 0)
             existing = url.deletingLastPathComponent().path
-        }
-        var resolved = existing
-        if let real = realpath(existing, nil) {
-            resolved = String(cString: real)
-            free(real)
         }
         for component in remainder {
             resolved += resolved.hasSuffix("/") ? component : "/" + component

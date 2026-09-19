@@ -26,7 +26,9 @@ Two run and the higher verdict wins (`CompositeRiskClassifier`):
   reasoning. The instructions give the model facts it otherwise guesses at (project build output is the
   project's own programs; filtering output is not network access; git reads are safe; anything that
   changes a file, setting, or repository state is at least moderate) and thirteen labelled examples.
-  Sampling is greedy, so the same command always gets the same verdict. If the model is unavailable or
+  Sampling is greedy, so the same command always gets the same verdict. The command is placed between
+markers and the model is told to treat it as data, but a command containing persuasive prose can still
+steer the verdict; that is why the rules floor exists and the model may only raise a level, never lower one. If the model is unavailable or
   fails it reports `moderate`, so a broken classifier asks rather than waves through.
 
 Measured on this machine (`scripts/check eval`, 45 labelled commands, ten of them held out from the

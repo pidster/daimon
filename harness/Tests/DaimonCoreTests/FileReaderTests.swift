@@ -32,6 +32,26 @@ import Testing
         #expect(beyond.rendered.contains("(no lines in range)"))
     }
 
+    @Test func exactLimitAtEndOfFileIsNotMore() throws {
+        let path = try temporaryFile("a\nb\nc\n")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let window = try FileReader().read(path: path, limit: 3)
+        #expect(window.lines == ["a", "b", "c"])
+        #expect(!window.hasMore)
+        let unterminated = try temporaryFile("a\nb\nc")
+        defer { try? FileManager.default.removeItem(atPath: unterminated) }
+        #expect(!(try FileReader().read(path: unterminated, limit: 3)).hasMore)
+        #expect(try FileReader().read(path: path, limit: 2).hasMore)
+    }
+
+    @Test func overLongLinesAreCutOnScalarBoundaries() {
+        let data = Data("ab€cd".utf8)  // € is three bytes at offsets 2-4
+        #expect(FileReader.utf8Prefix(data, maxBytes: 3) == "ab")
+        #expect(FileReader.utf8Prefix(data, maxBytes: 4) == "ab")
+        #expect(FileReader.utf8Prefix(data, maxBytes: 5) == "ab€")
+        #expect(FileReader.utf8Prefix(data, maxBytes: 99) == "ab€cd")
+    }
+
     @Test func honoursByteBudget() throws {
         let path = try temporaryFile("aaaa\nbbbb\ncccc\n")
         defer { try? FileManager.default.removeItem(atPath: path) }

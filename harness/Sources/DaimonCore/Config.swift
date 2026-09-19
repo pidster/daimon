@@ -7,8 +7,8 @@ import Foundation
 public struct Config: Codable, Equatable, Sendable {
     /// Default instructions for new sessions.
     public var instructions: String?
-    /// Which model sessions run on: `system` or `private-cloud`.
-    public var model: String?
+    /// Which model sessions run on; nil means `system`.
+    public var model: ModelSelection?
     /// Wall-clock limit for `run_command`, in seconds.
     public var commandTimeoutSeconds: Int?
     /// Bytes kept from each of stdout and stderr by `run_command`.
@@ -62,7 +62,7 @@ public struct Config: Codable, Equatable, Sendable {
 
     /// Creates a config; nil fields take defaults at resolution.
     public init(
-        instructions: String? = nil, model: String? = nil, commandTimeoutSeconds: Int? = nil,
+        instructions: String? = nil, model: ModelSelection? = nil, commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
         audit: AuditConfig? = nil, approval: ApprovalConfig? = nil
     ) {
@@ -87,7 +87,6 @@ public struct Config: Codable, Equatable, Sendable {
         if let threshold = config.approval?.threshold, threshold != "never", RiskLevel(rawValue: threshold) == nil {
             throw Failure.invalidApprovalThreshold(threshold)
         }
-        if let model = config.model { _ = try ModelSelection(parsing: model) }
         return config
     }
 
@@ -104,7 +103,7 @@ public struct Config: Codable, Equatable, Sendable {
     public var resolved: Resolved {
         Resolved(
             instructions: instructions ?? Self.defaultInstructions,
-            model: (try? ModelSelection(parsing: model ?? "")) ?? .default,
+            model: model ?? .default,
             runner: CommandRunner.Options(
                 timeout: .seconds(commandTimeoutSeconds ?? 60),
                 maxOutputBytes: commandMaxOutputBytes ?? 4096,
@@ -159,7 +158,8 @@ public struct Config: Codable, Equatable, Sendable {
         /// The classifier this configuration calls for.
         public var classifier: any RiskClassifier {
             approvalUsesModel
-                ? CompositeRiskClassifier([RuleRiskClassifier(), ModelRiskClassifier()]) : RuleRiskClassifier()
+                ? CompositeRiskClassifier([RuleRiskClassifier.standard, ModelRiskClassifier()])
+                : RuleRiskClassifier.standard
         }
     }
 }
