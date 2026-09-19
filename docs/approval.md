@@ -99,6 +99,14 @@ Every command produces `classifier.verdict` (level, reasons, sources, seconds) a
 `approval.requested` and `approval.decided` (decision, reason; `cached` for session approvals). See
 [logging.md](logging.md).
 
+## Testing policy without the model
+
+`PolicyScenarioTests` is a table: for a command line it states the parts the splitter must find, whether
+the deny patterns refuse it, and which patterns a user would be asked for at the default threshold, all
+driven through the real splitter, deny list, and rule classifier with a recording approver. No model, no
+MCP client. When a real line surprises you, add a row there first; it documents the intended behaviour
+and fails until the code matches.
+
 ## Extending
 
 Add a rule to `RuleRiskClassifier.defaultRules` with a reason a human would accept, and a case to the
