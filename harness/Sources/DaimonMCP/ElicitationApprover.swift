@@ -43,13 +43,15 @@ struct ElicitationApprover: Approver {
         // message, and the description, and the scope picker's labels say exactly what each choice keeps.
         let level = request.assessment.level.rawValue
         let reasons = request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n")
+        let context = request.line == request.command ? "" : "\nPart of: \(request.line)"
         let text = """
             Command:
-            \(request.command)
+            \(request.command)\(context)
 
             Directory: \(request.workingDirectory)
             Risk: \(level)
             \(reasons)
+            Remembered as: \(request.pattern)
 
             Accept runs it. Decline refuses.\(timeout.map { " No answer within \($0) counts as Decline." } ?? "")
             """
@@ -60,7 +62,7 @@ struct ElicitationApprover: Approver {
                 "scope": .object([
                     "type": .string("string"),
                     "title": .string("Remember this approval"),
-                    "description": .string("How long to keep approving this exact command"),
+                    "description": .string("How long to keep approving \(request.pattern)"),
                     "enum": .array(ApprovalScope.allCases.map { .string($0.rawValue) }),
                     "enumNames": .array([
                         .string("Once"), .string("This session"),

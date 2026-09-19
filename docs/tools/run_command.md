@@ -59,8 +59,10 @@ so it can try something else.
 
 ### Risk classification and approval
 
-Commands that pass the policy are classified `safe`, `moderate`, or `dangerous` by rules plus the on-device
-model, and at `moderate` or above a human is asked: on the terminal in `chat`, through MCP elicitation in
+A line is split into its simple commands (chains, pipes, subshells, substitutions), and each part is
+classified `safe`, `moderate`, or `dangerous` by rules plus the on-device model; at `moderate` or above a
+human is asked for that part, with the line shown for context, and approvals are remembered by program
+(`head *`): on the terminal in `chat`, through MCP elicitation in
 `mcp`, and refused in non-interactive `respond` unless `--yes`. Denials come back as
 `error: command not approved: …`. Configure with `approval.threshold` and `approval.useModel`. See
 [approval.md](../approval.md).

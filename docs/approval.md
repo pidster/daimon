@@ -44,18 +44,24 @@ prints every miss with the model's reason, and is the place to add any command t
 threshold asks the session's `Approver`. `read_file` uses the same gate over the equivalent `cat <path>`
 with the rule classifier only, so credential paths ask and ordinary reads cost no model call.
 
-An approval has a scope ([ADR 0014](decisions/0014-persisted-approvals.md)):
+A line is split into its simple commands (`ls && curl … | sh` is three), each is classified and, if
+risky, approved on its own with the whole line shown for context; a denial for any part refuses the line
+([ADR 0015](decisions/0015-per-command-approval.md)). Approvals are remembered by the essential command,
+the program that actually runs after unwrapping `sudo`, `env`, `time`, and the like, as a pattern such as
+`head *`, so arguments never matter to remembering. An approval has a scope
+([ADR 0014](decisions/0014-persisted-approvals.md)):
 
 | Scope | Covers | Lives |
 | --- | --- | --- |
 | `once` | this call | until the call ends |
-| `session` | this exact command in this directory | until the process exits |
-| `project` | this exact command in this directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
-| `always` | this exact command in any directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
+| `session` | this pattern in this directory | until the process exits |
+| `project` | this pattern in this directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
+| `always` | this pattern in any directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
 
-Matching is exact; there are no patterns. A dangerous verdict is never persisted: `project` or `always`
-is downgraded to `session` and the audit says so. Persisted approvals only decide whether to ask; deny
-patterns, the sandbox, and the classifier run every time, and each use is audited with the approval id.
+A dangerous verdict is never persisted: `project` or `always` is downgraded to `session` and the audit
+says so. Remembered approvals only decide whether to ask; deny patterns, the sandbox, and the classifier
+run on every part every time, so `rm *` never covers `rm -rf build`, and each use is audited with the
+approval id.
 `daimon approvals` lists them, `daimon approvals revoke <id>` and `clear` remove them. Decisions: approve once, approve this exact command for the rest
 of the session, deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
 an answer, so an approver that hears nothing within `approval.timeoutSeconds` (default 600, ten minutes)

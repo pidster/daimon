@@ -380,7 +380,7 @@ struct Approvals: AsyncParsableCommand {
             for entry in entries {
                 let where_ = entry.workingDirectory ?? "any directory"
                 print(
-                    "\(entry.id)\t\(entry.scope.rawValue)\texpires \(entry.expiresAt.formatted(date: .abbreviated, time: .omitted))\t\(where_)\t\(entry.command)"
+                    "\(entry.id)\t\(entry.scope.rawValue)\texpires \(entry.expiresAt.formatted(date: .abbreviated, time: .omitted))\t\(where_)\t\(entry.pattern)"
                 )
             }
         }

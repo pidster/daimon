@@ -13,13 +13,13 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let store = ApprovalStore(url: url)
         let project = try await store.grant(
-            command: "swift test", directory: "/a", scope: .project, level: .moderate, source: "chat")
+            pattern: "swift *", directory: "/a", scope: .project, level: .moderate, source: "chat")
         let always = try await store.grant(
-            command: "git push", directory: "/a", scope: .always, level: .moderate, source: "mcp")
-        #expect(await store.find(command: "swift test", directory: "/a")?.id == project.id)
-        #expect(await store.find(command: "swift test", directory: "/b") == nil)
-        #expect(await store.find(command: "git push", directory: "/anywhere")?.id == always.id)
-        #expect(await store.find(command: "git push --force", directory: "/a") == nil)
+            pattern: "git *", directory: "/a", scope: .always, level: .moderate, source: "mcp")
+        #expect(await store.find(pattern: "swift *", directory: "/a")?.id == project.id)
+        #expect(await store.find(pattern: "swift *", directory: "/b") == nil)
+        #expect(await store.find(pattern: "git *", directory: "/anywhere")?.id == always.id)
+        #expect(await store.find(pattern: "gh *", directory: "/a") == nil)
         let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
         #expect(permissions == 0o600)
         let reloaded = ApprovalStore(url: url)
@@ -35,8 +35,8 @@ import Testing
         let url = temporaryFile()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let short = ApprovalStore(url: url, lifetime: .seconds(0))
-        _ = try await short.grant(command: "ls", directory: "/", scope: .always, level: .moderate, source: "t")
-        #expect(await short.find(command: "ls", directory: "/") == nil)
+        _ = try await short.grant(pattern: "ls *", directory: "/", scope: .always, level: .moderate, source: "t")
+        #expect(await short.find(pattern: "ls *", directory: "/") == nil)
         #expect(await ApprovalStore(url: url).all.isEmpty)
     }
 
@@ -109,6 +109,52 @@ import Testing
         // Cached for the session, though.
         try await gate.clear(command: "rm -rf build", workingDirectory: "/repo")
         #expect(sink.events.last?.details["decision"] == "cached")
+    }
+
+    @Test func approvalsAreRememberedPerPatternNotPerArguments() async throws {
+        let approver = Answering(.approved(.session))
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .moderate,
+            store: ApprovalStore(url: nil))
+        try await gate.clear(command: "head -x 1 -y 2 -z 3", workingDirectory: "/")
+        try await gate.clear(command: "head -n 5 other.txt", workingDirectory: "/")
+        #expect(approver.asked.events.count == 1)
+        try await gate.clear(command: "tail -n 5", workingDirectory: "/")
+        #expect(approver.asked.events.count == 2)
+    }
+
+    @Test func eachSimpleCommandInALineIsApprovedSeparately() async throws {
+        struct ByName: RiskClassifier {
+            func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+                let level: RiskLevel = command.hasPrefix("ls") ? .safe : .moderate
+                return RiskAssessment(level: level, reasons: [command], sources: ["byname"])
+            }
+        }
+        final class Recorder: Approver {
+            let seen = MemoryAuditSink()
+            func decide(_ request: ApprovalRequest) async -> ApprovalDecision {
+                seen.write(
+                    AuditEvent(
+                        session: "x", kind: .approvalRequested,
+                        details: [
+                            "command": .string(request.command), "line": .string(request.line),
+                            "pattern": .string(request.pattern),
+                        ]))
+                return request.command.hasPrefix("rm") ? .denied("no") : .approved(.once)
+            }
+        }
+        let recorder = Recorder()
+        let gate = ApprovalGate(classifier: ByName(), approver: recorder, threshold: .moderate)
+        try await gate.clear(command: "ls && touch a | wc -l", workingDirectory: "/")
+        #expect(recorder.seen.events.map { $0.details["command"]?.stringValue } == ["touch a", "wc -l"])
+        #expect(recorder.seen.events.first?.details["pattern"] == "touch *")
+        #expect(recorder.seen.events.first?.details["line"] == "ls && touch a | wc -l")
+        await #expect(throws: CommandRunner.Failure.disapproved("rm -r x: no")) {
+            try await gate.clear(command: "ls; rm -r x; echo after", workingDirectory: "/")
+        }
+        await #expect(throws: CommandRunner.Failure.disapproved("no")) {
+            try await gate.clear(command: "rm -r x", workingDirectory: "/")
+        }
     }
 
     @Test func onceIsNotRemembered() async throws {

@@ -135,7 +135,10 @@ public struct CommandRunner: Sendable {
             "sandbox": .bool(sandboxed), "network": .bool(options.policy.sandbox.allowNetwork),
             "nested": .bool(options.policy.sandbox.enabled && Self.isNestedSandbox),
         ]
-        if case .denied(let reason) = options.policy.check(command) {
+        let verdicts = ([command] + CommandSplitter.split(command).map(\.text)).map(options.policy.check)
+        if let denial = verdicts.first(where: { if case .denied = $0 { true } else { false } }),
+            case .denied(let reason) = denial
+        {
             decision["verdict"] = "denied"
             decision["reason"] = .string(reason)
             audit?.record(.policyDecision, details: decision)

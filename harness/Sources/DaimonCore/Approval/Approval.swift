@@ -1,17 +1,26 @@
 import Foundation
 
-/// A command awaiting a human decision.
+/// A simple command awaiting a human decision.
 public struct ApprovalRequest: Equatable, Sendable {
-    /// The command line.
+    /// The simple command being approved.
     public var command: String
+    /// The whole line it is part of, for context; equal to `command` when the line is simple.
+    public var line: String
+    /// The key an approval is remembered under, such as `head *`.
+    public var pattern: String
     /// Where it would run.
     public var workingDirectory: String
     /// Why it needs approval.
     public var assessment: RiskAssessment
 
     /// Creates a request.
-    public init(command: String, workingDirectory: String, assessment: RiskAssessment) {
+    public init(
+        command: String, line: String? = nil, pattern: String? = nil, workingDirectory: String,
+        assessment: RiskAssessment
+    ) {
         self.command = command
+        self.line = line ?? command
+        self.pattern = pattern ?? (CommandSplitter.split(command).first?.pattern ?? command)
         self.workingDirectory = workingDirectory
         self.assessment = assessment
     }
@@ -62,11 +71,13 @@ public struct TerminalApprover: Approver {
 
     /// Prompts and parses the answer; end of input denies.
     public func decide(_ request: ApprovalRequest) async -> ApprovalDecision {
+        let context = request.line == request.command ? "" : "\n  part of: \(request.line)"
         let text = """
 
-            approval needed (\(request.assessment.level.rawValue)): \(request.command)
+            approval needed (\(request.assessment.level.rawValue)): \(request.command)\(context)
               in \(request.workingDirectory)
               \(request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n  "))
+              remembered as: \(request.pattern)
             run it? [y]es once / [s]ession / [p]roject (30 days, this directory) / [a]lways (30 days) / [n]o:\u{20}
             """
         FileHandle.standardError.write(Data(text.utf8))
@@ -101,9 +112,9 @@ public actor ApprovalGate {
     private let source: String
     private var sessionApprovals: Set<String> = []
 
-    /// Session approvals are keyed on the exact command line in the exact directory.
-    private static func key(_ command: String, _ workingDirectory: String) -> String {
-        "\(workingDirectory)\u{0}\(command)"
+    /// Session approvals are keyed on the pattern (`head *`) in the exact directory.
+    private static func key(_ pattern: String, _ workingDirectory: String) -> String {
+        "\(workingDirectory)\u{0}\(pattern)"
     }
 
     /// Creates a gate.
@@ -146,50 +157,66 @@ public actor ApprovalGate {
         try await clear(command: command, workingDirectory: workingDirectory, classifier: classifier)
     }
 
-    private func clear(command: String, workingDirectory: String, classifier: any RiskClassifier) async throws {
+    private func clear(command line: String, workingDirectory: String, classifier: any RiskClassifier) async throws {
+        // Every simple command in the line is checked and approved on its own, so a dangerous part
+        // cannot hide behind a safe first command, and approvals are remembered per pattern.
+        let parts = CommandSplitter.split(line)
+        let segments = parts.isEmpty ? [SimpleCommand(text: line, executable: line)] : parts
+        for segment in segments {
+            do {
+                try await clearSegment(segment, line: line, workingDirectory: workingDirectory, classifier: classifier)
+            } catch CommandRunner.Failure.disapproved(let reason) where segments.count > 1 {
+                throw CommandRunner.Failure.disapproved("\(segment.text): \(reason)")
+            }
+        }
+    }
+
+    private func clearSegment(
+        _ segment: SimpleCommand, line: String, workingDirectory: String, classifier: any RiskClassifier
+    ) async throws {
         let started = Date()
-        let assessment = await classifier.classify(command: command, workingDirectory: workingDirectory)
+        let assessment = await classifier.classify(command: segment.text, workingDirectory: workingDirectory)
+        var base: [String: JSONValue] = ["command": .string(segment.text), "pattern": .string(segment.pattern)]
+        if line != segment.text { base["line"] = .string(line) }
         audit?.record(
             .classifierVerdict,
-            details: [
-                "command": .string(command), "level": .string(assessment.level.rawValue),
+            details: base.merging([
+                "level": .string(assessment.level.rawValue),
                 "reasons": .array(assessment.reasons.map { .string($0) }),
                 "sources": .array(assessment.sources.map { .string($0) }),
                 "seconds": .double(Date().timeIntervalSince(started)),
-            ])
+            ]) { $1 })
         guard let threshold, assessment.level >= threshold else { return }
-        if sessionApprovals.contains(Self.key(command, workingDirectory)) {
-            audit?.record(.approvalDecided, details: ["command": .string(command), "decision": "cached"])
+        if sessionApprovals.contains(Self.key(segment.pattern, workingDirectory)) {
+            audit?.record(.approvalDecided, details: base.merging(["decision": "cached"]) { $1 })
             return
         }
         if assessment.level < .dangerous,
-            let standing = await store?.find(command: command, directory: workingDirectory)
+            let standing = await store?.find(pattern: segment.pattern, directory: workingDirectory)
         {
             audit?.record(
                 .approvalDecided,
-                details: [
-                    "command": .string(command), "decision": .string("cached-\(standing.scope.rawValue)"),
-                    "approvalID": .string(standing.id),
-                ])
+                details: base.merging([
+                    "decision": .string("cached-\(standing.scope.rawValue)"), "approvalID": .string(standing.id),
+                ]) { $1 })
             return
         }
-        audit?.record(
-            .approvalRequested, details: ["command": .string(command), "level": .string(assessment.level.rawValue)])
+        audit?.record(.approvalRequested, details: base.merging(["level": .string(assessment.level.rawValue)]) { $1 })
         let decision = await approver.decide(
-            ApprovalRequest(command: command, workingDirectory: workingDirectory, assessment: assessment))
+            ApprovalRequest(
+                command: segment.text, line: line, pattern: segment.pattern, workingDirectory: workingDirectory,
+                assessment: assessment))
         switch decision {
         case .approved(let requested):
             // A dangerous command is never remembered beyond the session, whatever was chosen.
             let scope = (requested.isPersistent && assessment.level == .dangerous) ? .session : requested
-            var details: [String: JSONValue] = [
-                "command": .string(command), "decision": "approved", "scope": .string(scope.rawValue),
-            ]
+            var details = base.merging(["decision": "approved", "scope": .string(scope.rawValue)]) { $1 }
             if scope != requested { details["downgradedFrom"] = .string(requested.rawValue) }
-            if scope != .once { sessionApprovals.insert(Self.key(command, workingDirectory)) }
+            if scope != .once { sessionApprovals.insert(Self.key(segment.pattern, workingDirectory)) }
             if scope.isPersistent, let store {
                 do {
                     let entry = try await store.grant(
-                        command: command, directory: workingDirectory, scope: scope, level: assessment.level,
+                        pattern: segment.pattern, directory: workingDirectory, scope: scope, level: assessment.level,
                         source: source)
                     details["approvalID"] = .string(entry.id)
                     details["expiresAt"] = .string(entry.expiresAt.ISO8601Format())
@@ -201,14 +228,12 @@ public actor ApprovalGate {
             audit?.record(.approvalDecided, details: details)
         case .denied(let reason):
             audit?.record(
-                .approvalDecided,
-                details: ["command": .string(command), "decision": "denied", "reason": .string(reason)])
+                .approvalDecided, details: base.merging(["decision": "denied", "reason": .string(reason)]) { $1 })
             throw CommandRunner.Failure.disapproved(reason)
         case .unanswered(let waited):
             let reason = "no answer within \(waited); an unanswered approval counts as declined"
             audit?.record(
-                .approvalDecided,
-                details: ["command": .string(command), "decision": "timed-out", "reason": .string(reason)])
+                .approvalDecided, details: base.merging(["decision": "timed-out", "reason": .string(reason)]) { $1 })
             throw CommandRunner.Failure.disapproved(reason)
         }
     }

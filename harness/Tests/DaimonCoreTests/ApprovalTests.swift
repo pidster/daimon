@@ -132,17 +132,19 @@ import Testing
         #expect(sink.events.last?.details["reason"]?.stringValue?.contains("unanswered") == true)
     }
 
-    @Test func sessionApprovalIsCachedPerExactCommand() async throws {
+    @Test func sessionApprovalIsCachedPerPatternAndDirectory() async throws {
         let approver = Recording(.approved(.session))
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
             classifier: Fixed(level: .dangerous), approver: approver, threshold: .moderate,
             audit: AuditLog(session: "s", sink: sink))
-        try await gate.clear(command: "git push", workingDirectory: "/")
-        try await gate.clear(command: "git push", workingDirectory: "/")
-        try await gate.clear(command: "git push origin", workingDirectory: "/")
-        #expect(approver.asked.events.count == 2)
-        #expect(sink.events.filter { $0.details["decision"] == "cached" }.count == 1)
+        try await gate.clear(command: "git push", workingDirectory: "/a")
+        try await gate.clear(command: "git push", workingDirectory: "/a")
+        try await gate.clear(command: "git push", workingDirectory: "/b")
+        try await gate.clear(command: "git push origin", workingDirectory: "/a")  // same pattern and directory
+        try await gate.clear(command: "hg push", workingDirectory: "/a")
+        #expect(approver.asked.events.count == 3)
+        #expect(sink.events.filter { $0.details["decision"] == "cached" }.count == 2)
     }
 
     @Test func runnerConsultsTheGateAfterPolicy() async throws {

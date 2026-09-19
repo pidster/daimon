@@ -82,7 +82,8 @@ when something is wrong. `daimon --version` prints the version.
 
 ### `daimon approvals`
 
-`daimon approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, command.
+`daimon approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, pattern
+(such as `head *`).
 `daimon approvals revoke <id>` removes one; `daimon approvals clear` removes all. See
 [approval.md](approval.md).
 

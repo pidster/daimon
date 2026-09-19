@@ -19,17 +19,18 @@ public enum ApprovalScope: String, Codable, Equatable, Sendable, CaseIterable {
 
 /// Approvals that outlive the process, kept in `~/.daimon/approvals.json`.
 ///
-/// A persisted approval is a standing permission, so it is bound to the exact
-/// command line (and directory for `project`), expires, is never granted for a
-/// dangerous command, and can be listed and revoked with `daimon approvals`.
+/// A persisted approval is a standing permission, so it is bound to a pattern
+/// (`head *`: the program, any arguments; and the directory for `project`),
+/// expires, is never used for a dangerous verdict, and can be listed and revoked
+/// with `daimon approvals`.
 /// Deny patterns and the sandbox still apply to every use.
 public actor ApprovalStore {
     /// One standing approval.
     public struct Entry: Codable, Equatable, Sendable, Identifiable {
         /// Short random id, for `daimon approvals revoke`.
         public var id: String
-        /// The exact command line.
-        public var command: String
+        /// The approval key, such as `head *`.
+        public var pattern: String
         /// The directory, for `project` scope; nil for `always`.
         public var workingDirectory: String?
         /// `project` or `always`.
@@ -43,9 +44,9 @@ public actor ApprovalStore {
         /// Which entry point granted it.
         public var source: String
 
-        /// Whether `command` in `directory` is covered at `now`.
-        func covers(command: String, directory: String, now: Date) -> Bool {
-            guard now < expiresAt, self.command == command else { return false }
+        /// Whether `pattern` in `directory` is covered at `now`.
+        func covers(pattern: String, directory: String, now: Date) -> Bool {
+            guard now < expiresAt, self.pattern == pattern else { return false }
             return scope == .always || workingDirectory == directory
         }
     }
@@ -77,9 +78,9 @@ public actor ApprovalStore {
         entries.filter { $0.expiresAt > Date() }.sorted { $0.grantedAt > $1.grantedAt }
     }
 
-    /// The entry covering `command` in `directory`, if any.
-    public func find(command: String, directory: String) -> Entry? {
-        entries.first { $0.covers(command: command, directory: directory, now: Date()) }
+    /// The entry covering `pattern` in `directory`, if any.
+    public func find(pattern: String, directory: String) -> Entry? {
+        entries.first { $0.covers(pattern: pattern, directory: directory, now: Date()) }
     }
 
     /// Records a standing approval and writes the file.
@@ -88,12 +89,12 @@ public actor ApprovalStore {
     /// - Throws: File-system errors from writing.
     @discardableResult
     public func grant(
-        command: String, directory: String, scope: ApprovalScope, level: RiskLevel, source: String
+        pattern: String, directory: String, scope: ApprovalScope, level: RiskLevel, source: String
     ) throws -> Entry {
         precondition(scope.isPersistent, "only project and always are persisted")
         let now = Date()
         let entry = Entry(
-            id: String(UUID().uuidString.prefix(8)).lowercased(), command: command,
+            id: String(UUID().uuidString.prefix(8)).lowercased(), pattern: pattern,
             workingDirectory: scope == .project ? directory : nil, scope: scope, level: level, grantedAt: now,
             expiresAt: now.addingTimeInterval(TimeInterval(lifetime.components.seconds)), source: source)
         entries.append(entry)

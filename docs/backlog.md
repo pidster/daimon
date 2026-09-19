@@ -4,11 +4,8 @@ Work agreed but not started, in rough priority order. Each item becomes an ADR w
 
 ## Policy
 
-- **Check each simple command in a compound line.** `run_command` classifies and approves the whole line,
-  but a line can chain or pipe several commands (`;`, `&&`, `||`, `|`, `$(…)`, subshells). Split it into
-  simple commands, run the deny patterns and the classifier on each, take the worst verdict, and show the
-  approver the parts. Persisted approvals then bind to the whole exact line as now, but a dangerous part
-  can never hide behind a safe first command. Raised 2026-09-19.
+- Done 2026-09-19: each simple command in a line is checked and approved separately, remembered by
+  program ([ADR 0015](decisions/0015-per-command-approval.md)).
 
 ## Enabling other harnesses (see the objective)
 
