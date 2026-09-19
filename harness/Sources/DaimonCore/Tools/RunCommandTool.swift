@@ -6,7 +6,7 @@ import FoundationModels
 /// The command passes the `CommandPolicy`, the approval gate, and runs under
 /// the Seatbelt sandbox rooted at the harness's launch directory; a
 /// model-chosen working directory changes where it runs, never what it may write.
-public struct RunCommandTool: Tool {
+public struct RunCommandTool: DaimonTool {
     /// The identifier the model uses to request this tool.
     public let name = "run_command"
     /// What the model is told this tool does.
@@ -27,6 +27,23 @@ public struct RunCommandTool: Tool {
 
     /// Supplies the policy, timeout, and output cap.
     private let runner: CommandRunner
+
+    /// Sandbox, timeout, output cap, and approval, from the runner's live options.
+    public var limits: String {
+        let seconds = runner.options.timeout.components.seconds
+        let confinement =
+            runner.options.policy.sandbox.enabled
+            ? "in a Seatbelt sandbox rooted at daimon's launch directory; writes elsewhere fail"
+            : "with no sandbox (policy.sandbox.enabled is false)"
+        return
+            "POSIX shell via /bin/sh -c \(confinement). Timeout \(seconds) s; only the last "
+            + "\(runner.options.maxOutputBytes) bytes of stdout and stderr are returned. Commands pass a deny/allow "
+            + "policy and a risk classifier; moderate and dangerous ones need the user's approval."
+    }
+    /// How to ask for it.
+    public let examplePrompt =
+        "Use run_command with working directory /path/to/repo to run exactly: swift test 2>&1 | tail -3 . "
+        + "Report the exit status and output verbatim, nothing else."
 
     /// Creates the tool over a runner that supplies timeout and output limits.
     public init(runner: CommandRunner = CommandRunner()) {

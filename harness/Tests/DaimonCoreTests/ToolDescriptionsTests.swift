@@ -3,7 +3,7 @@ import Testing
 @testable import DaimonCore
 
 @Suite struct ToolDescriptionsTests {
-    @Test func everyRegisteredToolIsDescribedWithGuidance() {
+    @Test func everyRegisteredToolIsDescribed() {
         let registry = ToolRegistry()
         let descriptions = registry.descriptions
         #expect(descriptions.map(\.name) == registry.all.map(\.name))
@@ -25,6 +25,20 @@ import Testing
         #expect(path["type"] == "string")
         #expect(path["description"]?.stringValue?.contains("Path") == true)
         #expect(schema["required"] == .array(["path"]))
+    }
+
+    @Test func limitsComeFromTheLiveOptions() {
+        let registry = ToolRegistry(
+            runner: .init(timeout: .seconds(5), maxOutputBytes: 999), reader: FileReader(maxBytes: 777))
+        let limits = Dictionary(uniqueKeysWithValues: registry.descriptions.map { ($0.name, $0.limits) })
+        #expect(limits["run_command"]?.contains("Timeout 5 s") == true)
+        #expect(limits["run_command"]?.contains("999 bytes") == true)
+        #expect(limits["read_file"]?.contains("777 bytes") == true)
+        var unsandboxed = CommandRunner.Options()
+        unsandboxed.policy.sandbox.enabled = false
+        #expect(
+            ToolRegistry(runner: unsandboxed).descriptions.first { $0.name == "run_command" }?.limits.contains(
+                "no sandbox") == true)
     }
 
     @Test func rendersJSONAndMarkdown() {

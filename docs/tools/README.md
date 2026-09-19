@@ -13,15 +13,15 @@ Select tools per session with `--tool <name>` on the CLI or the `tools` argument
 registered tool's schema is in the prompt on every turn, so enable only what a task needs.
 
 MCP clients discover these tools through the `daimon://tools` resource, generated from the registry; the
-limits and example prompt for each come from `ToolRegistry.guidance`, which a test keeps complete. See
-[../mcp.md](../mcp.md).
+limits and example prompt for each come from the tool itself (`DaimonTool.limits`, rendered from its live
+options, and `DaimonTool.examplePrompt`). See [../mcp.md](../mcp.md).
 
 ## Adding a tool
 
-1. Add a `struct` conforming to `FoundationModels.Tool` under `harness/Sources/DaimonCore/Tools/`, with an
-   `@Generable` `Arguments` type and `@Guide` descriptions on each property.
+1. Add a `struct` conforming to `DaimonTool` under `harness/Sources/DaimonCore/Tools/`, with an
+   `@Generable` `Arguments` type, `@Guide` descriptions on each property, `limits` rendered from its
+   options, and an `examplePrompt` that names the tool.
 2. Keep the work in a pure helper (like `CurrentDateTool.format` or `FileReader`) and test that.
 3. Bound the result: 4 KiB or page it. See [../context-management.md](../context-management.md).
-4. Append it to `ToolRegistry.init`.
+4. Append it to `ToolRegistry.init`; it is wrapped by `AuditedTool` there.
 5. Add a page here and a row above. The description is prompt text; write it for the model.
-6. Add its limits and an example prompt to `ToolRegistry.guidance`; the tests fail until you do.

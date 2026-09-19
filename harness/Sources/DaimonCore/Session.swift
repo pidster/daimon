@@ -252,7 +252,8 @@ public struct Conversation: Sendable {
         let registry = ToolRegistry(runner: session.config.runner, audit: audit, approval: gate)
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
-        return Conversation(gate: gate, tools: selection.tools, audit: audit, instructions: instructions, model: model)
+        return Conversation(
+            gate: gate, tools: selection.tools.map { $0 }, audit: audit, instructions: instructions, model: model)
     }
 
     /// Creates the agent that runs this conversation.

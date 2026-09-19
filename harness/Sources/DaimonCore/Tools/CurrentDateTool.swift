@@ -3,11 +3,16 @@ import FoundationModels
 
 /// Reports the current date and time. The on-device model has no clock, so
 /// this is the smallest useful example of a tool the harness can offer.
-public struct CurrentDateTool: Tool {
+public struct CurrentDateTool: DaimonTool {
     /// The identifier the model uses to request this tool.
     public let name = "current_date"
     /// What the model is told this tool does.
     public let description = "Returns the current local date and time."
+    /// One line of output.
+    public let limits = "One line of output."
+    /// How to ask for it.
+    public let examplePrompt =
+        "Use current_date to find today's date in Asia/Tokyo and reply with just the date."
 
     /// Arguments the model may supply when calling the tool.
     @Generable

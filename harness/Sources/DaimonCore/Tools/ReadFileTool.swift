@@ -6,7 +6,7 @@ import FoundationModels
 /// Pages are line ranges bounded by a byte budget, so the model can walk a
 /// large file by following the `offset` hint at the end of each page instead
 /// of receiving more than its context can hold.
-public struct ReadFileTool: Tool {
+public struct ReadFileTool: DaimonTool {
     /// The identifier the model uses to request this tool.
     public let name = "read_file"
     /// What the model is told this tool does.
@@ -33,6 +33,14 @@ public struct ReadFileTool: Tool {
     private let defaultLimit: Int
     /// Asks before reading credential-like paths; nil never asks.
     private let approval: ApprovalGate?
+
+    /// Page size and byte budget, from the live reader.
+    public var limits: String {
+        "Pages of up to \(defaultLimit) lines and \(reader.maxBytes) bytes; follow the offset hint to continue. "
+            + "Binary files and directories are refused. Credential-like paths need the user's approval."
+    }
+    /// How to ask for it.
+    public let examplePrompt = "Use read_file to read /path/to/file.md, then summarise it in three bullet points."
 
     /// Creates the tool over a reader that supplies the byte budget.
     public init(reader: FileReader = FileReader(), defaultLimit: Int = 100, approval: ApprovalGate? = nil) {

@@ -150,7 +150,7 @@ than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; daimon's own tools
 are reachable only through `respond`, and are described to clients by the `daimon://tools` resources,
 generated from `ToolRegistry.descriptions` (schema from each tool's `GenerationSchema`, limits and example
-prompt from `ToolRegistry.guidance`).
+prompt from the tool's own `DaimonTool` conformance, so a changed default shows up in the catalogue).
 The request types decode and validate arguments as pure, testable values; see
 [ADR 0006](decisions/0006-mcp-server-over-stdio.md).
 

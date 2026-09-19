@@ -16,41 +16,13 @@ public struct ToolDescription: Codable, Equatable, Sendable {
     public var examplePrompt: String
 }
 
-/// Human-written guidance that accompanies each tool's generated schema.
-struct ToolGuidance: Sendable {
-    let limits: String
-    let examplePrompt: String
-}
-
 extension ToolRegistry {
-    /// Guidance per tool name. Every registered tool must have an entry; a test enforces it.
-    static let guidance: [String: ToolGuidance] = [
-        "current_date": ToolGuidance(
-            limits: "One line of output.",
-            examplePrompt: "Use current_date to find today's date in Asia/Tokyo and reply with just the date."),
-        "run_command": ToolGuidance(
-            limits:
-                "POSIX shell via /bin/sh -c in a Seatbelt sandbox rooted at daimon's launch directory; writes elsewhere "
-                + "fail. Timeout 60 s by default; only the last 4 KiB of stdout and stderr are returned. Commands pass a "
-                + "deny/allow policy and a risk classifier; moderate and dangerous ones need the user's approval.",
-            examplePrompt:
-                "Use run_command with working directory /path/to/repo to run exactly: swift test 2>&1 | tail -3 . "
-                + "Report the exit status and output verbatim, nothing else."),
-        "read_file": ToolGuidance(
-            limits:
-                "Pages of up to 100 lines and 4 KiB; follow the offset hint to continue. Binary files and directories "
-                + "are refused. Credential-like paths need the user's approval.",
-            examplePrompt:
-                "Use read_file to read /path/to/file.md, then summarise it in three bullet points."),
-    ]
-
     /// Descriptions of every registered tool, in registration order.
     public var descriptions: [ToolDescription] {
         all.map { tool in
-            let guidance = Self.guidance[tool.name]
-            return ToolDescription(
-                name: tool.name, description: tool.description, parameters: Self.schema(of: tool),
-                limits: guidance?.limits ?? "", examplePrompt: guidance?.examplePrompt ?? "")
+            ToolDescription(
+                name: tool.name, description: tool.description, parameters: Self.schema(of: tool), limits: tool.limits,
+                examplePrompt: tool.examplePrompt)
         }
     }
 
