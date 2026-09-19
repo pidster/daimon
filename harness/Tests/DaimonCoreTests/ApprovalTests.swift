@@ -37,7 +37,7 @@ import Testing
     }
 
     @Test func invalidRulePatternIsAThrownError() {
-        #expect(throws: RuleRiskClassifier.InvalidRule(pattern: "(")) {
+        #expect(throws: RuleRiskClassifier.Failure.invalidRule(pattern: "(")) {
             try RuleRiskClassifier(rules: [.init("(", .safe, "broken")])
         }
         #expect(RuleRiskClassifier.standard.rules.count == RuleRiskClassifier.defaultRules.count)

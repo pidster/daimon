@@ -182,7 +182,7 @@ import Testing
             (
                 .sessionStart,
                 D.sessionStart(
-                    entryPoint: "mcp-thread", instructions: "i", tools: ["t"], model: .system, unsafe: true,
+                    entryPoint: .mcpThread, instructions: "i", tools: ["t"], model: .system, unsafe: true,
                     autoApprove: false, resume: "r", parent: "p")
             ),
             (.sessionStart, D.sessionRestart(tools: ["t"], model: .system)),
@@ -221,7 +221,7 @@ import Testing
         #expect(D.approvalRequested(command: "c", pattern: "c *", line: "c", level: .safe)["line"] == nil)
         #expect(
             D.sessionStart(
-                entryPoint: "respond", instructions: "i", tools: [], model: .system, unsafe: false, autoApprove: false,
+                entryPoint: .respond, instructions: "i", tools: [], model: .system, unsafe: false, autoApprove: false,
                 resume: nil)["resume"] == .null)
     }
 }

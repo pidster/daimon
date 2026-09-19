@@ -27,24 +27,29 @@ public struct RuleRiskClassifier: RiskClassifier {
     public let rules: [Rule]
     private let compiled: [(regex: NSRegularExpression, rule: Rule)]
 
-    /// A rule whose pattern does not compile.
-    public struct InvalidRule: Error, Equatable, CustomStringConvertible {
-        /// The offending pattern.
-        public let pattern: String
+    /// Why the rules could not be compiled.
+    public enum Failure: Error, Equatable, CustomStringConvertible {
+        /// A rule's pattern does not compile as a regular expression.
+        case invalidRule(pattern: String)
+
         /// Human-readable explanation.
-        public var description: String { "invalid risk rule pattern: \(pattern)" }
+        public var description: String {
+            switch self {
+            case .invalidRule(let pattern): "invalid risk rule pattern: \(pattern)"
+            }
+        }
     }
 
     /// Creates a classifier over `rules`, compiling every pattern once.
     ///
-    /// - Throws: `InvalidRule` naming the first pattern that does not compile.
+    /// - Throws: `Failure.invalidRule` naming the first pattern that does not compile.
     public init(rules: [Rule]) throws {
         self.rules = rules
         compiled = try rules.map { rule in
             do {
                 return (try RegexCache.regex(rule.pattern), rule)
             } catch {
-                throw InvalidRule(pattern: rule.pattern)
+                throw Failure.invalidRule(pattern: rule.pattern)
             }
         }
     }

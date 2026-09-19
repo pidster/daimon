@@ -174,8 +174,12 @@ Exit codes follow swift-argument-parser conventions (64 for usage errors).
 
 ## Error handling
 
-Errors are typed enums conforming to `Error` and `CustomStringConvertible`. Library code never prints or calls
-`fatalError`; the CLI is the only place that renders errors to stderr.
+Errors are typed enums named `Failure`, one per subsystem, conforming to `Error`, `CustomStringConvertible`,
+and `Equatable`, and they keep the underlying cause typed where a caller could act on it
+(`Session.Failure.malformedConfig` carries a `ConfigProblem`). Library code never prints or calls
+`fatalError`; the CLI is the only place that renders errors to stderr, and `Daimon.usage` is the one
+place a bad-input failure from the core becomes a usage error (exit 64). Entry points are the closed
+`EntryPoint` enum, so the values `session.start` and the approval store record cannot drift from the docs.
 
 ## Concurrency
 

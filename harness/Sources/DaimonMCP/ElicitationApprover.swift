@@ -75,7 +75,7 @@ struct ElicitationApprover: Approver {
         )
         let server = server
         do {
-            let result = try await withOptionalTimeout(timeout) {
+            let result = try await Timeout.run(timeout) {
                 try await server.requestElicitation(message: text, requestedSchema: schema)
             }
             switch result.action {
@@ -83,9 +83,9 @@ struct ElicitationApprover: Approver {
             case .decline: return .denied("declined by the user")
             case .cancel: return .denied("cancelled by the user")
             }
-        } catch let timeout as TimeoutError {
-            Diagnostics.mcp.info("approval unanswered: \(timeout)")
-            return .unanswered(timeout.duration)
+        } catch Timeout.Failure.elapsed(let waited) {
+            Diagnostics.mcp.info("approval unanswered: \(waited)")
+            return .unanswered(waited)
         } catch {
             Diagnostics.mcp.error("elicitation failed: \(error)")
             return .denied("approval request failed: \(error)")

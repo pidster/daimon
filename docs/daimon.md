@@ -96,6 +96,7 @@ Serves the Model Context Protocol over stdio until the client closes the pipe. S
 | Flag | Meaning |
 | --- | --- |
 | `-i, --instructions <text>` | Default instructions for `respond` threads that supply none. |
+| `--tool <name>` (repeatable) | Tools threads get unless a `respond` call names its own. Default: all. |
 | `--unsafe` | Disable the `run_command` policy and sandbox for every call. |
 | `-m, --model <model>` | Default model for new threads; callers may override per thread. |
 | `-y, --yes` | Approve risky commands without asking the client's user. |
@@ -148,7 +149,7 @@ carry `condensed: true`. See [context-management.md](context-management.md).
 | --- | --- |
 | 0 | Success, including a reply in which the model reports that a command was refused; the refusal itself is in the audit log (`daimon logs --kind approval.decided`). |
 | 1 | Runtime failure, such as the model being unavailable. |
-| 64 | Usage error: bad flags, unknown `--tool`, empty stdin prompt, malformed `config.json`. |
+| 64 | Usage error: bad flags, unknown `--tool` or `--model`, empty stdin prompt, malformed `config.json`, a `--resume` name that is invalid or not saved. |
 
 ## Requirements
 

@@ -16,6 +16,34 @@ struct Daimon: AsyncParsableCommand {
     )
 }
 
+/// The flags every session-starting subcommand shares, declared once.
+struct SessionOptions: ParsableArguments {
+    @Option(
+        name: [.short, .customLong("instructions")],
+        help: "Instructions for the model. Defaults to config.json's instructions.")
+    var instructions: String?
+
+    @Option(name: .customLong("tool"), help: "Tool to enable (repeatable). All tools are enabled when omitted.")
+    var toolNames: [String] = []
+
+    @Flag(help: "Disable the run_command policy and sandbox.")
+    var unsafe = false
+
+    @Option(
+        name: [.short, .customLong("model")],
+        help: "Model: system (on device) or private-cloud. Defaults to config.json.")
+    var model: String?
+
+    /// The session request these flags describe.
+    ///
+    /// - Throws: `ValidationError` for an unknown model name.
+    func request(entryPoint: EntryPoint, autoApprove: Bool = false, resume: String? = nil) throws -> Session.Request {
+        .init(
+            entryPoint: entryPoint, instructions: instructions, model: try model.map(Daimon.parseModel),
+            tools: ToolSelection(toolNames), unsafe: unsafe, autoApprove: autoApprove, resume: resume)
+    }
+}
+
 /// One prompt in, one reply out, in the shape of `fm respond`.
 struct Respond: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -24,34 +52,17 @@ struct Respond: AsyncParsableCommand {
     @Argument(help: "Prompt for the model. Read from stdin when omitted.")
     var prompt: String?
 
-    @Option(
-        name: [.short, .customLong("instructions")],
-        help: "Instructions for the model to follow. Defaults to config.json's instructions.")
-    var instructions: String?
-
-    @Option(name: .customLong("tool"), help: "Tool to enable (repeatable). All tools are enabled when omitted.")
-    var toolNames: [String] = []
+    @OptionGroup var options: SessionOptions
 
     @Flag(inversion: .prefixedNo, help: "Stream the output as it is generated.")
     var stream = true
 
-    @Flag(help: "Disable the run_command policy and sandbox.")
-    var unsafe = false
-
     @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking (non-interactive).")
     var yes = false
 
-    @Option(
-        name: [.short, .customLong("model")],
-        help: "Model: system (on device) or private-cloud. Defaults to config.json.")
-    var model: String?
-
     mutating func run() async throws {
         let text = try prompt ?? Self.readStdin()
-        let session = try Daimon.begin(
-            .init(
-                entryPoint: "respond", instructions: instructions, model: try model.map(Daimon.parseModel),
-                tools: ToolSelection(toolNames), unsafe: unsafe, autoApprove: yes))
+        let session = try Daimon.begin(try options.request(entryPoint: .respond, autoApprove: yes))
         defer { session.end() }
         let agent = try session.openAgent(
             approver: DenyingApprover(
@@ -108,12 +119,7 @@ extension Daimon {
 
     /// Sets up a session, turning set-up failures into usage errors and printing its notes to stderr.
     static func begin(_ request: Session.Request) throws -> Session {
-        let session: Session
-        do {
-            session = try Session.begin(request, home: home)
-        } catch let failure as Session.Failure {
-            throw ValidationError("\(failure)")
-        }
+        let session = try usage { try Session.begin(request, home: home) }
         for note in session.notes {
             FileHandle.standardError.write(Data((note + "\n").utf8))
         }
@@ -122,10 +128,20 @@ extension Daimon {
 
     /// Parses a `--model` value into a usage error on failure.
     static func parseModel(_ text: String) throws -> ModelSelection {
+        try usage { try ModelSelection(parsing: text) }
+    }
+
+    /// Runs `operation`, turning a bad-input failure from the core into a usage error (exit 64) and
+    /// letting everything else through.
+    static func usage<T>(_ operation: () throws -> T) throws -> T {
         do {
-            return try ModelSelection(parsing: text)
-        } catch {
-            throw ValidationError("\(error)")
+            return try operation()
+        } catch let failure as Session.Failure {
+            throw ValidationError("\(failure)")
+        } catch let failure as ModelSelection.Failure {
+            throw ValidationError("\(failure)")
+        } catch let failure as TranscriptStore.Failure {
+            throw ValidationError("\(failure)")
         }
     }
 }
@@ -137,27 +153,13 @@ struct Mcp: AsyncParsableCommand {
         discussion: "Exposes 'respond' (run a task on the model, on a named thread) and 'close_thread', and the "
             + "resources daimon://tools and daimon://tools.md. Stdout carries the protocol; diagnostics go to stderr.")
 
-    @Option(
-        name: [.short, .customLong("instructions")],
-        help: "Default instructions for 'respond' sessions. Defaults to config.json's instructions.")
-    var instructions: String?
-
-    @Flag(help: "Disable the run_command policy and sandbox.")
-    var unsafe = false
+    @OptionGroup var options: SessionOptions
 
     @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking the client's user.")
     var yes = false
 
-    @Option(
-        name: [.short, .customLong("model")],
-        help: "Default model for threads: system (on device) or private-cloud.")
-    var model: String?
-
     func run() async throws {
-        let session = try Daimon.begin(
-            .init(
-                entryPoint: "mcp", instructions: instructions, model: try model.map(Daimon.parseModel), unsafe: unsafe,
-                autoApprove: yes))
+        let session = try Daimon.begin(try options.request(entryPoint: .mcp, autoApprove: yes))
         defer { session.end() }
         try await DaimonServer(session: session).run()
     }
@@ -169,27 +171,13 @@ struct Chat: AsyncParsableCommand {
         abstract: "Start an interactive chat session.",
         discussion: "Type /help for commands. Transcripts save to ~/.daimon/transcripts and resume with --resume.")
 
-    @Option(
-        name: [.short, .customLong("instructions")],
-        help: "Instructions for the model. Defaults to config.json's instructions.")
-    var instructions: String?
-
-    @Option(name: .customLong("tool"), help: "Tool to enable (repeatable). All tools are enabled when omitted.")
-    var toolNames: [String] = []
+    @OptionGroup var options: SessionOptions
 
     @Option(name: [.short, .long], help: "Resume a saved transcript by name.")
     var resume: String?
 
     @Option(name: .long, help: "Save the transcript under this name on exit. Defaults to the resumed name.")
     var save: String?
-
-    @Flag(help: "Disable the run_command policy and sandbox.")
-    var unsafe = false
-
-    @Option(
-        name: [.short, .customLong("model")],
-        help: "Model: system (on device) or private-cloud. Defaults to config.json.")
-    var model: String?
 
     @Flag(name: .long, help: "List saved transcripts (for --resume) and exit.")
     var list = false
@@ -200,15 +188,13 @@ struct Chat: AsyncParsableCommand {
             for name in try store.list() { print(name) }
             return
         }
-        let session = try Daimon.begin(
-            .init(
-                entryPoint: "chat", instructions: instructions, model: try model.map(Daimon.parseModel),
-                tools: ToolSelection(toolNames), unsafe: unsafe, resume: resume))
+        let session = try Daimon.begin(try options.request(entryPoint: .chat, resume: resume))
         defer { session.end() }
         try Daimon.home.ensure()
         var agent: Agent
         if let resume {
-            agent = try session.openAgent(approver: TerminalApprover(), transcript: try store.load(resume))
+            let transcript = try Daimon.usage { try store.load(resume) }
+            agent = try session.openAgent(approver: TerminalApprover(), transcript: transcript)
             Self.note("resumed '\(resume)' (\(agent.transcript.turnCount) turns)")
         } else {
             agent = try session.openAgent(approver: TerminalApprover())
@@ -314,12 +300,7 @@ struct Logs: ParsableCommand {
             }
             kinds.append(parsed)
         }
-        let config: Config.Resolved
-        do {
-            config = try Session.loadConfig(home: Daimon.home)
-        } catch let failure as Session.Failure {
-            throw ValidationError("\(failure)")
-        }
+        let config = try Daimon.usage { try Session.loadConfig(home: Daimon.home) }
         var files = Array(
             FileAuditSink.rotatedFiles(for: Daimon.home.auditFile, keep: config.auditLimits.keepFiles).reversed())
         files.append(Daimon.home.auditFile)

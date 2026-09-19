@@ -12,7 +12,7 @@ struct FakeThread: RespondingThread {
 }
 
 /// A session over a scratch home, with a memory audit sink and a denying approver.
-func scratchSession(entryPoint: String = "mcp") throws -> Session {
+func scratchSession(entryPoint: EntryPoint = .mcp) throws -> Session {
     let root = FileManager.default.temporaryDirectory.appending(path: "daimon-mcp-tests-\(UUID().uuidString)")
     let home = Home(root: root)
     try home.ensure()

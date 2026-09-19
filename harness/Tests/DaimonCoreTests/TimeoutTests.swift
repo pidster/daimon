@@ -4,13 +4,13 @@ import Testing
 
 @Suite struct TimeoutTests {
     @Test func returnsResultWhenInTime() async throws {
-        let value = try await withTimeout(.seconds(5)) { 42 }
+        let value = try await Timeout.run(.seconds(5)) { 42 }
         #expect(value == 42)
     }
 
     @Test func throwsTimeoutErrorWhenLate() async {
-        await #expect(throws: TimeoutError(duration: .milliseconds(50))) {
-            try await withTimeout(.milliseconds(50)) {
+        await #expect(throws: Timeout.Failure.elapsed(.milliseconds(50))) {
+            try await Timeout.run(.milliseconds(50)) {
                 try await Task.sleep(for: .seconds(10))
                 return 1
             }
@@ -19,7 +19,7 @@ import Testing
 
     @Test func propagatesOperationErrors() async {
         struct Boom: Error {}
-        await #expect(throws: Boom.self) { try await withTimeout(.seconds(5)) { throw Boom() } }
+        await #expect(throws: Boom.self) { try await Timeout.run(.seconds(5)) { throw Boom() } }
     }
 
     @Test func configResolvesTimeout() {
@@ -29,9 +29,9 @@ import Testing
     }
 
     @Test func optionalTimeoutRunsUnboundedWhenNil() async throws {
-        #expect(try await withOptionalTimeout(nil) { 7 } == 7)
-        await #expect(throws: TimeoutError.self) {
-            try await withOptionalTimeout(.milliseconds(20)) {
+        #expect(try await Timeout.run(nil) { 7 } == 7)
+        await #expect(throws: Timeout.Failure.self) {
+            try await Timeout.run(.milliseconds(20)) {
                 try await Task.sleep(for: .seconds(5))
                 return 0
             }

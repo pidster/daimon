@@ -146,7 +146,7 @@ public actor ApprovalGate {
     private let approver: any Approver
     private let audit: AuditLog?
     private let store: ApprovalStore?
-    private let source: String
+    private let source: EntryPoint?
     private let sessionApprovals: SessionApprovals
     private let turns: TurnClock
     /// Per-turn state: once-approvals and refusals, dropped when the clock moves on.
@@ -172,13 +172,13 @@ public actor ApprovalGate {
     ///   - threshold: From which level to ask; `.never` still audits verdicts.
     ///   - audit: Where verdicts and decisions are recorded.
     ///   - store: Standing approvals that outlive the process; nil keeps only session approvals.
-    ///   - source: Entry point name recorded on grants.
+    ///   - source: The face recorded on grants; nil (a gate outside a session) records `unknown`.
     ///   - sessionApprovals: Session-scoped approvals; share one instance across gates of one process.
     ///   - turns: The conversation's clock; defaults to the audit log's, or a clock that never
     ///     advances, under which "this turn" means the life of the gate.
     public init(
         classifier: any RiskClassifier, approver: any Approver, threshold: ApprovalThreshold, audit: AuditLog? = nil,
-        store: ApprovalStore? = nil, source: String = "unknown",
+        store: ApprovalStore? = nil, source: EntryPoint? = nil,
         sessionApprovals: SessionApprovals = SessionApprovals(),
         turns: TurnClock? = nil
     ) {
@@ -309,7 +309,7 @@ public actor ApprovalGate {
                 do {
                     let entry = try await store.grant(
                         pattern: segment.pattern, directory: workingDirectory, scope: scope, level: assessment.level,
-                        source: source)
+                        source: source?.rawValue ?? "unknown")
                     approvalID = entry.id
                     expiresAt = entry.expiresAt
                 } catch {

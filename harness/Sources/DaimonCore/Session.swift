@@ -11,8 +11,8 @@ import FoundationModels
 public struct Session: Sendable {
     /// What the entry point asked for, from flags and arguments.
     public struct Request: Sendable, Equatable {
-        /// `respond`, `chat`, or `mcp`, recorded in the audit log.
-        public var entryPoint: String
+        /// Which face this is, recorded in the audit log and on standing approvals.
+        public var entryPoint: EntryPoint
         /// Instructions override; nil takes `config.json`'s.
         public var instructions: String?
         /// Model override; nil takes `config.json`'s.
@@ -28,7 +28,8 @@ public struct Session: Sendable {
 
         /// Creates a request.
         public init(
-            entryPoint: String, instructions: String? = nil, model: ModelSelection? = nil, tools: ToolSelection = .all,
+            entryPoint: EntryPoint, instructions: String? = nil, model: ModelSelection? = nil,
+            tools: ToolSelection = .all,
             unsafe: Bool = false, autoApprove: Bool = false, resume: String? = nil
         ) {
             self.entryPoint = entryPoint
@@ -78,15 +79,34 @@ public struct Session: Sendable {
 
     /// Why a session could not be set up.
     public enum Failure: Error, CustomStringConvertible, Equatable {
+        /// What is wrong with `config.json`.
+        public enum ConfigProblem: Equatable, Sendable {
+            /// The JSON does not decode, including an unknown `approval.threshold` value.
+            case invalidJSON(String)
+            /// A `run_command` policy pattern does not compile.
+            case invalidPolicy(CommandPolicy.Failure)
+            /// The file exists but cannot be read.
+            case unreadable(String)
+
+            /// Human-readable explanation.
+            public var description: String {
+                switch self {
+                case .invalidJSON(let detail): detail
+                case .invalidPolicy(let failure): failure.description
+                case .unreadable(let detail): detail
+                }
+            }
+        }
+
         /// `config.json` exists but cannot be used.
-        case malformedConfig(path: String, reason: String)
+        case malformedConfig(path: String, problem: ConfigProblem)
         /// `--tool` names not in the registry.
         case unknownTools([String])
 
         /// Human-readable explanation.
         public var description: String {
             switch self {
-            case .malformedConfig(let path, let reason): "malformed \(path): \(reason)"
+            case .malformedConfig(let path, let problem): "malformed \(path): \(problem.description)"
             case .unknownTools(let names): "unknown tool(s): \(names.joined(separator: ", "))"
             }
         }
@@ -109,8 +129,8 @@ public struct Session: Sendable {
     /// The classifier every conversation's gate uses.
     let classifier: any RiskClassifier
 
-    /// The entry point name, recorded on grants and audit events.
-    public var entryPoint: String { request.entryPoint }
+    /// Which face this session is.
+    public var entryPoint: EntryPoint { request.entryPoint }
     /// The instructions in force.
     public var instructions: String { config.instructions }
 
@@ -120,8 +140,24 @@ public struct Session: Sendable {
     public static func loadConfig(home: Home) throws -> Config.Resolved {
         do {
             return try Config.load(from: home.configFile).resolved
+        } catch let failure as CommandPolicy.Failure {
+            throw Failure.malformedConfig(path: home.configFile.path, problem: .invalidPolicy(failure))
+        } catch let error as DecodingError {
+            throw Failure.malformedConfig(path: home.configFile.path, problem: .invalidJSON(Self.describe(error)))
         } catch {
-            throw Failure.malformedConfig(path: home.configFile.path, reason: "\(error)")
+            throw Failure.malformedConfig(path: home.configFile.path, problem: .unreadable("\(error)"))
+        }
+    }
+
+    /// The decoder's own explanation, without the wrapping the framework adds.
+    private static func describe(_ error: DecodingError) -> String {
+        switch error {
+        case .dataCorrupted(let context), .keyNotFound(_, let context), .typeMismatch(_, let context),
+            .valueNotFound(_, let context):
+            context.codingPath.isEmpty
+                ? context.debugDescription
+                : "\(context.codingPath.map(\.stringValue).joined(separator: ".")): \(context.debugDescription)"
+        @unknown default: "\(error)"
         }
     }
 
@@ -213,7 +249,7 @@ public struct Session: Sendable {
         audit.record(
             .sessionStart,
             details: AuditEvent.Details.sessionStart(
-                entryPoint: "\(entryPoint)-thread", instructions: conversation.instructions,
+                entryPoint: entryPoint.thread, instructions: conversation.instructions,
                 tools: conversation.tools.map(\.name), model: conversation.model, unsafe: request.unsafe,
                 autoApprove: request.autoApprove, resume: nil, parent: self.audit.session))
         return conversation

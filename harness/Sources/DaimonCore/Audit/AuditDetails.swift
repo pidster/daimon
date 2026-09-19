@@ -7,11 +7,11 @@ extension AuditEvent {
     public enum Details {
         /// `session.start` for a session or an MCP thread.
         public static func sessionStart(
-            entryPoint: String, instructions: String, tools: [String], model: ModelSelection, unsafe: Bool,
+            entryPoint: EntryPoint, instructions: String, tools: [String], model: ModelSelection, unsafe: Bool,
             autoApprove: Bool, resume: String?, parent: String? = nil
         ) -> [String: JSONValue] {
             var details: [String: JSONValue] = [
-                "entryPoint": .string(entryPoint), "instructions": .string(instructions),
+                "entryPoint": .string(entryPoint.rawValue), "instructions": .string(instructions),
                 "tools": .array(tools.map { .string($0) }), "model": .string(model.description),
                 "unsafe": .bool(unsafe), "autoApprove": .bool(autoApprove),
                 "resume": resume.map { .string($0) } ?? .null,

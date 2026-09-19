@@ -78,7 +78,7 @@ import Testing
         let approver = Answering(.approved(.project))
         let first = ApprovalGate(
             classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate),
-            audit: AuditLog(session: "s", sink: sink), store: store, source: "test")
+            audit: AuditLog(session: "s", sink: sink), store: store, source: .chat)
         try await first.clear(command: "swift test", workingDirectory: "/repo")
         #expect(sink.events.last?.details["decision"] == "approved")
         #expect(sink.events.last?.details["scope"] == "project")
@@ -87,7 +87,7 @@ import Testing
         let second = ApprovalGate(
             classifier: Fixed(level: .moderate), approver: Answering(.denied("should not ask")),
             threshold: .level(.moderate),
-            audit: AuditLog(session: "s2", sink: sink), store: store, source: "test")
+            audit: AuditLog(session: "s2", sink: sink), store: store, source: .chat)
         try await second.clear(command: "swift test", workingDirectory: "/repo")
         #expect(sink.events.last?.details["decision"] == "cached-project")
         // A different directory asks again.
@@ -102,7 +102,7 @@ import Testing
         let sink = MemoryAuditSink()
         let gate = ApprovalGate(
             classifier: Fixed(level: .dangerous), approver: Answering(.approved(.always)), threshold: .level(.moderate),
-            audit: AuditLog(session: "s", sink: sink), store: store, source: "test")
+            audit: AuditLog(session: "s", sink: sink), store: store, source: .chat)
         try await gate.clear(command: "rm -rf build", workingDirectory: "/repo")
         #expect(sink.events.last?.details["scope"] == "session")
         #expect(sink.events.last?.details["downgradedFrom"] == "always")
