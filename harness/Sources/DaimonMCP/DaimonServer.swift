@@ -77,10 +77,11 @@ public struct DaimonServer: Sendable {
             : ElicitationApprover(server: server, client: client, timeout: config.approvalTimeout)
     }
 
-    /// A gate for one session (thread or direct call), sharing this server's approver.
-    private func gate(audit: AuditLog) -> ApprovalGate {
+    /// A gate for one thread, sharing this server's approver, standing approvals, and session approvals.
+    func gate(audit: AuditLog) -> ApprovalGate {
         ApprovalGate(
-            classifier: config.classifier, approver: approver, threshold: config.approvalThreshold, audit: audit)
+            classifier: config.classifier, approver: approver, threshold: config.approvalThreshold, audit: audit,
+            store: store, source: "mcp", sessionApprovals: sessionApprovals)
     }
 
     /// Starts serving on stdin/stdout and returns when the client disconnects.

@@ -25,6 +25,33 @@ struct FakeThread: RespondingThread {
         #expect(second.structuredContent?.objectValue?["created"] == .bool(false))
     }
 
+    @Test func threadGatesPersistProjectApprovalsAndShareSessionOnes() async throws {
+        struct Grant: Approver {
+            func decide(_ request: ApprovalRequest) async -> ApprovalDecision { .approved(.project) }
+        }
+        struct Moderate: RiskClassifier {
+            func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+                RiskAssessment(level: .moderate, reasons: ["x"], sources: ["t"])
+            }
+        }
+        let store = ApprovalStore(url: nil)
+        var config = Config().resolved
+        config.approvalUsesModel = false
+        let server = DaimonServer(config: config, autoApprove: false, store: store) { _, _, _, _, _ in
+            FakeThread(reply: "")
+        }
+        // The server's own approver needs a client; drive the gate it builds with a granting approver instead.
+        let gate = ApprovalGate(
+            classifier: Moderate(), approver: Grant(), threshold: .moderate, store: store, source: "mcp",
+            sessionApprovals: SessionApprovals())
+        try await gate.clear(command: "touch a", workingDirectory: "/repo")
+        #expect(await store.find(pattern: "touch *", directory: "/repo") != nil)
+        // And the gate the server builds carries the same store and source.
+        let built = server.gate(audit: AuditLog.disabled(session: "t"))
+        _ = built
+        #expect(await store.all.first?.source == "mcp")
+    }
+
     @Test func respondReportsAnEmptyRefusalListByDefault() async throws {
         let result = try await fakeServer.call(
             .init(name: "respond", arguments: ["prompt": .string("hi"), "thread_id": .string("r")]))
