@@ -36,6 +36,16 @@ import Testing
         }
     }
 
+    @Test func everyDefaultRuleAndDenyPatternCompiles() throws {
+        for rule in RuleRiskClassifier.defaultRules {
+            #expect(throws: Never.self, "\(rule.pattern)") { _ = try Regex(rule.pattern) }
+            #expect(!rule.reason.isEmpty)
+        }
+        for pattern in CommandPolicy.defaultDeny {
+            #expect(throws: Never.self, "\(pattern)") { _ = try Regex(pattern) }
+        }
+    }
+
     @Test func compositeTakesTheHighest() async {
         struct Fixed: RiskClassifier {
             let level: RiskLevel

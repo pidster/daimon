@@ -466,4 +466,8 @@ Ordered by severity; effort S (under an hour), M (half a day), L (a day or more)
 
 2026-09-19: D1, D2, D3, D5, D6, D7, D8, D9, T1, T2, T3, O1, O2, O6 addressed (commit "Close the
 high-severity review findings"). D4 is moot: the direct MCP `run_command` tool was removed on 2026-09-18.
-Remaining items stand as listed in the Todo.
+T4, T5, T6 addressed 2026-09-19 (commit "Close the remaining medium review findings"): the elicitation
+approver is driven through an in-process MCP client and server for accept, decline, cancel, silence, and
+the no-elicitation client; the network test asserts the kernel's "Operation not permitted" rather than any
+failure; every default rule and deny pattern is compiled by a test. All medium items are now closed; the
+low items stand as listed in the Todo.

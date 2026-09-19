@@ -108,10 +108,17 @@ import Testing
     func sandboxCanBlockNetwork() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(atPath: dir) }
-        var options = CommandRunner.Options(workingDirectory: dir, timeout: .seconds(10))
+        var options = CommandRunner.Options(workingDirectory: dir, writableRoot: dir, timeout: .seconds(10))
         options.policy.sandbox.allowNetwork = false
-        let outcome = try await CommandRunner(options: options).run("curl -sS -m 3 https://example.com -o /dev/null")
-        #expect(outcome.exitStatus != 0)
+        // A closed local port: without the sandbox this is "Connection refused"; with network denied the
+        // kernel refuses the connect call itself, which is the only outcome that proves enforcement.
+        let probe = "/usr/bin/python3 -c \"import socket; socket.socket().connect(('127.0.0.1', 1))\""
+        let denied = try await CommandRunner(options: options).run(probe)
+        #expect(denied.exitStatus != 0)
+        #expect(denied.stderr.contains("Operation not permitted"), "\(denied.stderr)")
+        options.policy.sandbox.allowNetwork = true
+        let allowed = try await CommandRunner(options: options).run(probe)
+        #expect(allowed.stderr.contains("Connection refused"), "\(allowed.stderr)")
     }
 
     @Test func unrestrictedRunsPlainShell() async throws {
