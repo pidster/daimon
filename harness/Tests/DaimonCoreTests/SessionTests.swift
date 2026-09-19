@@ -90,8 +90,31 @@ import Testing
         let home = try temporaryHome()
         defer { try? FileManager.default.removeItem(at: home.root) }
         let (session, sink) = try begin(.init(entryPoint: "respond", autoApprove: true), home: home)
-        let gate = try session.conversation(id: "t", approver: DenyingApprover(reason: "must not be asked"))
-        try await gate.conversation.gate.clear(command: "rm -rf build", workingDirectory: home.root.path)
+        let conversation = try session.conversation(id: "t", approver: DenyingApprover(reason: "must not be asked"))
+        try await conversation.gate.clear(command: "rm -rf build", workingDirectory: home.root.path)
         #expect(sink.events.last?.details["decision"] == "approved")
+    }
+
+    @Test func aThreadConversationRecordsItsOwnSessionStart() throws {
+        let home = try temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let (session, sink) = try begin(.init(entryPoint: "mcp", unsafe: true), home: home)
+        let conversation = try session.conversation(
+            id: "thread-1", approver: DenyingApprover(reason: "x"), instructions: "be brief", toolNames: ["read_file"],
+            model: .privateCloud)
+        #expect(conversation.instructions == "be brief")
+        #expect(conversation.model == .privateCloud)
+        #expect(conversation.tools.map(\.name) == ["read_file"])
+        let start = sink.events.last
+        #expect(start?.kind == .sessionStart)
+        #expect(start?.session == "thread-1")
+        #expect(start?.details["entryPoint"] == "mcp-thread")
+        #expect(start?.details["parent"] == .string(session.audit.session))
+        #expect(start?.details["instructions"] == "be brief")
+        #expect(start?.details["tools"] == .array(["read_file"]))
+        #expect(start?.details["model"] == "private-cloud")
+        #expect(start?.details["unsafe"] == true)
+        #expect(start?.details["autoApprove"] == false)
+        #expect(start?.details["resume"] == .null)
     }
 }

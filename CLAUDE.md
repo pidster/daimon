@@ -66,7 +66,7 @@ under `sandbox-exec` with a generated profile, bounded output and a timeout. `Fi
 `Home`, `Config`, and `TranscriptStore` are `~/.daimon`. `AuditLog` writes JSON Lines; `Diagnostics` wraps
 unified logging. `ContextPolicy` recovers from context overflow by dropping old turns. `Session.begin` is
 the single set-up path for every face; `respond` and `chat` open the session's own `Conversation`, and
-`DaimonMCP` opens one per `thread_id` through `Session.openConversation` (threads held by
+`DaimonMCP` opens one per `thread_id` through `Session.conversation` (threads held by
 `ThreadStore`/`ConversationThread` actors), so all of them share one config, approval store, and
 session-approval set. `DaimonMCP` exposes `respond` and `close_thread`; daimon's own tools are reachable
 only through `respond`. Details: `docs/design.md`.

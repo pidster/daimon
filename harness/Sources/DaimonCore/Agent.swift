@@ -80,9 +80,16 @@ public final class Agent {
         try await model.tokenCount(for: session.transcript)
     }
 
-    /// Starts a fresh session with the same instructions and tools, discarding the conversation.
+    /// Starts a fresh session with the same instructions and tools, discarding the conversation,
+    /// and records it as a `session.start` with reason `new`.
     public func reset() {
         session = model.session(tools: tools, transcript: session.transcript.condensed(keepTurns: 0))
+        audit?.record(
+            .sessionStart,
+            details: [
+                "reason": "new", "tools": .array(tools.map { .string($0.name) }),
+                "model": .string(model.selection.description),
+            ])
     }
 
     /// Runs `operation`; on context overflow under a `.condense` policy, rebuilds the

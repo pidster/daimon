@@ -18,7 +18,7 @@ public actor ConversationThread: RespondingThread {
     /// The conversation; isolated to this actor because it is not `Sendable`.
     private let agent: Agent
 
-    /// Wraps an agent opened by `Session.openConversation`.
+    /// Wraps an agent opened from a `Conversation` the session set up for this thread.
     public init(id: String, agent: Agent) {
         self.id = id
         self.agent = agent
@@ -31,6 +31,24 @@ public actor ConversationThread: RespondingThread {
         let before = agent.condensations
         let text = try await agent.respond(to: prompt)
         return (text, agent.condensations > before)
+    }
+}
+
+/// Everything the server keeps for one open `thread_id`: the thread, the gate its tools consult, and
+/// the audit log its events go to. Created together by the thread factory and dropped together.
+public struct OpenThread: Sendable {
+    /// Answers prompts on this thread.
+    public let thread: any RespondingThread
+    /// The gate, kept so a turn's refusals can be reported in the result.
+    public let gate: ApprovalGate
+    /// The thread's audit session.
+    public let audit: AuditLog
+
+    /// Creates the record.
+    public init(thread: any RespondingThread, gate: ApprovalGate, audit: AuditLog) {
+        self.thread = thread
+        self.gate = gate
+        self.audit = audit
     }
 }
 
@@ -76,22 +94,30 @@ public actor ThreadStore<Thread: Sendable> {
         public let thread: Thread
         /// Whether it was created by this call.
         public let created: Bool
-        /// The id evicted to make room, if any.
-        public let evicted: String?
+        /// The thread evicted to make room, if any.
+        public let evicted: Evicted?
+    }
+
+    /// A thread dropped to make room for another.
+    public struct Evicted: Sendable {
+        /// Its id.
+        public let id: String
+        /// The thread itself, so the caller can close it down.
+        public let thread: Thread
     }
 
     /// Creates and stores a thread, evicting the least recently used one if at capacity.
     ///
-    /// - Returns: The thread and the evicted id, if any.
+    /// - Returns: The thread and the evicted thread, if any.
     /// - Throws: `Failure.alreadyExists`, or whatever `make` throws.
-    public func create(id: String, _ make: () throws -> Thread) throws -> (thread: Thread, evicted: String?) {
+    public func create(id: String, _ make: () throws -> Thread) throws -> (thread: Thread, evicted: Evicted?) {
         guard threads[id] == nil else { throw Failure.alreadyExists(id) }
         let thread = try make()
-        var evicted: String?
-        if threads.count >= capacity, let oldest = recency.first {
+        var evicted: Evicted?
+        if threads.count >= capacity, let oldest = recency.first, let dropped = threads[oldest] {
             threads[oldest] = nil
             recency.removeFirst()
-            evicted = oldest
+            evicted = Evicted(id: oldest, thread: dropped)
         }
         threads[id] = thread
         recency.append(id)
@@ -116,11 +142,13 @@ public actor ThreadStore<Thread: Sendable> {
         return thread
     }
 
-    /// Removes the thread with `id`.
+    /// Removes and returns the thread with `id`.
     ///
     /// - Throws: `Failure.notFound` if there is none.
-    public func close(_ id: String) throws {
-        guard threads.removeValue(forKey: id) != nil else { throw Failure.notFound(id) }
+    @discardableResult
+    public func close(_ id: String) throws -> Thread {
+        guard let thread = threads.removeValue(forKey: id) else { throw Failure.notFound(id) }
         recency.removeAll { $0 == id }
+        return thread
     }
 }

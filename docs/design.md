@@ -99,7 +99,7 @@ flag means the same everywhere. The three faces are overlays on this core:
 | --- | --- |
 | `respond` | `session.openAgent(approver:)` with a denying approver that explains `--yes` and `chat` |
 | `chat` | `session.openAgent(approver:transcript:)` with the terminal approver, resumable |
-| `mcp` | `session.openConversation(id:approver:…)` per `thread_id` with the elicitation approver, its own audit session, gate, tools, and optional instruction, tool, and model overrides |
+| `mcp` | `session.conversation(id:approver:…)` per `thread_id` with the elicitation approver, its own audit session (recording its own `session.start`), gate, tools, and optional instruction, tool, and model overrides; the server keeps the thread, gate, and audit log together as one `OpenThread` in the `ThreadStore`, so they are created and dropped together |
 
 Every conversation of a session shares its config, `ApprovalStore`, and `SessionApprovals`, so a
 "this project" answer on one MCP thread is written once and a "this session" answer covers every thread.

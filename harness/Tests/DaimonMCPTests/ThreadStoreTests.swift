@@ -26,7 +26,7 @@ import Testing
         #expect(try await store.create(id: "a") { "A" }.evicted == nil)
         _ = try await store.create(id: "b") { "B" }
         _ = await store.find("a")  // b is now least recently used
-        #expect(try await store.create(id: "c") { "C" }.evicted == "b")
+        #expect(try await store.create(id: "c") { "C" }.evicted?.id == "b")
         #expect(await store.ids == ["c", "a"])
         #expect(await store.find("b") == nil)
     }

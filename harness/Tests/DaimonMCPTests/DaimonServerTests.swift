@@ -25,8 +25,9 @@ func scratchSession(entryPoint: String = "mcp") throws -> Session {
 
     init() throws {
         server = DaimonServer(session: try scratchSession())
-        fakeServer = DaimonServer(session: try scratchSession()) { session, _, id, _, _, _ in
-            (FakeThread(reply: "\(id):"), nil, session.audit.log(forSession: id))
+        fakeServer = DaimonServer(session: try scratchSession()) { session, approver, id, _, _, _ in
+            let conversation = try session.conversation(id: id, approver: approver)
+            return OpenThread(thread: FakeThread(reply: "\(id):"), gate: conversation.gate, audit: conversation.audit)
         }
     }
 
@@ -47,11 +48,11 @@ func scratchSession(entryPoint: String = "mcp") throws -> Session {
         }
         let session = try scratchSession()
         // Two threads opened from the same session share one store and one session-approval set.
-        let first = try session.conversation(id: "a", approver: Grant()).conversation
+        let first = try session.conversation(id: "a", approver: Grant())
         try await first.gate.clear(command: "touch a", workingDirectory: "/repo")
         #expect(await session.store.find(pattern: "touch *", directory: "/repo")?.source == "mcp")
         let second = try session.conversation(id: "b", approver: DenyingApprover(reason: "must not ask"))
-        try await second.conversation.gate.clear(command: "touch b", workingDirectory: "/repo")
+        try await second.gate.clear(command: "touch b", workingDirectory: "/repo")
     }
 
     @Test func respondReportsAnEmptyRefusalListByDefault() async throws {

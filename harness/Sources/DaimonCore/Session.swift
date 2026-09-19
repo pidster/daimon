@@ -186,30 +186,15 @@ public struct Session: Sendable {
     /// - Returns: The agent over the session's tools, recording to the session's audit log.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public func openAgent(approver: any Approver, transcript: Transcript? = nil) throws -> Agent {
-        let conversation = try Conversation.setUp(session: self, audit: audit, approver: approver, toolNames: toolNames)
-        return try conversation.openAgent(
-            instructions: instructions, model: config.model, audit: audit, transcript: transcript)
-    }
-
-    /// Sets up a further conversation with its own audit log, gate, and tools, sharing the session's
-    /// store and session approvals. Needs no model; `openConversation` adds the agent.
-    ///
-    /// - Parameters:
-    ///   - id: The conversation's id; its audit events carry it as the session.
-    ///   - approver: How the face asks a human; replaced by `AutoApprover` when the request said `--yes`.
-    ///   - toolNames: Tool selection; nil takes the session's.
-    /// - Returns: The conversation and the audit log its tools record to.
-    /// - Throws: `Failure.unknownTools`.
-    public func conversation(
-        id: String, approver: any Approver, toolNames: [String]? = nil
-    ) throws -> (conversation: Conversation, audit: AuditLog) {
-        let audit = self.audit.log(forSession: id)
         let conversation = try Conversation.setUp(
-            session: self, audit: audit, approver: approver, toolNames: toolNames ?? self.toolNames)
-        return (conversation, audit)
+            session: self, audit: audit, approver: approver, instructions: instructions, toolNames: toolNames,
+            model: config.model)
+        return try conversation.openAgent(transcript: transcript)
     }
 
-    /// Opens a further conversation with optional overrides: the MCP server calls this per `thread_id`.
+    /// Sets up a further conversation with its own audit session, gate, and tools, sharing the
+    /// session's store and session approvals, and records its `session.start`. Needs no model;
+    /// `Conversation.openAgent` adds the agent. The MCP server calls this per `thread_id`.
     ///
     /// - Parameters:
     ///   - id: The conversation's id; its audit events carry it as the session.
@@ -217,17 +202,26 @@ public struct Session: Sendable {
     ///   - instructions: Instructions override; nil takes the session's.
     ///   - toolNames: Tool selection; nil takes the session's.
     ///   - model: Model override; nil takes the session's.
-    /// - Returns: The conversation, its agent, and the audit log the agent records to.
-    /// - Throws: `Failure.unknownTools` or `ModelSelection.Failure`.
-    public func openConversation(
+    /// - Returns: The conversation, ready to open.
+    /// - Throws: `Failure.unknownTools`.
+    public func conversation(
         id: String, approver: any Approver, instructions: String? = nil, toolNames: [String]? = nil,
         model: ModelSelection? = nil
-    ) throws -> (conversation: Conversation, agent: Agent, audit: AuditLog) {
-        let (conversation, audit) = try self.conversation(id: id, approver: approver, toolNames: toolNames)
-        let agent = try conversation.openAgent(
-            instructions: instructions ?? self.instructions, model: model ?? config.model, audit: audit,
-            transcript: nil)
-        return (conversation, agent, audit)
+    ) throws -> Conversation {
+        let audit = self.audit.log(forSession: id)
+        let conversation = try Conversation.setUp(
+            session: self, audit: audit, approver: approver, instructions: instructions ?? self.instructions,
+            toolNames: toolNames ?? self.toolNames, model: model ?? config.model)
+        audit.record(
+            .sessionStart,
+            details: [
+                "entryPoint": .string("\(entryPoint)-thread"), "parent": .string(self.audit.session),
+                "instructions": .string(conversation.instructions),
+                "tools": .array(conversation.tools.map { .string($0.name) }),
+                "model": .string(conversation.model.description), "unsafe": .bool(request.unsafe),
+                "autoApprove": .bool(request.autoApprove), "resume": .null,
+            ])
+        return conversation
     }
 
     /// Records `session.end`.
@@ -242,12 +236,19 @@ public struct Conversation: Sendable {
     public let gate: ApprovalGate
     /// The tools the model may use.
     public let tools: [any Tool]
+    /// The log the conversation's turns and tool calls are recorded to.
+    public let audit: AuditLog
+    /// The instructions the agent starts with.
+    public let instructions: String
+    /// The model the agent runs on.
+    public let model: ModelSelection
 
     /// Builds the gate and the tool registry for one conversation of `session`.
     ///
     /// - Throws: `Session.Failure.unknownTools` for names not in the registry.
     static func setUp(
-        session: Session, audit: AuditLog, approver: any Approver, toolNames: [String]
+        session: Session, audit: AuditLog, approver: any Approver, instructions: String, toolNames: [String],
+        model: ModelSelection
     ) throws -> Conversation {
         let gate = ApprovalGate(
             classifier: session.classifier, approver: session.request.autoApprove ? AutoApprover() : approver,
@@ -256,17 +257,15 @@ public struct Conversation: Sendable {
         let registry = ToolRegistry(runner: session.config.runner, audit: audit, approval: gate)
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
-        return Conversation(gate: gate, tools: selection.tools)
+        return Conversation(gate: gate, tools: selection.tools, audit: audit, instructions: instructions, model: model)
     }
 
     /// Creates the agent that runs this conversation.
     ///
+    /// - Parameter transcript: A saved conversation to resume, or nil to start from the instructions.
+    /// - Returns: The agent, recording to this conversation's audit log and advancing its turn clock.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
-    func openAgent(
-        instructions: String, model: ModelSelection, audit: AuditLog, transcript: Transcript?
-    ) throws
-        -> Agent
-    {
+    public func openAgent(transcript: Transcript? = nil) throws -> Agent {
         if let transcript {
             return try Agent(transcript: transcript, tools: tools, model: model, audit: audit)
         }
