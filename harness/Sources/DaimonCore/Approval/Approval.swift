@@ -16,12 +16,11 @@ public struct ApprovalRequest: Equatable, Sendable {
 
     /// Creates a request.
     public init(
-        command: String, line: String? = nil, pattern: String? = nil, workingDirectory: String,
-        assessment: RiskAssessment
+        command: String, line: String? = nil, pattern: String, workingDirectory: String, assessment: RiskAssessment
     ) {
         self.command = command
         self.line = line ?? command
-        self.pattern = pattern ?? (CommandSplitter.split(command).first?.pattern ?? command)
+        self.pattern = pattern
         self.workingDirectory = workingDirectory
         self.assessment = assessment
     }
@@ -208,21 +207,36 @@ public actor ApprovalGate {
     ///
     /// - Throws: `Failure.refused` with the reason otherwise.
     public func clear(readingFile path: String, workingDirectory: String) async throws {
+        let line = "cat \(path)"
         try await clear(
-            command: "cat \(path)", workingDirectory: workingDirectory, classifier: RuleRiskClassifier.standard)
+            parts: CommandSplitter.split(line), line: line, workingDirectory: workingDirectory,
+            classifier: RuleRiskClassifier.standard)
     }
 
-    /// Returns normally if the command may run.
+    /// Returns normally if the command line may run, splitting it into simple commands first.
     ///
     /// - Throws: `Failure.refused` with the reason otherwise.
-    public func clear(command: String, workingDirectory: String) async throws {
-        try await clear(command: command, workingDirectory: workingDirectory, classifier: classifier)
+    public func clear(command line: String, workingDirectory: String) async throws {
+        try await clear(parts: CommandSplitter.split(line), line: line, workingDirectory: workingDirectory)
     }
 
-    private func clear(command line: String, workingDirectory: String, classifier: any RiskClassifier) async throws {
+    /// Returns normally if every simple command of `line` may run. `CommandRunner` splits once for
+    /// the policy check and passes the parts here.
+    ///
+    /// - Parameters:
+    ///   - parts: The line's simple commands, from `CommandSplitter.split`; empty falls back to the line.
+    ///   - line: The whole line, for context in prompts and the audit log.
+    ///   - workingDirectory: Where it would run.
+    /// - Throws: `Failure.refused` with the reason otherwise.
+    public func clear(parts: [SimpleCommand], line: String, workingDirectory: String) async throws {
+        try await clear(parts: parts, line: line, workingDirectory: workingDirectory, classifier: classifier)
+    }
+
+    private func clear(
+        parts: [SimpleCommand], line: String, workingDirectory: String, classifier: any RiskClassifier
+    ) async throws {
         // Every simple command in the line is checked and approved on its own, so a dangerous part
         // cannot hide behind a safe first command, and approvals are remembered per pattern.
-        let parts = CommandSplitter.split(line)
         let segments = parts.isEmpty ? [SimpleCommand(text: line, executable: line)] : parts
         for segment in segments {
             do {

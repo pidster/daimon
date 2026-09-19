@@ -38,7 +38,7 @@ public struct AuditedTool<Base: DaimonTool>: DaimonTool {
     ///
     /// - Throws: Whatever the base tool throws.
     public func call(arguments: Arguments) async throws -> String {
-        let call = String(UUID().uuidString.prefix(8)).lowercased()
+        let call = ShortID.make()
         let started = Date()
         audit.record(
             .toolCall, call: call,

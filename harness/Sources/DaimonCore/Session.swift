@@ -149,7 +149,7 @@ public struct Session: Sendable {
             )
         }
         let toolNames = try Self.resolve(request.tools, runner: config.runner)
-        let sessionID = String(UUID().uuidString.prefix(8)).lowercased()
+        let sessionID = ShortID.make()
         let sink: any AuditSink = config.auditEnabled ? try dependencies.makeSink(home, config) : NullAuditSink()
         let audit = AuditLog(session: sessionID, sink: sink)
         audit.record(

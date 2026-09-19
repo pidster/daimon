@@ -43,6 +43,8 @@ public struct FileReader: Sendable {
         case binary(String)
         /// `offset` or `limit` is below 1.
         case invalidRange
+        /// The approval gate refused the read.
+        case notApproved(String)
 
         /// Human-readable explanation.
         public var description: String {
@@ -51,6 +53,7 @@ public struct FileReader: Sendable {
             case .isDirectory(let path): "path is a directory: \(path)"
             case .binary(let path): "file appears to be binary: \(path)"
             case .invalidRange: "offset and limit must be at least 1"
+            case .notApproved(let reason): "read not approved: \(reason)"
             }
         }
     }

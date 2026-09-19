@@ -90,7 +90,7 @@ public struct DaimonServer: Sendable {
     /// Dispatches one `tools/call`. Argument errors surface as MCP protocol
     /// errors; execution failures come back as tool results with `isError`.
     func call(_ params: CallTool.Parameters) async throws -> CallTool.Result {
-        let call = String(UUID().uuidString.prefix(8)).lowercased()
+        let call = ShortID.make()
         let arguments = params.arguments.map { Self.render($0) } ?? "{}"
         audit.record(
             .mcpRequest, call: call, details: AuditEvent.Details.mcpRequest(tool: params.name, arguments: arguments))

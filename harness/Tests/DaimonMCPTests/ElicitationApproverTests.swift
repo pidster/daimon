@@ -8,7 +8,7 @@ import Testing
 /// Drives `ElicitationApprover` through a real in-process MCP client and server.
 @Suite struct ElicitationApproverTests {
     private let request = ApprovalRequest(
-        command: "touch x", workingDirectory: "/tmp",
+        command: "touch x", pattern: "touch *", workingDirectory: "/tmp",
         assessment: RiskAssessment(level: .moderate, reasons: ["modifies files"], sources: ["rules"]))
 
     /// A connected client whose elicitation handler answers with `answer`, and the server it talks to.

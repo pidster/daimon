@@ -138,7 +138,8 @@ public struct CommandRunner: Sendable {
                     sandbox: sandboxed, network: options.policy.sandbox.allowNetwork,
                     nested: options.policy.sandbox.enabled && Self.isNestedSandbox))
         }
-        let verdicts = ([command] + CommandSplitter.split(command).map(\.text)).map(options.policy.check)
+        let parts = CommandSplitter.split(command)
+        let verdicts = ([command] + parts.map(\.text)).map(options.policy.check)
         if let denial = verdicts.first(where: { if case .denied = $0 { true } else { false } }),
             case .denied(let reason) = denial
         {
@@ -147,7 +148,7 @@ public struct CommandRunner: Sendable {
             throw Failure.denied(reason)
         }
         do {
-            try await approval?.clear(command: command, workingDirectory: workingDirectory)
+            try await approval?.clear(parts: parts, line: command, workingDirectory: workingDirectory)
         } catch ApprovalGate.Failure.refused(let reason) {
             decided(.disapproved, reason: reason)
             throw Failure.disapproved(reason)

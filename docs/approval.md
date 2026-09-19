@@ -87,7 +87,9 @@ minutes) reports `unanswered`, the gate refuses the command and audits the decis
 to `0` to wait indefinitely. The terminal prompt in `chat` has no timeout: a person is at the keyboard,
 and end of input counts as a refusal. A denial returns to the
 model as `error: command not approved: …` (or `error: read not approved: …` from `read_file`) so it can
-choose another approach. The gate itself throws `ApprovalGate.Failure.refused`; each tool renders it.
+choose another approach. The gate itself throws `ApprovalGate.Failure.refused`; each tool renders it
+through `ToolOutput.error`. `CommandRunner` splits the line once, checks the policy over each part, and
+passes the parts to the gate, so a line is never split twice.
 
 "This turn" is defined by the conversation's `TurnClock`, which the agent advances once per prompt and
 the gate and the audit log both read, so a once-approval covers the rest of the tool loop whether or

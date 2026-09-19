@@ -63,9 +63,9 @@ public struct ReadFileTool: DaimonTool {
             )
             .rendered
         } catch ApprovalGate.Failure.refused(let reason) {
-            return "error: read not approved: \(reason)"
+            return ToolOutput.error(FileReader.Failure.notApproved(reason))
         } catch {
-            return "error: \(error)"
+            return ToolOutput.error(error)
         }
     }
 }

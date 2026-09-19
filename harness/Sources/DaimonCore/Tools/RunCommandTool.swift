@@ -62,7 +62,7 @@ public struct RunCommandTool: DaimonTool {
         do {
             return try await runner.run(arguments.command, in: arguments.workingDirectory).rendered
         } catch {
-            return "error: \(error)"
+            return ToolOutput.error(error)
         }
     }
 }

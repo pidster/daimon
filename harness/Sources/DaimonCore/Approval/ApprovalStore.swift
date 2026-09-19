@@ -94,7 +94,7 @@ public actor ApprovalStore {
         precondition(scope.isPersistent, "only project and always are persisted")
         let now = Date()
         let entry = Entry(
-            id: String(UUID().uuidString.prefix(8)).lowercased(), pattern: pattern,
+            id: ShortID.make(), pattern: pattern,
             workingDirectory: scope == .project ? directory : nil, scope: scope, level: level, grantedAt: now,
             expiresAt: now.addingTimeInterval(TimeInterval(lifetime.components.seconds)), source: source)
         entries.append(entry)

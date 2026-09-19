@@ -68,9 +68,6 @@ public struct TranscriptStore: Sendable {
     ///
     /// - Throws: `Failure.invalidName`.
     public static func validate(_ name: String) throws {
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
-        guard !name.isEmpty, name.count <= 64, name.unicodeScalars.allSatisfy(allowed.contains) else {
-            throw Failure.invalidName(name)
-        }
+        guard SafeName.isValid(name) else { throw Failure.invalidName(name) }
     }
 }

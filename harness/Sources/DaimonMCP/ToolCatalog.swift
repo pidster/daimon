@@ -96,10 +96,7 @@ public enum ToolCatalog {
 ///
 /// - Throws: `MCPError.invalidParams` otherwise.
 func validateThreadID(_ id: String) throws {
-    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
-    guard !id.isEmpty, id.count <= 64, id.unicodeScalars.allSatisfy(allowed.contains) else {
-        throw MCPError.invalidParams("'thread_id' must be 1-64 characters from [A-Za-z0-9._-]")
-    }
+    guard SafeName.isValid(id) else { throw MCPError.invalidParams("'thread_id' must be \(SafeName.rule)") }
 }
 
 /// Decoded arguments for the `respond` tool.
