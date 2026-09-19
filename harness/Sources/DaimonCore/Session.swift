@@ -154,12 +154,10 @@ public struct Session: Sendable {
         let audit = AuditLog(session: sessionID, sink: sink)
         audit.record(
             .sessionStart,
-            details: [
-                "entryPoint": .string(request.entryPoint), "instructions": .string(config.instructions),
-                "tools": .array(toolNames.map { .string($0) }), "model": .string(config.model.description),
-                "unsafe": .bool(request.unsafe), "autoApprove": .bool(request.autoApprove),
-                "resume": request.resume.map { .string($0) } ?? .null,
-            ])
+            details: AuditEvent.Details.sessionStart(
+                entryPoint: request.entryPoint, instructions: config.instructions, tools: toolNames,
+                model: config.model,
+                unsafe: request.unsafe, autoApprove: request.autoApprove, resume: request.resume))
         return Session(
             request: request, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
@@ -214,13 +212,10 @@ public struct Session: Sendable {
             toolNames: tools.resolved(or: toolNames), model: model ?? config.model)
         audit.record(
             .sessionStart,
-            details: [
-                "entryPoint": .string("\(entryPoint)-thread"), "parent": .string(self.audit.session),
-                "instructions": .string(conversation.instructions),
-                "tools": .array(conversation.tools.map { .string($0.name) }),
-                "model": .string(conversation.model.description), "unsafe": .bool(request.unsafe),
-                "autoApprove": .bool(request.autoApprove), "resume": .null,
-            ])
+            details: AuditEvent.Details.sessionStart(
+                entryPoint: "\(entryPoint)-thread", instructions: conversation.instructions,
+                tools: conversation.tools.map(\.name), model: conversation.model, unsafe: request.unsafe,
+                autoApprove: request.autoApprove, resume: nil, parent: self.audit.session))
         return conversation
     }
 

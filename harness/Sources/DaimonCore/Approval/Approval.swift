@@ -238,37 +238,43 @@ public actor ApprovalGate {
     ) async throws {
         let started = Date()
         let assessment = await classifier.classify(command: segment.text, workingDirectory: workingDirectory)
-        var base: [String: JSONValue] = ["command": .string(segment.text), "pattern": .string(segment.pattern)]
-        if line != segment.text { base["line"] = .string(line) }
+        let key = Self.key(segment.pattern, workingDirectory)
+        func decided(
+            _ decision: String, scope: ApprovalScope? = nil, reason: String? = nil, approvalID: String? = nil,
+            expiresAt: Date? = nil, downgradedFrom: ApprovalScope? = nil, persistError: String? = nil
+        ) {
+            audit?.record(
+                .approvalDecided,
+                details: AuditEvent.Details.approvalDecided(
+                    command: segment.text, pattern: segment.pattern, line: line, decision: decision, scope: scope,
+                    reason: reason, approvalID: approvalID, expiresAt: expiresAt, downgradedFrom: downgradedFrom,
+                    persistError: persistError))
+        }
         audit?.record(
             .classifierVerdict,
-            details: base.merging([
-                "level": .string(assessment.level.rawValue),
-                "reasons": .array(assessment.reasons.map { .string($0) }),
-                "sources": .array(assessment.sources.map { .string($0) }),
-                "seconds": .double(Date().timeIntervalSince(started)),
-            ]) { $1 })
+            details: AuditEvent.Details.classifierVerdict(
+                command: segment.text, pattern: segment.pattern, line: line, assessment: assessment,
+                seconds: Date().timeIntervalSince(started)))
         guard threshold.requiresApproval(at: assessment.level) else { return }
-        if sessionApprovals.contains(Self.key(segment.pattern, workingDirectory)) {
-            audit?.record(.approvalDecided, details: base.merging(["decision": "cached"]) { $1 })
+        if sessionApprovals.contains(key) {
+            decided("cached")
             return
         }
         _ = currentTurn()
-        if turnState.approved.contains(Self.key(segment.pattern, workingDirectory)) {
-            audit?.record(.approvalDecided, details: base.merging(["decision": "cached-turn"]) { $1 })
+        if turnState.approved.contains(key) {
+            decided("cached-turn")
             return
         }
         if assessment.level < .dangerous,
             let standing = await store?.find(pattern: segment.pattern, directory: workingDirectory)
         {
-            audit?.record(
-                .approvalDecided,
-                details: base.merging([
-                    "decision": .string("cached-\(standing.scope.rawValue)"), "approvalID": .string(standing.id),
-                ]) { $1 })
+            decided("cached-\(standing.scope.rawValue)", approvalID: standing.id)
             return
         }
-        audit?.record(.approvalRequested, details: base.merging(["level": .string(assessment.level.rawValue)]) { $1 })
+        audit?.record(
+            .approvalRequested,
+            details: AuditEvent.Details.approvalRequested(
+                command: segment.text, pattern: segment.pattern, line: line, level: assessment.level))
         let decision = await approver.decide(
             ApprovalRequest(
                 command: segment.text, line: line, pattern: segment.pattern, workingDirectory: workingDirectory,
@@ -277,35 +283,36 @@ public actor ApprovalGate {
         case .approved(let requested):
             // A dangerous command is never remembered beyond the session, whatever was chosen.
             let scope = (requested.isPersistent && assessment.level == .dangerous) ? .session : requested
-            var details = base.merging(["decision": "approved", "scope": .string(scope.rawValue)]) { $1 }
-            if scope != requested { details["downgradedFrom"] = .string(requested.rawValue) }
             if scope == .once {
-                turnState.approved.insert(Self.key(segment.pattern, workingDirectory))
+                turnState.approved.insert(key)
             } else {
-                sessionApprovals.insert(Self.key(segment.pattern, workingDirectory))
+                sessionApprovals.insert(key)
             }
+            var approvalID: String?
+            var expiresAt: Date?
+            var persistError: String?
             if scope.isPersistent, let store {
                 do {
                     let entry = try await store.grant(
                         pattern: segment.pattern, directory: workingDirectory, scope: scope, level: assessment.level,
                         source: source)
-                    details["approvalID"] = .string(entry.id)
-                    details["expiresAt"] = .string(entry.expiresAt.ISO8601Format())
+                    approvalID = entry.id
+                    expiresAt = entry.expiresAt
                 } catch {
-                    details["persistError"] = .string("\(error)")
+                    persistError = "\(error)"
                     Diagnostics.policy.error("could not persist approval: \(error)")
                 }
             }
-            audit?.record(.approvalDecided, details: details)
+            decided(
+                "approved", scope: scope, approvalID: approvalID, expiresAt: expiresAt,
+                downgradedFrom: scope != requested ? requested : nil, persistError: persistError)
         case .denied(let reason):
-            audit?.record(
-                .approvalDecided, details: base.merging(["decision": "denied", "reason": .string(reason)]) { $1 })
+            decided("denied", reason: reason)
             turnState.refusals.append(Refusal(command: segment.text, reason: reason))
             throw Failure.refused(reason)
         case .unanswered(let waited):
             let reason = "no answer within \(waited); an unanswered approval counts as declined"
-            audit?.record(
-                .approvalDecided, details: base.merging(["decision": "timed-out", "reason": .string(reason)]) { $1 })
+            decided("timed-out", reason: reason)
             turnState.refusals.append(Refusal(command: segment.text, reason: reason))
             throw Failure.refused(reason)
         }

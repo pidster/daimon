@@ -85,11 +85,7 @@ public final class Agent {
     public func reset() {
         session = model.session(tools: tools, transcript: session.transcript.condensed(keepTurns: 0))
         audit?.record(
-            .sessionStart,
-            details: [
-                "reason": "new", "tools": .array(tools.map { .string($0.name) }),
-                "model": .string(model.selection.description),
-            ])
+            .sessionStart, details: AuditEvent.Details.sessionRestart(tools: tools.map(\.name), model: model.selection))
     }
 
     /// Runs `operation`; on context overflow under a `.condense` policy, rebuilds the
@@ -107,10 +103,9 @@ public final class Agent {
             condensations += 1
             audit?.record(
                 .condensation,
-                details: [
-                    "turnsBefore": .int(before.turnCount), "turnsAfter": .int(condensed.turnCount),
-                    "contextSize": .int(details.contextSize), "tokenCount": .int(details.tokenCount),
-                ])
+                details: AuditEvent.Details.condensation(
+                    turnsBefore: before.turnCount, turnsAfter: condensed.turnCount, contextSize: details.contextSize,
+                    tokenCount: details.tokenCount))
             Diagnostics.agent.info("condensed \(before.turnCount) -> \(condensed.turnCount) turns")
             return try await operation()
         }
@@ -148,17 +143,15 @@ public final class Agent {
         _ prompt: String, _ operation: () async throws -> String
     ) async throws -> String {
         turns.advance()
-        audit?.record(.prompt, details: ["text": .string(prompt)])
+        audit?.record(.prompt, details: AuditEvent.Details.prompt(text: prompt))
         let started = Date()
         let before = condensations
         do {
             let text = try await withOverflowRecovery(operation)
             audit?.record(
                 .response,
-                details: [
-                    "text": .string(text), "condensed": .bool(condensations > before),
-                    "seconds": .double(Date().timeIntervalSince(started)),
-                ])
+                details: AuditEvent.Details.response(
+                    text: text, condensed: condensations > before, seconds: Date().timeIntervalSince(started)))
             return text
         } catch {
             audit?.error(error, context: "turn")

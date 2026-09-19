@@ -57,9 +57,8 @@ public final class AuditLog: Sendable {
 
     /// Records an error with its description.
     public func error(_ error: some Error, call: String? = nil, context: String? = nil) {
-        var details: [String: JSONValue] = ["message": .string(String(describing: error))]
-        if let context { details["context"] = .string(context) }
-        record(.error, call: call, details: details)
+        record(
+            .error, call: call, details: AuditEvent.Details.error(message: String(describing: error), context: context))
     }
 }
 

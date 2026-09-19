@@ -171,3 +171,57 @@ import Testing
         #expect(sink.events[2].details["verdict"] == "denied")
     }
 }
+
+@Suite struct AuditDetailsTests {
+    /// Every constructor's keys are within the documented field set for its kind.
+    @Test func constructorsStayWithinTheDocumentedFields() {
+        typealias D = AuditEvent.Details
+        let outcome = CommandRunner.Outcome(exitStatus: 0, stdout: "o", stderr: "e", timedOut: false, truncated: true)
+        let assessment = RiskAssessment(level: .moderate, reasons: ["r"], sources: ["rules"])
+        let samples: [(AuditEvent.Kind, [String: JSONValue])] = [
+            (
+                .sessionStart,
+                D.sessionStart(
+                    entryPoint: "mcp-thread", instructions: "i", tools: ["t"], model: .system, unsafe: true,
+                    autoApprove: false, resume: "r", parent: "p")
+            ),
+            (.sessionStart, D.sessionRestart(tools: ["t"], model: .system)),
+            (.sessionEnd, D.sessionEnd(reason: "closed")),
+            (.prompt, D.prompt(text: "hi")),
+            (.response, D.response(text: "yo", condensed: true, seconds: 1)),
+            (.toolCall, D.toolCall(tool: "t", arguments: "{}")),
+            (.toolResult, D.toolResult(tool: "t", output: "out", seconds: 1)),
+            (
+                .policyDecision,
+                D.policyDecision(
+                    command: "c", workingDirectory: "/", verdict: .denied, reason: "why", sandbox: true, network: false,
+                    nested: false)
+            ),
+            (.commandOutcome, D.commandOutcome(command: "c", outcome: outcome, seconds: 1)),
+            (.condensation, D.condensation(turnsBefore: 5, turnsAfter: 4, contextSize: 4096, tokenCount: 5000)),
+            (.mcpRequest, D.mcpRequest(tool: "respond", arguments: "{}")),
+            (.mcpResult, D.mcpResult(tool: "respond", isError: false, text: "t", seconds: 1)),
+            (.error, D.error(message: "m", context: "c")),
+            (
+                .classifierVerdict,
+                D.classifierVerdict(command: "c", pattern: "c *", line: "a && c", assessment: assessment, seconds: 1)
+            ),
+            (.approvalRequested, D.approvalRequested(command: "c", pattern: "c *", line: "c", level: .moderate)),
+            (
+                .approvalDecided,
+                D.approvalDecided(
+                    command: "c", pattern: "c *", line: "a && c", decision: "approved", scope: .session, reason: nil,
+                    approvalID: "id", expiresAt: Date(), downgradedFrom: .project, persistError: "disk")
+            ),
+        ]
+        for (kind, details) in samples {
+            let extra = Set(details.keys).subtracting(AuditEvent.fields(for: kind))
+            #expect(extra.isEmpty, "\(kind.rawValue) has undocumented fields \(extra.sorted())")
+        }
+        #expect(D.approvalRequested(command: "c", pattern: "c *", line: "c", level: .safe)["line"] == nil)
+        #expect(
+            D.sessionStart(
+                entryPoint: "respond", instructions: "i", tools: [], model: .system, unsafe: false, autoApprove: false,
+                resume: nil)["resume"] == .null)
+    }
+}

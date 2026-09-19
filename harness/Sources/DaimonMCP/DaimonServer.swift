@@ -92,7 +92,8 @@ public struct DaimonServer: Sendable {
     func call(_ params: CallTool.Parameters) async throws -> CallTool.Result {
         let call = String(UUID().uuidString.prefix(8)).lowercased()
         let arguments = params.arguments.map { Self.render($0) } ?? "{}"
-        audit.record(.mcpRequest, call: call, details: ["tool": .string(params.name), "arguments": .string(arguments)])
+        audit.record(
+            .mcpRequest, call: call, details: AuditEvent.Details.mcpRequest(tool: params.name, arguments: arguments))
         Diagnostics.mcp.debug("request \(call) \(params.name) \(arguments)")
         let started = Date()
         let result: CallTool.Result
@@ -115,10 +116,9 @@ public struct DaimonServer: Sendable {
             separator: "\n")
         audit.record(
             .mcpResult, call: call,
-            details: [
-                "tool": .string(params.name), "isError": .bool(result.isError ?? false), "text": .string(text),
-                "seconds": .double(Date().timeIntervalSince(started)),
-            ])
+            details: AuditEvent.Details.mcpResult(
+                tool: params.name, isError: result.isError ?? false, text: text,
+                seconds: Date().timeIntervalSince(started)))
         return result
     }
 
@@ -154,7 +154,7 @@ public struct DaimonServer: Sendable {
             return failure(String(describing: error))
         }
         if let evicted = opened.evicted {
-            evicted.thread.audit.record(.sessionEnd, details: ["reason": "evicted"])
+            evicted.thread.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "evicted"))
             Diagnostics.mcp.info("evicted thread \(evicted.id) to make room for \(id)")
         }
         if !opened.created, request.instructions != nil || request.tools != .all || request.model != nil {
@@ -184,7 +184,7 @@ public struct DaimonServer: Sendable {
     private func closeThread(_ request: CloseThreadRequest) async -> CallTool.Result {
         do {
             let closed = try await threads.close(request.threadID)
-            closed.audit.record(.sessionEnd, details: ["reason": "closed"])
+            closed.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed"))
             return success("closed \(request.threadID)")
         } catch {
             return failure(String(describing: error))

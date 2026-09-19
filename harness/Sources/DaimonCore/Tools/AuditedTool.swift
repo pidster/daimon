@@ -38,16 +38,14 @@ public struct AuditedTool<Base: Tool>: Tool where Base.Arguments: Generable, Bas
         let started = Date()
         audit.record(
             .toolCall, call: call,
-            details: ["tool": .string(base.name), "arguments": .string(arguments.generatedContent.jsonString)])
+            details: AuditEvent.Details.toolCall(tool: base.name, arguments: arguments.generatedContent.jsonString))
         Diagnostics.tools.debug("call \(call) \(base.name) \(arguments.generatedContent.jsonString)")
         do {
             let output = try await base.call(arguments: arguments)
             audit.record(
                 .toolResult, call: call,
-                details: [
-                    "tool": .string(base.name), "output": .string(output), "bytes": .int(output.utf8.count),
-                    "seconds": .double(Date().timeIntervalSince(started)),
-                ])
+                details: AuditEvent.Details.toolResult(
+                    tool: base.name, output: output, seconds: Date().timeIntervalSince(started)))
             return output
         } catch {
             audit.error(error, call: call, context: "tool \(base.name)")

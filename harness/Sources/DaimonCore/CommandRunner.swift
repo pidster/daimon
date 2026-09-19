@@ -130,43 +130,36 @@ public struct CommandRunner: Sendable {
         guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
         else { throw Failure.invalidWorkingDirectory(workingDirectory) }
         let sandboxed = options.policy.sandbox.enabled && !Self.isNestedSandbox
-        var decision: [String: JSONValue] = [
-            "command": .string(command), "workingDirectory": .string(workingDirectory),
-            "sandbox": .bool(sandboxed), "network": .bool(options.policy.sandbox.allowNetwork),
-            "nested": .bool(options.policy.sandbox.enabled && Self.isNestedSandbox),
-        ]
+        func decided(_ verdict: AuditEvent.Details.PolicyVerdict, reason: String? = nil) {
+            audit?.record(
+                .policyDecision,
+                details: AuditEvent.Details.policyDecision(
+                    command: command, workingDirectory: workingDirectory, verdict: verdict, reason: reason,
+                    sandbox: sandboxed, network: options.policy.sandbox.allowNetwork,
+                    nested: options.policy.sandbox.enabled && Self.isNestedSandbox))
+        }
         let verdicts = ([command] + CommandSplitter.split(command).map(\.text)).map(options.policy.check)
         if let denial = verdicts.first(where: { if case .denied = $0 { true } else { false } }),
             case .denied(let reason) = denial
         {
-            decision["verdict"] = "denied"
-            decision["reason"] = .string(reason)
-            audit?.record(.policyDecision, details: decision)
+            decided(.denied, reason: reason)
             Diagnostics.policy.info("denied: \(reason): \(command)")
             throw Failure.denied(reason)
         }
         do {
             try await approval?.clear(command: command, workingDirectory: workingDirectory)
         } catch ApprovalGate.Failure.refused(let reason) {
-            decision["verdict"] = "disapproved"
-            decision["reason"] = .string(reason)
-            audit?.record(.policyDecision, details: decision)
+            decided(.disapproved, reason: reason)
             throw Failure.disapproved(reason)
         }
-        decision["verdict"] = "allowed"
-        audit?.record(.policyDecision, details: decision)
+        decided(.allowed)
 
         let started = Date()
         let outcome = try await launch(command, in: workingDirectory, sandboxed: sandboxed)
         audit?.record(
             .commandOutcome,
-            details: [
-                "command": .string(command), "exitStatus": .int(Int(outcome.exitStatus)),
-                "timedOut": .bool(outcome.timedOut),
-                "truncated": .bool(outcome.truncated), "stdout": .string(outcome.stdout),
-                "stderr": .string(outcome.stderr),
-                "seconds": .double(Date().timeIntervalSince(started)),
-            ])
+            details: AuditEvent.Details.commandOutcome(
+                command: command, outcome: outcome, seconds: Date().timeIntervalSince(started)))
         Diagnostics.policy.debug("exit \(outcome.exitStatus) after \(Date().timeIntervalSince(started))s: \(command)")
         return outcome
     }
