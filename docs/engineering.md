@@ -43,7 +43,7 @@ A change is done only when all of the following are true. "Works on my machine" 
    `docs/tools/` and the index; a CLI flag or subcommand updates `docs/daimon.md`; an MCP change updates
    `docs/mcp.md`; an architectural change updates `docs/design.md`; a non-obvious or hard-to-reverse choice
    gets an ADR. If nothing in `docs/` needs to change, say so in the commit message.
-4. **Recorded.** `CLAUDE.md` is updated when the change alters how an agent should work in this repository
+4. **Recorded.** `AGENTS.md` (and `CLAUDE.md` for Claude Code-only points) is updated when the change alters how an agent should work in this repository
    (new command, new rule, moved code).
 
 Documentation is part of the development cycle, not a follow-up task. The pre-commit hook reminds you when a

@@ -112,5 +112,5 @@ How we work, in short:
 - Dogfooding: `.mcp.json` registers this repository's own release build (`swift build -c release`) as an
   MCP server, so Claude Code sessions here can use it.
 
-See [engineering.md](docs/engineering.md) for the full standard and [CLAUDE.md](CLAUDE.md) for the
+See [engineering.md](docs/engineering.md) for the full standard and [AGENTS.md](AGENTS.md) for the
 orientation given to AI agents working in this repository.
