@@ -25,7 +25,7 @@ import Testing
             .init(
                 entryPoint: .respond, instructions: "override", model: .privateCloud, tools: .named(["current_date"]),
                 unsafe: true, autoApprove: true, resume: "chat1"), home: home)
-        #expect(session.instructions == "override")
+        #expect(session.prompting == Prompting(systemPromptExtension: "from file", instructions: "override"))
         #expect(session.config.model == .privateCloud)
         #expect(session.config.runner.policy == .unrestricted)
         #expect(session.toolNames == ["current_date"])
@@ -35,6 +35,7 @@ import Testing
         let start = sink.events.first
         #expect(start?.kind == .sessionStart)
         #expect(start?.details["entryPoint"] == "respond")
+        #expect(start?.details["systemPromptExtension"] == "from file")
         #expect(start?.details["instructions"] == "override")
         #expect(start?.details["model"] == "private-cloud")
         #expect(start?.details["unsafe"] == true)
@@ -48,7 +49,9 @@ import Testing
         let home = try temporaryHome(config: #"{"instructions":"from file"}"#)
         defer { try? FileManager.default.removeItem(at: home.root) }
         let (session, _) = try begin(.init(entryPoint: .chat), home: home)
-        #expect(session.instructions == "from file")
+        #expect(session.prompting == Prompting(systemPromptExtension: "from file", instructions: nil))
+        #expect(session.prompting.rendered.hasPrefix(Prompting.systemPrompt))
+        #expect(session.prompting.rendered.hasSuffix("Guidance for this Mac:\nfrom file"))
         #expect(session.config.model == .system)
         #expect(session.config.runner.policy == .default)
         #expect(session.toolNames == ToolRegistry().all.map(\.name))
@@ -119,7 +122,7 @@ import Testing
             id: "thread-1", approver: DenyingApprover(reason: "x"), instructions: "be brief",
             tools: .named(["read_file"]),
             model: .privateCloud)
-        #expect(conversation.instructions == "be brief")
+        #expect(conversation.prompting.instructions == "be brief")
         #expect(conversation.model == .privateCloud)
         #expect(conversation.tools.map(\.name) == ["read_file"])
         let start = sink.events.last

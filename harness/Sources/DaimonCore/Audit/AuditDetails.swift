@@ -5,13 +5,16 @@ extension AuditEvent {
     /// and `docs/logging.md` has one Swift file to agree with. `fields(for:)` is the documented set;
     /// a test checks every constructor against it.
     public enum Details {
-        /// `session.start` for a session or an MCP thread.
+        /// `session.start` for a session or an MCP thread. daimon's own system prompt is not repeated
+        /// per event: it is fixed per `version`, which every event carries.
         public static func sessionStart(
-            entryPoint: EntryPoint, instructions: String, tools: [String], model: ModelSelection, unsafe: Bool,
+            entryPoint: EntryPoint, prompting: Prompting, tools: [String], model: ModelSelection, unsafe: Bool,
             autoApprove: Bool, resume: String?, parent: String? = nil
         ) -> [String: JSONValue] {
             var details: [String: JSONValue] = [
-                "entryPoint": .string(entryPoint.rawValue), "instructions": .string(instructions),
+                "entryPoint": .string(entryPoint.rawValue),
+                "systemPromptExtension": prompting.systemPromptExtension.map { .string($0) } ?? .null,
+                "instructions": prompting.instructions.map { .string($0) } ?? .null,
                 "tools": .array(tools.map { .string($0) }), "model": .string(model.description),
                 "unsafe": .bool(unsafe), "autoApprove": .bool(autoApprove),
                 "resume": resume.map { .string($0) } ?? .null,
@@ -174,7 +177,10 @@ extension AuditEvent {
     public static func fields(for kind: Kind) -> Set<String> {
         switch kind {
         case .sessionStart:
-            ["entryPoint", "instructions", "tools", "model", "unsafe", "autoApprove", "resume", "parent", "reason"]
+            [
+                "entryPoint", "systemPromptExtension", "instructions", "tools", "model", "unsafe", "autoApprove",
+                "resume", "parent", "reason",
+            ]
         case .sessionEnd: ["reason"]
         case .prompt: ["text"]
         case .response: ["text", "condensed", "seconds"]

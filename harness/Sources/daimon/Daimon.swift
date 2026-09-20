@@ -22,7 +22,7 @@ struct Daimon: AsyncParsableCommand {
 struct SessionOptions: ParsableArguments {
     @Option(
         name: [.short, .customLong("instructions")],
-        help: "Instructions for the model. Defaults to config.json's instructions.")
+        help: "Instructions for this conversation, added under daimon's system prompt and config.json's extension.")
     var instructions: String?
 
     @Option(name: .customLong("tool"), help: "Tool to enable (repeatable). All tools are enabled when omitted.")

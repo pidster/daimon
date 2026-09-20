@@ -5,7 +5,7 @@ set -eu
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
-SWIFT_PATHS="Sources Tests Package.swift"
+SWIFT_PATHS="Sources Tests Plugins Package.swift"
 
 # Rust checks run only once the workspace has at least one crate.
 have_crates() {

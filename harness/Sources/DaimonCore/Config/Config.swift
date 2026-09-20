@@ -5,7 +5,9 @@ import Foundation
 /// Every field is optional in the file; `resolved` fills in defaults. Unknown
 /// keys are ignored so older binaries tolerate newer files.
 public struct Config: Codable, Equatable, Sendable {
-    /// Default instructions for new sessions.
+    /// Text added to daimon's system prompt for every session on this Mac (layer 2 of `Prompting`).
+    public var systemPromptExtension: String?
+    /// The pre-0.2 name of `systemPromptExtension`; read when the new key is absent, never written.
     public var instructions: String?
     /// Which model sessions run on; nil means `system`.
     public var model: ModelSelection?
@@ -78,16 +80,14 @@ public struct Config: Codable, Equatable, Sendable {
         }
     }
 
-    /// Instructions used when the file sets none.
-    public static let defaultInstructions =
-        "You are daimon, a concise assistant. Use the available tools when they help answer accurately."
-
     /// Creates a config; nil fields take defaults at resolution.
     public init(
-        instructions: String? = nil, model: ModelSelection? = nil, commandTimeoutSeconds: Int? = nil,
+        systemPromptExtension: String? = nil, instructions: String? = nil, model: ModelSelection? = nil,
+        commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
         audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil
     ) {
+        self.systemPromptExtension = systemPromptExtension
         self.instructions = instructions
         self.model = model
         self.commandTimeoutSeconds = commandTimeoutSeconds
@@ -122,7 +122,7 @@ public struct Config: Codable, Equatable, Sendable {
     /// The effective values with defaults applied.
     public var resolved: Resolved {
         Resolved(
-            instructions: instructions ?? Self.defaultInstructions,
+            systemPromptExtension: systemPromptExtension ?? instructions,
             model: model ?? .default,
             runner: CommandRunner.Options(
                 timeout: .seconds(commandTimeoutSeconds ?? 60),
@@ -145,8 +145,8 @@ public struct Config: Codable, Equatable, Sendable {
 
     /// Configuration with every default filled in.
     public struct Resolved: Equatable, Sendable {
-        /// Instructions for new sessions.
-        public var instructions: String
+        /// The operator's addition to daimon's system prompt, if any.
+        public var systemPromptExtension: String?
         /// Which model sessions run on.
         public var model: ModelSelection
         /// Limits for `run_command`.

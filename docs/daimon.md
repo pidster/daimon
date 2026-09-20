@@ -11,7 +11,7 @@ One prompt in, one reply out. The prompt is read from stdin when omitted.
 
 | Flag | Meaning |
 | --- | --- |
-| `-i, --instructions <text>` | System instructions for the session. Default: `config.json`, else the built-in default. |
+| `-i, --instructions <text>` | Instructions for this conversation, added under daimon's own system prompt and `config.json`'s `systemPromptExtension`. See [ADR 0017](decisions/0017-three-layer-instructions.md). |
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
@@ -109,7 +109,7 @@ Serves the Model Context Protocol over stdio until the client closes the pipe. S
 
 | Flag | Meaning |
 | --- | --- |
-| `-i, --instructions <text>` | Default instructions for `respond` threads that supply none. |
+| `-i, --instructions <text>` | Conversation instructions for threads whose `respond` call supplies none. |
 | `--tool <name>` (repeatable) | Tools threads get unless a `respond` call names its own. Default: all. |
 | `--unsafe` | Disable the `run_command` policy and sandbox for every call. |
 | `-m, --model <model>` | Default model for new threads; callers may override per thread. |
@@ -132,7 +132,7 @@ State lives in `~/.daimon`, or `$DAIMON_HOME` when set. Any command that writes 
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `instructions` | built-in | Default system instructions for new sessions. |
+| `systemPromptExtension` | none | Text added under daimon's own system prompt for every session and thread on this Mac: house style, standing assumptions. `instructions` is the pre-0.2 name and is read when this key is absent. See [ADR 0017](decisions/0017-three-layer-instructions.md). |
 | `model` | `system` | `system`, `private-cloud`, or `ollama:<name>`. See [ADR 0013](decisions/0013-model-selection.md) and [ADR 0016](decisions/0016-local-runtimes-through-an-executor.md). |
 | `ollama` | `{ "baseURL": "http://127.0.0.1:11434", "timeoutSeconds": 120 }` | Where Ollama serves `ollama:<name>` models and how long one generation request may take. |
 | `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
@@ -146,7 +146,7 @@ Environment: `DAIMON_HOME` relocates the directory; `DAIMON_LOG=debug|info|error
 stderr.
 
 ```json
-{ "instructions": "You are terse.", "commandTimeoutSeconds": 120 }
+{ "systemPromptExtension": "Prefer British spelling.", "commandTimeoutSeconds": 120 }
 ```
 
 A malformed file or an invalid `commandPolicy` pattern is an error; a missing file is fine. Unknown fields are

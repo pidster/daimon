@@ -17,7 +17,9 @@ let package = Package(
     targets: [
         .target(
             name: "DaimonCore",
-            linkerSettings: [.linkedFramework("FoundationModels")]
+            exclude: ["Resources/system-prompt.md"],
+            linkerSettings: [.linkedFramework("FoundationModels")],
+            plugins: ["EmbedSystemPrompt"]
         ),
         .target(
             name: "DaimonMCP",
@@ -46,6 +48,10 @@ let package = Package(
         .testTarget(
             name: "ModelEvalTests",
             dependencies: ["DaimonCore"]
+        ),
+        .plugin(
+            name: "EmbedSystemPrompt",
+            capability: .buildTool()
         ),
     ]
 )

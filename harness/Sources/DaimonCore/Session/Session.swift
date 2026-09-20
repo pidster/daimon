@@ -13,7 +13,7 @@ public struct Session: Sendable {
     public struct Request: Sendable, Equatable {
         /// Which face this is, recorded in the audit log and on standing approvals.
         public var entryPoint: EntryPoint
-        /// Instructions override; nil takes `config.json`'s.
+        /// The conversation's own instructions (layer 3 of `Prompting`); nil means none.
         public var instructions: String?
         /// Model override; nil takes `config.json`'s.
         public var model: ModelSelection?
@@ -131,8 +131,10 @@ public struct Session: Sendable {
 
     /// Which face this session is.
     public var entryPoint: EntryPoint { request.entryPoint }
-    /// The instructions in force.
-    public var instructions: String { config.instructions }
+    /// The layers of what the model is told, for the session's own conversation.
+    public var prompting: Prompting {
+        Prompting(systemPromptExtension: config.systemPromptExtension, instructions: request.instructions)
+    }
 
     /// Reads `config.json` under `home`, mapping every failure to `Failure.malformedConfig`.
     ///
@@ -174,7 +176,6 @@ public struct Session: Sendable {
         var config = try loadConfig(home: home)
         var notes: [String] = []
         if let model = request.model { config.model = model }
-        if let instructions = request.instructions { config.instructions = instructions }
         if request.unsafe {
             config.runner.policy = .unrestricted
             notes.append("warning: --unsafe: run_command policy and sandbox are off")
@@ -191,9 +192,11 @@ public struct Session: Sendable {
         audit.record(
             .sessionStart,
             details: AuditEvent.Details.sessionStart(
-                entryPoint: request.entryPoint, instructions: config.instructions, tools: toolNames,
-                model: config.model,
-                unsafe: request.unsafe, autoApprove: request.autoApprove, resume: request.resume))
+                entryPoint: request.entryPoint,
+                prompting: Prompting(
+                    systemPromptExtension: config.systemPromptExtension, instructions: request.instructions),
+                tools: toolNames, model: config.model, unsafe: request.unsafe, autoApprove: request.autoApprove,
+                resume: request.resume))
         return Session(
             request: request, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
@@ -221,7 +224,7 @@ public struct Session: Sendable {
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public func openAgent(approver: any Approver, transcript: Transcript? = nil) throws -> Agent {
         let conversation = try Conversation.setUp(
-            session: self, audit: audit, approver: approver, instructions: instructions, toolNames: toolNames,
+            session: self, audit: audit, approver: approver, prompting: prompting, toolNames: toolNames,
             model: config.model)
         return try conversation.openAgent(transcript: transcript)
     }
@@ -233,7 +236,7 @@ public struct Session: Sendable {
     /// - Parameters:
     ///   - id: The conversation's id; its audit events carry it as the session.
     ///   - approver: How the face asks a human; replaced by `AutoApprover` when the request said `--yes`.
-    ///   - instructions: Instructions override; nil takes the session's.
+    ///   - instructions: The thread's own instructions (layer 3); nil takes the session's.
     ///   - tools: Tool selection; `.all` takes the session's.
     ///   - model: Model override; nil takes the session's.
     /// - Returns: The conversation, ready to open.
@@ -243,13 +246,15 @@ public struct Session: Sendable {
         model: ModelSelection? = nil
     ) throws -> Conversation {
         let audit = self.audit.log(forSession: id)
+        var prompting = self.prompting
+        if let instructions { prompting.instructions = instructions }
         let conversation = try Conversation.setUp(
-            session: self, audit: audit, approver: approver, instructions: instructions ?? self.instructions,
+            session: self, audit: audit, approver: approver, prompting: prompting,
             toolNames: tools.resolved(or: toolNames), model: model ?? config.model)
         audit.record(
             .sessionStart,
             details: AuditEvent.Details.sessionStart(
-                entryPoint: entryPoint.thread, instructions: conversation.instructions,
+                entryPoint: entryPoint.thread, prompting: conversation.prompting,
                 tools: conversation.tools.map(\.name), model: conversation.model, unsafe: request.unsafe,
                 autoApprove: request.autoApprove, resume: nil, parent: self.audit.session))
         return conversation
@@ -269,8 +274,8 @@ public struct Conversation: Sendable {
     public let tools: [any Tool]
     /// The log the conversation's turns and tool calls are recorded to.
     public let audit: AuditLog
-    /// The instructions the agent starts with.
-    public let instructions: String
+    /// The three layers the agent starts with; `Prompting.rendered` is what the model sees.
+    public let prompting: Prompting
     /// The model the agent runs on.
     public let model: ModelSelection
     /// Where Ollama is, should the model be one of its.
@@ -280,7 +285,7 @@ public struct Conversation: Sendable {
     ///
     /// - Throws: `Session.Failure.unknownTools` for names not in the registry.
     static func setUp(
-        session: Session, audit: AuditLog, approver: any Approver, instructions: String, toolNames: [String],
+        session: Session, audit: AuditLog, approver: any Approver, prompting: Prompting, toolNames: [String],
         model: ModelSelection
     ) throws -> Conversation {
         let gate = ApprovalGate(
@@ -291,7 +296,7 @@ public struct Conversation: Sendable {
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(
-            gate: gate, tools: selection.tools.map { $0 }, audit: audit, instructions: instructions, model: model,
+            gate: gate, tools: selection.tools.map { $0 }, audit: audit, prompting: prompting, model: model,
             ollama: session.config.ollama)
     }
 
@@ -305,6 +310,6 @@ public struct Conversation: Sendable {
         if let transcript {
             return Agent(transcript: transcript, tools: tools, model: resolved, audit: audit)
         }
-        return Agent(instructions: instructions, tools: tools, model: resolved, audit: audit)
+        return Agent(instructions: prompting.rendered, tools: tools, model: resolved, audit: audit)
     }
 }

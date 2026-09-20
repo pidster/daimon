@@ -63,7 +63,9 @@ list of tools the model sees (`current_date`, `run_command`, `read_file`), each 
 `CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus on-device
 model classifier, ask at `moderate` and above through an `Approver` per entry point), then runs `/bin/sh -c`
 under `sandbox-exec` with a generated profile, bounded output and a timeout. `FileReader` pages files.
-`Home`, `Config`, and `TranscriptStore` are `~/.daimon`. `AuditLog` writes JSON Lines; `Diagnostics` wraps
+`Home`, `Config`, and `TranscriptStore` are `~/.daimon`. `Prompting` layers daimon's own system prompt (the
+file `harness/Sources/DaimonCore/Resources/system-prompt.md`, embedded at build time by the
+`EmbedSystemPrompt` plugin), the operator's `systemPromptExtension`, and the caller's instructions (ADR 0017). `AuditLog` writes JSON Lines; `Diagnostics` wraps
 unified logging. `ContextPolicy` recovers from context overflow by dropping old turns. `Session.begin` is
 the single set-up path for every face; `respond` and `chat` open the session's own `Conversation`, and
 `DaimonMCP` opens one per `thread_id` through `Session.conversation` (threads held by

@@ -34,7 +34,8 @@ availability and shapes the API.
 | --- | --- | --- |
 | `DaimonCore` | library | All model-facing logic, grouped by folder: `Session/` (session, conversation, agent, model selection, context policy, tool registry and catalogue), `Exec/` (command runner, policy, splitter, regex cache), `Approval/` (gate, classifiers, store, threshold), `Audit/` (events, details, log, turn clock, diagnostics), `Tools/` (the tools, the file reader, and the audit wrapper), `Config/` (config, home, transcripts), `CLI/` (doctor and chat input, here so they are testable), `Support/` (timeout, ids, names). |
 | `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
-| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `logs`, `doctor`, `mcp`. Session set-up is `Session.begin` in `DaimonCore`. |
+| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `models`, `logs`, `doctor`, `approvals`, `mcp`. Session set-up is `Session.begin` in `DaimonCore`. |
+| `EmbedSystemPrompt` | build-tool plugin | Embeds `Resources/system-prompt.md` into `DaimonCore` as a string constant at build time. |
 | `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic. |
 
 ## Components
@@ -100,7 +101,11 @@ on-device classifier when `approval.useModel` is set and appends to the audit fi
 rules only with a memory sink. Every unit test passes `testing()`, which is how "tests never need the
 model" holds for sessions as well as for gates.
 
-A `Conversation` is one gate plus the tools wired to it, built by one function for every face of daimon.
+A `Conversation` is one gate plus the tools wired to it and the `Prompting` the agent starts with, built by
+one function for every face of daimon. `Prompting` renders three layers into the framework's instructions:
+daimon's own system prompt (the file `Resources/system-prompt.md`, embedded at build time by the
+`EmbedSystemPrompt` plugin), the operator's `systemPromptExtension` from config, and the caller's
+conversation instructions; see [ADR 0017](decisions/0017-three-layer-instructions.md).
 The approver is the one thing that differs between faces, so it is given when a conversation is opened,
 not when the session begins; a `--yes` request replaces it with `AutoApprover` inside the core, so the
 flag means the same everywhere. The three faces are overlays on this core:
@@ -118,7 +123,7 @@ The MCP tests build real sessions over a scratch home and check that two threads
 ### Home, config, transcripts
 
 `Home` resolves `$DAIMON_HOME` or `~/.daimon` and lays out `config.json`, `logs/`, and `transcripts/`.
-`Config` is optional JSON (instructions, `run_command` limits, MCP thread capacity) with defaults applied by
+`Config` is optional JSON (system prompt extension, model, `run_command` limits, MCP thread capacity) with defaults applied by
 `resolved`. `TranscriptStore` saves and loads transcripts as `<name>.json`. Commands that write (audit log,
 transcripts, the doctor's write probe) call `Home.ensure()`; `tools` and `logs` never create the directory.
 

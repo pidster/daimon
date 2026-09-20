@@ -33,7 +33,9 @@ public enum ToolCatalog {
                 ]),
                 "instructions": .object([
                     "type": .string("string"),
-                    "description": .string("Optional system instructions for the session."),
+                    "description": .string(
+                        "Instructions for this thread, added under daimon's own system prompt. Only when a thread "
+                            + "starts."),
                 ]),
                 "tools": .object([
                     "type": .string("array"),

@@ -40,7 +40,7 @@ import Testing
 
     @Test func resolvedAppliesDefaults() {
         let resolved = Config().resolved
-        #expect(resolved.instructions == Config.defaultInstructions)
+        #expect(resolved.systemPromptExtension == nil)
         #expect(resolved.runner == CommandRunner.Options(timeout: .seconds(60), maxOutputBytes: 4096))
         #expect(resolved.maxThreads == 32)
     }
@@ -49,11 +49,14 @@ import Testing
         let file = FileManager.default.temporaryDirectory.appending(path: "daimon-config-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: file) }
         let config = Config(
-            instructions: "be terse", commandTimeoutSeconds: 5, commandMaxOutputBytes: 100, maxThreads: 2)
+            systemPromptExtension: "be terse", commandTimeoutSeconds: 5, commandMaxOutputBytes: 100, maxThreads: 2)
         try config.save(to: file)
         #expect(try Config.load(from: file) == config)
         try Data(#"{"instructions":"x","future":true}"#.utf8).write(to: file)
         #expect(try Config.load(from: file) == Config(instructions: "x"))
+        #expect(try Config.load(from: file).resolved.systemPromptExtension == "x")  // pre-0.2 key
+        try Data(#"{"systemPromptExtension":"y","instructions":"x"}"#.utf8).write(to: file)
+        #expect(try Config.load(from: file).resolved.systemPromptExtension == "y")
         #expect(config.resolved.runner.timeout == .seconds(5))
     }
 }

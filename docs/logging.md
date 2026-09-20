@@ -35,7 +35,7 @@ sensitive; it is why it is user-only.
 
 | Kind | Details | Written by |
 | --- | --- | --- |
-| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`), `instructions`, `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
+| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`), `systemPromptExtension` and `instructions` (the operator's and the caller's layers, null when absent; daimon's own prompt is fixed per `version`), `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
 | `session.end` | `reason`: `closed` (explicit), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
 | `prompt` | `text` | `Agent` |
 | `response` | `text`, `condensed`, `seconds` | `Agent` |
