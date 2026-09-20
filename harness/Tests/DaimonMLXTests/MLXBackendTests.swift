@@ -70,7 +70,9 @@ import Testing
 }
 
 /// Runs real weights. Needs `DAIMON_MLX_TESTS=1`, a build with `--traits MLX`, and `DAIMON_MLX_MODEL`
-/// set to a model directory; never in the gate. See docs/backends.md.
+/// set to a model directory; never in the gate. Known not to work under `swift test` today: MLX looks
+/// for its Metal library beside the main executable, which is Xcode's test runner, and fails with
+/// "Failed to load the default metallib"; verify through the `daimon` binary as docs/backends.md shows.
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["DAIMON_MLX_TESTS"] == "1" && MLXBackend.isCompiledIn))
 struct MLXLiveTests {
     static let directory = ProcessInfo.processInfo.environment["DAIMON_MLX_MODEL"] ?? ""

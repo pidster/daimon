@@ -3,7 +3,6 @@ import Foundation
 import FoundationModels
 
 #if MLX
-    import HuggingFace
     import MLXFoundationModels
     import MLXHuggingFace
     import MLXLLM
@@ -126,7 +125,7 @@ public struct MLXBackend: ModelBackend {
             let name = url.lastPathComponent
             var parts: [String] = []
             if let data = try? Data(contentsOf: url.appending(path: "config.json")),
-                let json = try? JSONDecoder().decode(JSONValue.self, from: data).objectValue
+                let json = try? JSONDecoder().decode(DaimonCore.JSONValue.self, from: data).objectValue
             {
                 if let type = json["model_type"]?.stringValue { parts.append(type) }
                 if let quantization = json["quantization"]?.objectValue, let bits = quantization["bits"]?.intValue {
@@ -142,14 +141,14 @@ public struct MLXBackend: ModelBackend {
     }
 
     /// The models directory, the declared models, and whether the bridge is compiled in.
-    public func settings(in config: Config.Resolved, home: Home) -> JSONValue {
+    public func settings(in config: Config.Resolved, home: Home) -> DaimonCore.JSONValue {
         .object([
             "modelsDirectory": .string(Self.modelsDirectory(config: config, home: home).path),
             "compiledIn": .bool(Self.isCompiledIn),
             "models": .object(
                 Dictionary(
                     uniqueKeysWithValues: config.mlxModels.map { name, capabilities in
-                        (name, JSONValue.object(["capabilities": .array(capabilities.map { .string($0) })]))
+                        (name, DaimonCore.JSONValue.object(["capabilities": .array(capabilities.map { .string($0) })]))
                     })),
         ])
     }

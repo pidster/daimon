@@ -32,9 +32,6 @@ CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/S
 [ "$CURRENT" = "$VERSION" ] || { echo "DaimonVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
 gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated" >&2; exit 1; }
-printf 'kernel void daimon_probe() {}\n' > "$TMPDIR/daimon-metal-probe.metal"
-xcrun metal -c "$TMPDIR/daimon-metal-probe.metal" -o "$TMPDIR/daimon-metal-probe.air" >/dev/null 2>&1 \
-    || { echo "the Metal toolchain is missing; run: xcodebuild -downloadComponent MetalToolchain" >&2; exit 1; }
 NOTES="$(awk -v v="$VERSION" '
     $0 == "## " v { on = 1; next }
     /^## / { on = 0 }
@@ -46,7 +43,7 @@ scripts/check coverage-gate
 scripts/check eval
 
 echo "==> build"
-(cd harness && swift build -c release --traits MLX)
+(cd harness && swift build -c release)
 BIN="harness/.build/release/daimon"
 rm -rf "$OUT"; mkdir -p "$OUT/stage"
 cp "$BIN" "$OUT/stage/daimon"

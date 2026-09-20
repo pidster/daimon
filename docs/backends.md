@@ -114,7 +114,9 @@ several GB.
 MLX or Hugging Face safetensors layout in daimon's own process on the GPU. MLX compiles Metal kernels at
 build time, so the bridge is behind the `MLX` package trait: the ordinary build and the sandboxed
 pre-commit hook never need the Metal toolchain, and a build without the trait refuses every `mlx:` model
-with a message saying so. To build with it:
+with a message saying so. The Homebrew release is built without the trait, because MLX looks for its
+Metal library in a `mlx-swift_Cmlx.bundle` beside the executable at run time and the one-file release
+does not carry it; MLX is a self-build option. To build with it:
 
 ```
 xcodebuild -downloadComponent MetalToolchain     # once; several GB
@@ -141,9 +143,16 @@ Capabilities come from the operator, because the bridge never infers them: decla
 
 Accepted capability names: `toolCalling`, `guidedGeneration`, `reasoning`, `vision`; another spelling is
 refused at resolve. `daimon models` lists the directories with architecture, quantisation, and the
-declaration. The live test (`DAIMON_MLX_TESTS=1 DAIMON_MLX_MODEL=<directory> swift test --traits MLX
---filter MLXLiveTests`) runs a text conversation undeclared, then the tool loop with `toolCalling`
-declared, and reports the outcomes. What has been verified, and with which weights, is in the changelog.
+declaration.
+
+Verified on 2026-09-20 with `mlx-community/Qwen3-1.7B-4bit` (a Hugging Face cache snapshot, 938 MB)
+on an M4 Max, through the CLI built with `--traits MLX`: undeclared, a text-only reply in 2.5 s
+including the weight load; declared `toolCalling`, the `current_date` loop ran 3 of 3 attempts, about
+4 s each, with the right arguments; undeclared with tools requested, refused before generation with the
+hint. The live test (`DAIMON_MLX_TESTS=1 DAIMON_MLX_MODEL=<directory> swift test --traits MLX --filter
+MLXLiveTests`) cannot run under `swift test` today: MLX looks for its Metal library beside the main
+executable, which in the test runner is Xcode's, and fails with "Failed to load the default metallib";
+verify through the binary instead, as above.
 
 Errors: `this build has no MLX support` when the trait is off; `no MLX model at <path> (no config.json);
 models under <dir>: …` when the name points nowhere; `unknown capability '<x>'` for a bad declaration; the

@@ -18,7 +18,12 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.31.4"),
+        // The MLX bridge's tokenizer loader macro expands to code that needs swift-transformers in the
+        // consumer; the same package coreai-models uses.
+        .package(url: "https://github.com/huggingface/swift-transformers.git", from: "1.1.0"),
+        // 3.31.4 does not export MLXFoundationModels as a product; main does. Pinned to a commit.
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift-lm.git", revision: "c6446cf7bfb7cea76408013b614d4b2c530eaa03"),
         // No tagged release yet; pinned to a commit so builds are reproducible (docs/backends.md).
         .package(
             url: "https://github.com/apple/coreai-models.git", revision: "3f109efd54273391f9fd9f5f5b3d8c6e99836d55"),
@@ -41,8 +46,10 @@ let package = Package(
             name: "DaimonMLX",
             dependencies: [
                 "DaimonCore",
+                .product(name: "MLXFoundationModels", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
                 .product(name: "MLXHuggingFace", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
                 .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
+                .product(name: "Tokenizers", package: "swift-transformers", condition: .when(traits: ["MLX"])),
             ]
         ),
         .target(

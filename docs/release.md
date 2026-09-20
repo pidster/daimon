@@ -24,9 +24,10 @@ every local step and prints the remote ones instead of executing them.
 1. Preflight: clean tree on `main`, `DaimonVersion.current` equals `X.Y.Z`, no existing tag, `gh` is
    authenticated, `CHANGELOG.md` has a non-empty `## X.Y.Z` section, `scripts/check` passes (the full
    test run), `scripts/check coverage-gate` passes, and `scripts/check eval` passes.
-2. Build: `swift build -c release --traits MLX` (the release carries the MLX backend, so the build machine
-   needs the Metal toolchain; preflight checks `xcrun metal` works), `strip`, verify `daimon --version`
-   prints `X.Y.Z` and `daimon doctor` passes on the build machine.
+2. Build: `swift build -c release`, `strip`, verify `daimon --version` prints `X.Y.Z` and `daimon doctor`
+   passes on the build machine. The release is built without the `MLX` trait: MLX needs a Metal library
+   bundle beside the binary at run time, which the one-file tarball and formula do not carry
+   (`docs/backends.md`); MLX is a self-build option until that packaging is decided.
 3. Package: tarball with `daimon` and `LICENSE`; SHA-256 file.
 4. Publish: `git tag -a vX.Y.Z`, push the tag, `gh release create` with both assets and generated notes.
 5. Tap: clone or update `pidster/homebrew-tap`, write `Formula/daimon.rb` from the template with the new

@@ -51,8 +51,10 @@ HTTP API, so the Ollama executor's transcript-to-chat mapping is most of a share
 parameterised by base URL, auth, and the request dialect. Embeddings, reranking, and other
 non-conversational models are not `LanguageModel`s and need task-specific interfaces (an `embed` tool, a
 `rerank` tool) rather than a backend; that is a separate design. Also open: estimating context use from
-what a runtime reports so condensing can act before it truncates (Ollama), and verifying the MLX
-tool loop on a quantised model once the Metal toolchain is present.
+what a runtime reports so condensing can act before it truncates (Ollama); shipping MLX in the
+Homebrew release, which means carrying `mlx-swift_Cmlx.bundle` beside the binary (libexec plus a
+symlink, or a bundle-aware formula); and making the MLX live test find the Metal library under the
+test runner.
 
 ## Upstream
 
