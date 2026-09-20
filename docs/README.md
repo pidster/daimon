@@ -20,6 +20,7 @@
 | [backlog.md](backlog.md) | Agreed work not yet started: compound-command policy checks, receipts, structured output, condensing tools, sampling |
 | [engineering.md](engineering.md) | Standards, tooling, the pre-commit gate, and CI |
 | [decisions/](decisions/) | Architecture Decision Records, one per significant decision |
+| [proposals/2026-09-20-escalations.md](proposals/2026-09-20-escalations.md) | For review: two escalation verbs (approval, inquiry) and a choice of channels, including a non-blocking hand-off to the calling agent |
 | [reviews/](reviews/) | Dated code and documentation reviews with their todo lists and status |
 
 Conventions: documentation is updated in the same change as the code it describes (see the definition of done
