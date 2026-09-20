@@ -35,13 +35,17 @@ not the differentiator. Items, in order of leverage:
 ## Models
 
 - Done 2026-09-19: `ollama:<name>` models through a daimon-supplied executor
-  ([ADR 0016](decisions/0016-local-runtimes-through-an-executor.md)), with `daimon models`, the `ollama`
-  config section, and the doctor check. Open: estimate context use from Ollama's reported usage so the
-  condensing policy can act before the runtime silently truncates; other runtimes (MLX, llama.cpp) as
-  further executors when wanted.
-- **Agent tests without the model.** The scripted executor from the spike (`ExecutorSpikeTests`) can
-  drive `Agent`, `ConversationThread`, and `DaimonServer.respond` end to end without Apple's model;
-  extend it to replace `FakeThread` and to cover the chat loop.
+  ([ADR 0016](decisions/0016-local-runtimes-through-an-executor.md)).
+- Done 2026-09-20: a backend registry with declared capabilities, and MLX Swift and Core AI as backends
+  ([ADR 0019](decisions/0019-model-backends.md)); a Core ML approval-risk classifier behind a versioned
+  contract ([ADR 0020](decisions/0020-coreml-risk-classifier.md)).
+- **Context estimation from the runtime.** Ollama reports prompt and completion token counts on every
+  reply; use them to estimate context use so the condensing policy acts before the runtime silently
+  truncates. Repeated in practice: the git thread on the on-device model lost its instructions to hook
+  output. Belongs with `ContextPolicy`, not with a new backend.
+- **Agent tests without the model.** `ScriptedModel` (`Tests/DaimonTestSupport`) already drives `Agent`,
+  the tool loop, and `DaimonServer.respond` over a real client. Left: replace `FakeThread` in the server
+  tests with it and cover the chat loop.
 
 ## Model backends, deferred
 
@@ -50,11 +54,10 @@ Candidates recorded on 2026-09-20 with the MLX and Core AI work, not implemented
 HTTP API, so the Ollama executor's transcript-to-chat mapping is most of a shared HTTP executor for them,
 parameterised by base URL, auth, and the request dialect. Embeddings, reranking, and other
 non-conversational models are not `LanguageModel`s and need task-specific interfaces (an `embed` tool, a
-`rerank` tool) rather than a backend; that is a separate design. Also open: estimating context use from
-what a runtime reports so condensing can act before it truncates (Ollama); shipping MLX in the
-Homebrew release, which means carrying `mlx-swift_Cmlx.bundle` beside the binary (libexec plus a
-symlink, or a bundle-aware formula); and making the MLX live test find the Metal library under the
-test runner.
+`rerank` tool) rather than a backend; that is a separate design. Packaging chores, wanted only when
+someone asks for MLX from the tap: shipping MLX in the Homebrew release, which means carrying
+`mlx-swift_Cmlx.bundle` beside the binary (libexec plus a symlink, or a bundle-aware formula); and making
+the MLX live test find the Metal library under the test runner.
 
 ## Upstream
 
@@ -66,5 +69,9 @@ test runner.
 
 ## Open design
 
-- Approval for clients that do not render elicitation (mobile). Paused; see
-  `docs/decisions/0014-persisted-approvals.md` for what exists.
+- **Escalations.** Approval and inquiry as distinct verbs, delivered over more channels than MCP
+  elicitation (the harness's own question dialog, a terminal, a file, a webhook), so an operator who is
+  another agent, or absent, still gets a bounded, audited answer. Proposal written 2026-09-20 at
+  `proposals/2026-09-20-escalations.md`; awaiting review before an ADR. It subsumes the earlier question of
+  approval for clients that do not render elicitation (mobile), paused since
+  [ADR 0014](decisions/0014-persisted-approvals.md).
