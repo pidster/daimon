@@ -23,6 +23,16 @@ command = "/path/to/daimon"
 args = ["mcp"]
 ```
 
+## Client compatibility
+
+daimon speaks MCP through the official Swift SDK (0.12.1). Where the SDK is stricter than the protocol,
+daimon normalises the message before the SDK sees it, in `CompatibilityTransport`, rather than refuse a
+compliant client. One case so far: an `initialize` whose `capabilities.experimental` has object values,
+which the specification allows and Codex sends (`{"codex/auth-change": {}}`); the SDK declares the field
+as a map of strings and fails the whole request with `-32603`. Each object value is replaced by its
+compact JSON text (`"{}"`), nothing else in the message changes, and daimon never reads the field. Found
+and fixed on 2026-09-20 against 0.1.4; the captured request is a regression test.
+
 ## Discovering the model's tools
 
 daimon's own tools are not MCP tools, so a client learns about them from two resources:

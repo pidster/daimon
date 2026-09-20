@@ -42,6 +42,14 @@ not the differentiator. Items, in order of leverage:
   drive `Agent`, `ConversationThread`, and `DaimonServer.respond` end to end without Apple's model;
   extend it to replace `FakeThread` and to cover the chat loop.
 
+## Upstream
+
+- Report to `modelcontextprotocol/swift-sdk`: `Client.Capabilities.experimental` is `[String: String]?`
+  (`Sources/MCP/Client/Client.swift:128`, still so on main at `a0ae212`) while the specification allows
+  object values; Codex sends `{"codex/auth-change": {}}` and the server fails `initialize` with
+  `-32603`. daimon works around it in `CompatibilityTransport`; drop the workaround when the SDK
+  changes the type.
+
 ## Open design
 
 - Approval for clients that do not render elicitation (mobile). Paused; see

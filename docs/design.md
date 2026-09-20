@@ -160,7 +160,8 @@ than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 
 ### MCP server
 
-`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`). It advertises `respond` and `close_thread` from
+`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`) through `CompatibilityTransport`, which
+normalises messages the SDK cannot decode although the protocol allows them (see `docs/mcp.md`). It advertises `respond` and `close_thread` from
 `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; daimon's own tools
 are reachable only through `respond`, and are described to clients by the `daimon://tools` resources,
 generated from `ToolRegistry.descriptions` (schema from each tool's `GenerationSchema`, limits and example

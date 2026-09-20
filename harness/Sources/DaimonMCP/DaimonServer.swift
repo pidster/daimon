@@ -74,11 +74,13 @@ public struct DaimonServer: Sendable {
         Diagnostics.mcp.info("client disconnected")
     }
 
-    /// Registers the method handlers and starts the server on `transport`; returns once the transport
-    /// is up. Tests call this with an in-memory transport and a real client.
+    /// Registers the method handlers and starts the server on `transport`, wrapped in
+    /// `CompatibilityTransport`; returns once the transport is up. Tests call this with an in-memory
+    /// transport and a real client.
     ///
     /// - Throws: Transport errors from the MCP SDK.
     func serve(transport: any Transport) async throws {
+        let transport = CompatibilityTransport(transport)
         await server.withMethodHandler(ListTools.self) { _ in .init(tools: ToolCatalog.all) }
         await server.withMethodHandler(CallTool.self) { params in try await self.call(params) }
         await server.withMethodHandler(ListResources.self) { _ in
