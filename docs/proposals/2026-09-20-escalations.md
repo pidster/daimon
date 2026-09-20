@@ -1,6 +1,6 @@
 # Proposal: escalations, with two verbs and a choice of channels
 
-Date: 2026-09-20. Status: for review. Becomes ADR 0018 (amending ADR 0011 and 0014) when accepted.
+Date: 2026-09-20. Status: for review. Becomes the next ADR (amending ADR 0011 and 0014) when accepted.
 
 ## Problem
 

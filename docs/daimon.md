@@ -7,7 +7,8 @@
 
 ### `daimon respond [<prompt>]` (default)
 
-One prompt in, one reply out. The prompt is read from stdin when omitted.
+One prompt in, one reply out. The prompt is read from stdin when omitted and stdin is a pipe; on a
+terminal with no prompt, `daimon` prints its help instead of waiting for input.
 
 | Flag | Meaning |
 | --- | --- |
@@ -87,6 +88,12 @@ the Apple models are still listed.
   private-cloud	available
   ollama:qwen3-coder:latest	30.5B 18.6 GB
 ```
+
+### `daimon config`
+
+Prints the effective configuration as JSON: every setting with its default applied, the model, the
+`run_command` policy, and the paths under `~/.daimon`, with whether `config.json` exists. The same view
+the model's [`inspect`](tools/inspect.md) tool and the `daimon://config` resource give.
 
 ### `daimon doctor`
 

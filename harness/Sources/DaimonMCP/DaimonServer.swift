@@ -86,7 +86,10 @@ public struct DaimonServer: Sendable {
         await server.withMethodHandler(ListResources.self) { _ in
             .init(resources: ToolCatalog.resources, nextCursor: nil)
         }
-        await server.withMethodHandler(ReadResource.self) { params in try self.read(params) }
+        await server.withMethodHandler(ListResourceTemplates.self) { _ in
+            .init(templates: ToolCatalog.resourceTemplates, nextCursor: nil)
+        }
+        await server.withMethodHandler(ReadResource.self) { params in try await self.read(params) }
         let client = client
         try await server.start(transport: transport) { info, capabilities in
             let supported = capabilities.elicitation != nil
@@ -136,14 +139,40 @@ public struct DaimonServer: Sendable {
         return result
     }
 
-    /// Serves the tool catalogue resources, generated from the live registry.
-    func read(_ params: ReadResource.Parameters) throws -> ReadResource.Result {
+    /// Serves the resources: the tool catalogue from the live registry, and the introspection views.
+    ///
+    /// - Throws: `MCPError.invalidParams` for an unknown URI; file errors reading the audit log.
+    func read(_ params: ReadResource.Parameters) async throws -> ReadResource.Result {
         let registry = ToolRegistry(runner: config.runner)
+        let views = session.introspection
+        func json(_ value: JSONValue) -> ReadResource.Result {
+            .init(contents: [.text(Introspection.render(value), uri: params.uri, mimeType: "application/json")])
+        }
+        func lines(_ events: [AuditEvent]) throws -> ReadResource.Result {
+            let text = try events.map { String(decoding: try AuditEvent.encoder.encode($0), as: UTF8.self) }
+                .joined(separator: "\n")
+            return .init(contents: [.text(text, uri: params.uri, mimeType: "application/x-ndjson")])
+        }
         switch params.uri {
         case ToolCatalog.toolsResourceURI:
             return .init(contents: [.text(registry.descriptionsJSON, uri: params.uri, mimeType: "application/json")])
         case ToolCatalog.toolsMarkdownResourceURI:
             return .init(contents: [.text(registry.descriptionsMarkdown, uri: params.uri, mimeType: "text/markdown")])
+        case ToolCatalog.configResourceURI:
+            return json(views.configuration)
+        case ToolCatalog.statusResourceURI:
+            var status = views.status()
+            status["threads"] = .array(await threads.ids.map { .string($0) })
+            status["standingApprovals"] = .int(await session.store.all.count)
+            return json(.object(status))
+        case ToolCatalog.approvalsResourceURI:
+            return json(await views.approvals())
+        case ToolCatalog.auditResourceURI:
+            return try lines(try views.audit(AuditQuery(last: 100)))
+        case let uri where uri.hasPrefix(ToolCatalog.auditResourceURI + "/"):
+            let id = String(uri.dropFirst(ToolCatalog.auditResourceURI.count + 1))
+            guard SafeName.isValid(id) else { throw MCPError.invalidParams("session id must be \(SafeName.rule)") }
+            return try lines(try views.audit(AuditQuery(session: id)))
         default:
             throw MCPError.invalidParams("Unknown resource: \(params.uri)")
         }

@@ -51,13 +51,53 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(tools.map(\.name) == ["respond", "close_thread"])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
         let resources = try await pair.client.listResources().resources
-        #expect(resources.map(\.uri) == ["daimon://tools", "daimon://tools.md"])
+        #expect(
+            resources.map(\.uri) == [
+                "daimon://tools", "daimon://tools.md", "daimon://config", "daimon://status", "daimon://approvals",
+                "daimon://audit",
+            ])
         let json = try await pair.client.readResource(uri: "daimon://tools")
         #expect(json.first?.mimeType == "application/json")
         #expect(json.first?.text?.contains("run_command") == true)
         let markdown = try await pair.client.readResource(uri: "daimon://tools.md")
         #expect(markdown.first?.text?.hasPrefix("# daimon tools") == true)
         await #expect(throws: MCPError.self) { _ = try await pair.client.readResource(uri: "daimon://nope") }
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func introspectionResourcesAndTemplateOverTheProtocol() async throws {
+        let pair = try await connected(steps: [.say("one")])
+        _ = try await call(pair.client, "respond", ["prompt": .string("a"), "thread_id": .string("intro")])
+        let config = try await pair.client.readResource(uri: "daimon://config").first?.text ?? ""
+        #expect(config.contains("\"version\" : \"\(DaimonVersion.current)\""))
+        #expect(config.contains("\"threshold\" : \"moderate\""))
+        let status = try await pair.client.readResource(uri: "daimon://status").first?.text ?? ""
+        #expect(status.contains("\"threads\" : [\n    \"intro\"\n  ]"), "\(status)")
+        #expect(status.contains("\"entryPoint\" : \"mcp\""))
+        #expect(try await pair.client.readResource(uri: "daimon://approvals").first?.text == "[\n\n]")
+        let templates = try await pair.client.send(ListResourceTemplates.request(.init())).value.templates
+        #expect(templates.map(\.uriTemplate) == ["daimon://audit/{session}"])
+        // The audit resources read the file, and the test session writes to a memory sink, so they are
+        // empty here; the shape and the id check are what the wire test pins.
+        let thread = try await pair.client.readResource(uri: "daimon://audit/intro")
+        #expect(thread.first?.mimeType == "application/x-ndjson")
+        await #expect(throws: MCPError.self) { _ = try await pair.client.readResource(uri: "daimon://audit/bad id") }
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func theModelCanInspectItsOwnStatus() async throws {
+        let pair = try await connected(steps: [
+            .call(name: "inspect", arguments: #"{"what":"status"}"#), .say("Status: {tool}"),
+        ])
+        let result = try await call(
+            pair.client, "respond", ["prompt": .string("where are you?"), "thread_id": .string("self")])
+        guard case .text(let text, _, _)? = result.content.first else { Issue.record("no text"); return }
+        #expect(text.contains("\"session\" : \"self\""), "\(text)")
+        #expect(text.contains("\"entryPoint\" : \"mcp-thread\"") == false)  // threads record the session's face
+        #expect(text.contains("\"turn\" : 1"))
+        #expect(text.contains("\"inspect\""))
         await pair.client.disconnect()
         await pair.server.stop()
     }

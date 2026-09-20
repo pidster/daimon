@@ -4,6 +4,22 @@ Notable changes per release, written for people who run daimon. The release scri
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `inspect`, a read-only tool the model can call to see daimon's effective config, this conversation's
+  status, the standing approvals, or recent audit events, bounded to 4 KiB.
+- MCP resources `daimon://config`, `daimon://status`, `daimon://approvals`, `daimon://audit`, and the
+  template `daimon://audit/{session}` for one thread's events, so a calling harness can read daimon's
+  state without a model turn.
+- `daimon config` prints the effective configuration as JSON.
+
+Changed:
+
+- `daimon` with no prompt on a terminal prints its help instead of waiting silently for stdin; a piped
+  stdin is still read.
+
 ## 0.1.5
 
 Fixed:

@@ -114,6 +114,8 @@ public struct Session: Sendable {
 
     /// What the entry point asked for.
     public let request: Request
+    /// Where config, logs, and approvals live.
+    public let home: Home
     /// The resolved configuration with overrides applied.
     public let config: Config.Resolved
     /// The session's audit log; `end()` closes it.
@@ -131,6 +133,28 @@ public struct Session: Sendable {
 
     /// Which face this session is.
     public var entryPoint: EntryPoint { request.entryPoint }
+
+    /// Read-only views of this session's config, approvals, and audit log, with the session's own status.
+    public var introspection: Introspection {
+        introspection(for: audit, tools: toolNames, model: config.model)
+    }
+
+    /// Views for one conversation of this session.
+    func introspection(for audit: AuditLog, tools: [String], model: ModelSelection) -> Introspection {
+        let sessionApprovals = sessionApprovals
+        let entryPoint = entryPoint
+        return Introspection(
+            home: home, config: config, store: store,
+            status: {
+                [
+                    "session": .string(audit.session), "entryPoint": .string(entryPoint.rawValue),
+                    "turn": .int(audit.currentTurn), "model": .string(model.description),
+                    "tools": .array(tools.map { .string($0) }),
+                    "sessionApprovals": .int(sessionApprovals.count),
+                    "auditFile": .string(home.auditFile.path), "version": .string(DaimonVersion.current),
+                ]
+            })
+    }
     /// The layers of what the model is told, for the session's own conversation.
     public var prompting: Prompting {
         Prompting(systemPromptExtension: config.systemPromptExtension, instructions: request.instructions)
@@ -198,7 +222,7 @@ public struct Session: Sendable {
                 tools: toolNames, model: config.model, unsafe: request.unsafe, autoApprove: request.autoApprove,
                 resume: request.resume))
         return Session(
-            request: request, config: config, audit: audit,
+            request: request, home: home, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
             sessionApprovals: SessionApprovals(), notes: notes, toolNames: toolNames,
             classifier: dependencies.makeClassifier(config))
@@ -292,7 +316,9 @@ public struct Conversation: Sendable {
             classifier: session.classifier, approver: session.request.autoApprove ? AutoApprover() : approver,
             threshold: session.config.approvalThreshold, audit: audit, store: session.store,
             source: session.entryPoint, sessionApprovals: session.sessionApprovals)
-        let registry = ToolRegistry(runner: session.config.runner, audit: audit, approval: gate)
+        let registry = ToolRegistry(
+            runner: session.config.runner, audit: audit, approval: gate,
+            introspection: session.introspection(for: audit, tools: toolNames, model: model))
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(

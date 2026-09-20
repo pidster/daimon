@@ -8,6 +8,7 @@ result format) and the limits that protect the context window. `daimon tools` pr
 | [current_date](current_date.md) | The date and time; the model has no clock. |
 | [run_command](run_command.md) | Run a shell command with a timeout and bounded output. |
 | [read_file](read_file.md) | Read a text file one page at a time. |
+| [inspect](inspect.md) | daimon's own config, status, approvals, and recent audit events; read-only. |
 
 Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
 registered tool's schema is in the prompt on every turn, so enable only what a task needs.

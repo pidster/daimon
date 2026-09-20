@@ -43,6 +43,23 @@ daimon's own tools are not MCP tools, so a client learns about them from two res
 | `daimon://tools.md` | The same as Markdown, with the prompting rules that work for the on-device model. |
 
 Both are generated from the live registry, so they cannot drift from what the model can actually call.
+
+## Inspecting daimon
+
+Four more resources and one template let a client read daimon's own state without spending a model turn
+([ADR 0018](decisions/0018-introspection.md)). They are read-only and show the same views as the model's
+[`inspect`](tools/inspect.md) tool and `daimon config`.
+
+| URI | Content |
+| --- | --- |
+| `daimon://config` | JSON: every setting with defaults applied, the model, the `run_command` policy, and the paths under `~/.daimon`. |
+| `daimon://status` | JSON: the server session id, entry point, model, tools, live `threads` (most recent first), approvals in force for the session, and the count of standing approvals. |
+| `daimon://approvals` | JSON: the standing approvals with pattern, directory, scope, level, expiry, and source. |
+| `daimon://audit` | JSON Lines: the last 100 audit events across every session, as written to the audit file. |
+| `daimon://audit/{session}` | JSON Lines: every event of one session or thread id (a `respond` `thread_id`), for reconstructing what a delegated task did. Listed as a resource template. |
+
+The audit resources read the audit file, so they are empty when `audit.enabled` is false. Reading them is
+not itself audited (the model's `inspect` calls are, as tool calls).
 `daimon tools --json` and `daimon tools --markdown` print the same text on the command line. The `respond`
 tool description points at `daimon://tools`.
 

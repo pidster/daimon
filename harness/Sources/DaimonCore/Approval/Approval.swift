@@ -111,6 +111,9 @@ public final class SessionApprovals: Sendable {
 
     /// Records `key` as approved for the session.
     func insert(_ key: String) { keys.withLock { _ = $0.insert(key) } }
+
+    /// How many patterns are approved for the session.
+    public var count: Int { keys.withLock { $0.count } }
 }
 
 /// One refusal within a turn, reported to callers so a refusal is detectable without parsing prose.

@@ -121,6 +121,15 @@ Every conversation of a session shares its config, `ApprovalStore`, and `Session
 "this project" answer on one MCP thread is written once and a "this session" answer covers every thread.
 The MCP tests build real sessions over a scratch home and check that two threads share one store.
 
+### `Introspection`
+
+Read-only views of daimon's own state, built once and rendered three ways: the model's `inspect` tool,
+the MCP `daimon://config|status|approvals|audit` resources, and `daimon config` and `daimon logs`. It
+holds the home, the effective config, the approval store, and a status closure the `Conversation`
+supplies (session id, turn, tools, model, session approvals); the MCP server adds live thread ids and
+the standing-approval count to the status resource. Audit reads go through the same file walk `logs`
+uses. See [ADR 0018](decisions/0018-introspection.md).
+
 ### Home, config, transcripts
 
 `Home` resolves `$DAIMON_HOME` or `~/.daimon` and lays out `config.json`, `logs/`, and `transcripts/`.

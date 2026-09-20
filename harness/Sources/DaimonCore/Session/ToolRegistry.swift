@@ -16,9 +16,11 @@ public struct ToolRegistry: Sendable {
     ///   - reader: Page limits for `read_file`.
     ///   - audit: Where tool calls are recorded; nil records nothing.
     ///   - approval: The gate risky tools consult; nil never asks.
+    ///   - introspection: What `inspect` shows; the default sees the default home and config.
     public init(
         runner: CommandRunner.Options = CommandRunner.Options(), reader: FileReader = FileReader(),
-        audit: AuditLog? = nil, approval: ApprovalGate? = nil
+        audit: AuditLog? = nil, approval: ApprovalGate? = nil,
+        introspection: Introspection = Introspection(home: Home.resolve(), config: Config().resolved)
     ) {
         let audit = audit ?? .disabled(session: "unaudited")
         let commandRunner = CommandRunner(options: runner, audit: audit, approval: approval)
@@ -26,6 +28,7 @@ public struct ToolRegistry: Sendable {
             AuditedTool(CurrentDateTool(), audit: audit),
             AuditedTool(RunCommandTool(runner: commandRunner), audit: audit),
             AuditedTool(ReadFileTool(reader: reader, approval: approval), audit: audit),
+            AuditedTool(InspectTool(introspection: introspection), audit: audit),
         ]
     }
 

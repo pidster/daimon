@@ -40,6 +40,18 @@ public enum JSONValue: Codable, Equatable, Sendable, ExpressibleByStringLiteral,
         return nil
     }
 
+    /// The object's members, if this is one.
+    public var objectValue: [String: JSONValue]? {
+        if case .object(let members) = self { return members }
+        return nil
+    }
+
+    /// The array's elements, if this is one.
+    public var arrayValue: [JSONValue]? {
+        if case .array(let elements) = self { return elements }
+        return nil
+    }
+
     /// Decodes from any JSON shape.
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()

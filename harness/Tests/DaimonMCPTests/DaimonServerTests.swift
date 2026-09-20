@@ -79,14 +79,18 @@ func scratchSession(entryPoint: EntryPoint = .mcp, dependencies: Session.Depende
         await #expect(throws: MCPError.self) { try await server.call(.init(name: "nope", arguments: nil)) }
     }
 
-    @Test func servesTheToolCatalogueAsResources() throws {
-        #expect(ToolCatalog.resources.map(\.uri) == ["daimon://tools", "daimon://tools.md"])
-        let json = try server.read(.init(uri: "daimon://tools"))
+    @Test func servesTheToolCatalogueAsResources() async throws {
+        #expect(
+            ToolCatalog.resources.map(\.uri) == [
+                "daimon://tools", "daimon://tools.md", "daimon://config", "daimon://status", "daimon://approvals",
+                "daimon://audit",
+            ])
+        let json = try await server.read(.init(uri: "daimon://tools"))
         #expect(json.contents.first?.text?.contains("\"name\" : \"read_file\"") == true)
         #expect(json.contents.first?.mimeType == "application/json")
-        let markdown = try server.read(.init(uri: "daimon://tools.md"))
+        let markdown = try await server.read(.init(uri: "daimon://tools.md"))
         #expect(markdown.contents.first?.text?.hasPrefix("# daimon tools") == true)
-        #expect(throws: MCPError.self) { try server.read(.init(uri: "daimon://nope")) }
+        await #expect(throws: MCPError.self) { try await server.read(.init(uri: "daimon://nope")) }
     }
 
     @Test func closingUnknownThreadIsAToolError() async throws {

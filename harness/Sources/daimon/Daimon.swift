@@ -12,7 +12,9 @@ struct Daimon: AsyncParsableCommand {
         abstract: "An on-device, tool-using AI microharness over Apple's Foundation Models.",
         version: DaimonVersion.current,
         subcommands: [
-            Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, DoctorCommand.self, Approvals.self,
+            Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
+            DoctorCommand.self,
+            Approvals.self,
         ],
         defaultSubcommand: Respond.self
     )
@@ -51,7 +53,7 @@ struct Respond: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Generate a response to a prompt, calling tools as needed.")
 
-    @Argument(help: "Prompt for the model. Read from stdin when omitted.")
+    @Argument(help: "Prompt for the model. Read from stdin when omitted and stdin is a pipe.")
     var prompt: String?
 
     @OptionGroup var options: SessionOptions
@@ -81,8 +83,10 @@ struct Respond: AsyncParsableCommand {
         }
     }
 
-    /// The whole of stdin, trimmed; a usage error if empty.
+    /// The whole of piped stdin, trimmed; a usage error if empty. When stdin is a terminal there is
+    /// nothing to read and waiting would look like a hang, so the help is shown instead.
     private static func readStdin() throws -> String {
+        guard isatty(FileHandle.standardInput.fileDescriptor) == 0 else { throw CleanExit.helpRequest(Daimon.self) }
         let data = FileHandle.standardInput.readDataToEndOfFile()
         let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw ValidationError("No prompt given and stdin is empty.") }
@@ -303,21 +307,26 @@ struct Logs: ParsableCommand {
             kinds.append(parsed)
         }
         let config = try Daimon.usage { try Session.loadConfig(home: Daimon.home) }
-        var files = Array(
-            FileAuditSink.rotatedFiles(for: Daimon.home.auditFile, keep: config.auditLimits.keepFiles).reversed())
-        files.append(Daimon.home.auditFile)
-        var events: [AuditEvent] = []
-        for file in files where FileManager.default.fileExists(atPath: file.path) {
-            events += AuditQuery.events(in: try Data(contentsOf: file))
-        }
         let query = AuditQuery(session: session, kinds: kinds, tool: tool, last: last)
-        for event in query.filter(events) {
+        for event in try Introspection(home: Daimon.home, config: config).audit(query) {
             if json {
                 print(String(decoding: try AuditEvent.encoder.encode(event), as: UTF8.self))
             } else {
                 print(event.summary)
             }
         }
+    }
+}
+
+/// Prints the effective configuration: every default applied, and where the file is.
+struct ConfigCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "config", abstract: "Print the effective configuration as JSON.",
+        discussion: "Defaults applied; the same view the model's inspect tool and the daimon://config resource give.")
+
+    func run() throws {
+        let config = try Daimon.usage { try Session.loadConfig(home: Daimon.home) }
+        print(Introspection.render(Introspection(home: Daimon.home, config: config).configuration))
     }
 }
 

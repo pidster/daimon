@@ -80,6 +80,16 @@ public enum ToolCatalog {
     public static let toolsResourceURI = "daimon://tools"
     /// URI of the Markdown resource describing the model's tools.
     public static let toolsMarkdownResourceURI = "daimon://tools.md"
+    /// URI of the effective configuration.
+    public static let configResourceURI = "daimon://config"
+    /// URI of the server's status: session, threads, approvals in force.
+    public static let statusResourceURI = "daimon://status"
+    /// URI of the standing approvals.
+    public static let approvalsResourceURI = "daimon://approvals"
+    /// URI of the most recent audit events across every session.
+    public static let auditResourceURI = "daimon://audit"
+    /// Template for one session's or thread's audit events.
+    public static let auditTemplate = "daimon://audit/{session}"
 
     /// The resources daimon advertises.
     public static let resources: [Resource] = [
@@ -92,6 +102,32 @@ public enum ToolCatalog {
         Resource(
             name: "daimon tools (Markdown)", uri: toolsMarkdownResourceURI, title: "How to prompt for daimon's tools",
             description: "The same catalogue as readable Markdown with prompting rules.", mimeType: "text/markdown"),
+        Resource(
+            name: "daimon config", uri: configResourceURI, title: "Effective configuration",
+            description: "Every setting with defaults applied, the model, the policy, and where the files are.",
+            mimeType: "application/json"),
+        Resource(
+            name: "daimon status", uri: statusResourceURI, title: "Server status",
+            description: "The server session, live threads with their turn counts, and approvals in force.",
+            mimeType: "application/json"),
+        Resource(
+            name: "daimon approvals", uri: approvalsResourceURI, title: "Standing command approvals",
+            description: "Project and always approvals with pattern, directory, scope, expiry, and source.",
+            mimeType: "application/json"),
+        Resource(
+            name: "daimon audit", uri: auditResourceURI, title: "Recent audit events",
+            description:
+                "The last 100 audit events across every session, as JSON Lines; the full log is in the audit file.",
+            mimeType: "application/x-ndjson"),
+    ]
+
+    /// Resource templates daimon advertises.
+    public static let resourceTemplates: [Resource.Template] = [
+        Resource.Template(
+            uriTemplate: auditTemplate, name: "daimon audit for one session",
+            title: "Audit events of one session or thread",
+            description: "Every event of the given session or thread id (a respond thread_id), as JSON Lines.",
+            mimeType: "application/x-ndjson")
     ]
 }
 
