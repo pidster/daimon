@@ -101,14 +101,41 @@ only through `respond`. Details: `docs/design.md`.
 ## MCP servers (`.mcp.json`)
 
 **Run every git command through daimon by prompting `mcp__daimon__respond`**, never through Bash:
-status, log, diff, add, commit, push. There is no direct `run_command` MCP tool by decision; the on-device
-model runs the command with its own `run_command` tool, so each one is classified, sandboxed, approved,
-and audited as a turn. Prompt shape that works: `Use run_command with working directory <repo> to run
-exactly: <command> . Report the exit status and output verbatim, nothing else.` Put commit messages in a
-file and commit with `git commit -q -F <path>` so the command stays short. Use a `thread_id` such as
-`git` and pass `tools: ["run_command"]` so the model has nothing else to reach for. Expect an approval
-dialog for commands that change repository state; choose "This session" for repeated shapes.
-The pre-commit hook then runs inside daimon's sandbox, which `scripts/check` detects. If daimon is not
+status, log, diff, add, commit, push. There is no direct `run_command` MCP tool by decision; the model
+behind `respond` runs the command with its own `run_command` tool, so each one is classified, sandboxed,
+approved, and audited as a turn.
+
+Open one thread for git and reuse it. When the thread starts, pass all four of these; they are refused on
+an existing thread:
+
+- `thread_id`: `git` (or `git2`, `git3` if the thread was closed).
+- `tools`: `["run_command"]`, so the model has nothing else to reach for.
+- `model`: `ollama:qwen3-coder`, the local Ollama model. It follows a fixed instruction reliably and its
+  context window is far larger than the on-device model's, so a thread survives many commits with hook
+  output. If Ollama is not running the thread fails to start with a clear error; then use the default
+  `system` model and keep prompts short.
+- `instructions` (the conversation layer; daimon's own system prompt and the config extension stay
+  underneath it):
+
+  ```
+  You run git commands for a coding assistant. Run exactly the command line given between backticks,
+  once, in the working directory given, with the run_command tool. Do not modify the command, add flags,
+  or run anything else. Reply with the exit status and the output verbatim, and nothing else.
+  ```
+
+Prompt shape for each turn, with the command between backticks so a trailing period is never taken as
+part of it:
+
+```
+Use run_command with working directory <repo> to run exactly the command line between the backticks:
+`<command>`
+Report the exit status and output verbatim, nothing else.
+```
+
+Put commit messages in a file and commit with `git commit -q -F <path> 2>&1 | tail -1` so the hook's
+test output does not fill the reply; push with `git push origin main 2>&1 | tail -1`. Expect an approval
+dialog for commands that change repository state; choose "This session" for repeated shapes. The
+pre-commit hook then runs inside daimon's sandbox, which `scripts/check` detects. If daimon is not
 connected, say so and ask the user to run `/mcp` rather than falling back to Bash.
 
 - `daimon`: this repository's own release build, for dogfooding, launched through `scripts/daimon-mcp`.
