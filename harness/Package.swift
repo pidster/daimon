@@ -37,13 +37,18 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
+        .target(
+            name: "DaimonTestSupport",
+            dependencies: ["DaimonCore"],
+            path: "Tests/DaimonTestSupport"
+        ),
         .testTarget(
             name: "DaimonCoreTests",
-            dependencies: ["DaimonCore"]
+            dependencies: ["DaimonCore", "DaimonTestSupport"]
         ),
         .testTarget(
             name: "DaimonMCPTests",
-            dependencies: ["DaimonMCP"]
+            dependencies: ["DaimonMCP", "DaimonTestSupport"]
         ),
         .testTarget(
             name: "ModelEvalTests",

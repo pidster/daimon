@@ -33,6 +33,7 @@ CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/S
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
 gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated" >&2; exit 1; }
 scripts/check all
+scripts/check coverage-gate
 scripts/check eval
 
 echo "==> build"

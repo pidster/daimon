@@ -68,23 +68,35 @@ public struct DaimonServer: Sendable {
     ///
     /// - Throws: Transport errors from the MCP SDK.
     public func run() async throws {
+        Diagnostics.mcp.info("serving on stdio")
+        try await serve(transport: StdioTransport(logger: DiagnosticsLogHandler.logger()))
+        await server.waitUntilCompleted()
+        Diagnostics.mcp.info("client disconnected")
+    }
+
+    /// Registers the method handlers and starts the server on `transport`; returns once the transport
+    /// is up. Tests call this with an in-memory transport and a real client.
+    ///
+    /// - Throws: Transport errors from the MCP SDK.
+    func serve(transport: any Transport) async throws {
         await server.withMethodHandler(ListTools.self) { _ in .init(tools: ToolCatalog.all) }
         await server.withMethodHandler(CallTool.self) { params in try await self.call(params) }
         await server.withMethodHandler(ListResources.self) { _ in
             .init(resources: ToolCatalog.resources, nextCursor: nil)
         }
         await server.withMethodHandler(ReadResource.self) { params in try self.read(params) }
-        Diagnostics.mcp.info("serving on stdio")
         let client = client
-        try await server.start(transport: StdioTransport(logger: DiagnosticsLogHandler.logger())) {
-            info, capabilities in
+        try await server.start(transport: transport) { info, capabilities in
             let supported = capabilities.elicitation != nil
             client.elicitation.withLock { $0 = supported }
             Diagnostics.mcp.info(
                 "client \(info.name) \(info.version); elicitation \(supported ? "supported" : "unsupported")")
         }
-        await server.waitUntilCompleted()
-        Diagnostics.mcp.info("client disconnected")
+    }
+
+    /// Stops the server; tests call this after `serve`.
+    func stop() async {
+        await server.stop()
     }
 
     /// Dispatches one `tools/call`. Argument errors surface as MCP protocol

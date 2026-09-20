@@ -62,8 +62,7 @@ test_() {
     fi
 }
 
-coverage() {
-    echo "==> coverage (swift)"
+coverage_report() {
     (
         cd harness
         swift test $SWIFT_SANDBOX --enable-code-coverage >/dev/null 2>&1 || swift test $SWIFT_SANDBOX --enable-code-coverage
@@ -76,6 +75,41 @@ coverage() {
         xcrun llvm-cov report "$first" $objects -instr-profile "$profile" \
             -ignore-filename-regex='(\.build|Tests|checkouts)/' -show-region-summary=false
     )
+}
+
+coverage() {
+    echo "==> coverage (swift)"
+    coverage_report
+}
+
+# The total line coverage as a number, such as 92.64.
+coverage_total() {
+    coverage_report | awk '/^TOTAL/ { sub("%", "", $7); print $7 }'
+}
+
+BASELINE_FILE="harness/coverage-baseline"
+
+# Refuses when total line coverage is below the recorded baseline; run before every release.
+coverage_gate() {
+    echo "==> coverage gate"
+    total="$(coverage_total)"
+    baseline="$(cat "$BASELINE_FILE" 2>/dev/null || echo 0)"
+    echo "line coverage $total% (baseline $baseline%)"
+    if awk -v t="$total" -v b="$baseline" 'BEGIN { exit !(t + 0 < b + 0) }'; then
+        echo "coverage fell below the baseline; add tests or, with a reason in the commit, lower $BASELINE_FILE" >&2
+        exit 1
+    fi
+    if awk -v t="$total" -v b="$baseline" 'BEGIN { exit !(t + 0 > b + 0) }'; then
+        echo "coverage rose; record it with 'scripts/check coverage-baseline' and commit before releasing" >&2
+        exit 1
+    fi
+}
+
+# Writes the current total line coverage as the baseline the gate compares against.
+coverage_baseline() {
+    total="$(coverage_total)"
+    echo "$total" > "$BASELINE_FILE"
+    echo "baseline set to $total% in $BASELINE_FILE"
 }
 
 eval_() {
@@ -132,9 +166,11 @@ case "${1:-all}" in
     test) test_ ;;
     format) format ;;
     coverage) coverage ;;
+    coverage-gate) coverage_gate ;;
+    coverage-baseline) coverage_baseline ;;
     eval) eval_ ;;
     hygiene) hygiene ;;
     all) hygiene; lint; build; test_ ;;
     install-hooks) install_hooks ;;
-    *) echo "usage: scripts/check [lint|build|test|format|coverage|eval|hygiene|all|install-hooks]" >&2; exit 64 ;;
+    *) echo "usage: scripts/check [lint|build|test|format|coverage|coverage-gate|coverage-baseline|eval|hygiene|all|install-hooks]" >&2; exit 64 ;;
 esac

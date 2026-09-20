@@ -21,7 +21,8 @@ intervene. A signed and notarised `.pkg` is a possible later channel.
 every local step and prints the remote ones instead of executing them.
 
 1. Preflight: clean tree on `main`, `DaimonVersion.current` equals `X.Y.Z`, no existing tag, `gh` is
-   authenticated, `scripts/check` passes, `scripts/check eval` passes.
+   authenticated, `scripts/check` passes (the full test run), `scripts/check coverage-gate` passes, and
+   `scripts/check eval` passes.
 2. Build: `swift build -c release`, `strip`, verify `daimon --version` prints `X.Y.Z` and `daimon doctor`
    passes on the build machine.
 3. Package: tarball with `daimon` and `LICENSE`; SHA-256 file.
@@ -31,6 +32,14 @@ every local step and prints the remote ones instead of executing them.
 6. Verify from a clean shell: `brew update && brew install pidster/tap/daimon && daimon doctor`.
 
 Until a macOS 27 CI runner exists this runs on a developer's Mac with Xcode 27.
+
+## Coverage gate
+
+`harness/coverage-baseline` records the total line coverage of the last release. `scripts/check
+coverage-gate` measures the current figure and refuses a release when it is lower. When it is higher,
+the gate also refuses until `scripts/check coverage-baseline` has recorded the new figure and it is
+committed, so the baseline only ever moves up through a commit that says so. Lowering it is possible
+by editing the file, and the commit must say why.
 
 ## Bumping the version
 

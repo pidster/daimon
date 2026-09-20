@@ -36,7 +36,8 @@ availability and shapes the API.
 | `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
 | `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `models`, `logs`, `doctor`, `approvals`, `mcp`. Session set-up is `Session.begin` in `DaimonCore`. |
 | `EmbedSystemPrompt` | build-tool plugin | Embeds `Resources/system-prompt.md` into `DaimonCore` as a string constant at build time. |
-| `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic. |
+| `DaimonTestSupport` | library, tests only | `ScriptedModel`: a `LanguageModel` that answers from a script, so the agent, tool loop, and MCP server run in tests with no model. |
+| `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic; `DaimonServerWireTests` drives the server through a real MCP client on an in-memory transport. |
 
 ## Components
 
