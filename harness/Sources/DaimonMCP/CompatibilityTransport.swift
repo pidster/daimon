@@ -90,3 +90,19 @@ extension Value {
         }
     }
 }
+
+extension JSONValue {
+    /// The daimon JSON value with the same shape as an MCP value; binary data becomes its base64 text.
+    init(_ value: MCP.Value) {
+        switch value {
+        case .null: self = .null
+        case .bool(let b): self = .bool(b)
+        case .int(let i): self = .int(i)
+        case .double(let d): self = .double(d)
+        case .string(let s): self = .string(s)
+        case .data(mimeType: _, let data): self = .string(data.base64EncodedString())
+        case .array(let a): self = .array(a.map(JSONValue.init))
+        case .object(let o): self = .object(o.mapValues(JSONValue.init))
+        }
+    }
+}

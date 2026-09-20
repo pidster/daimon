@@ -206,6 +206,36 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         await server.stop()
     }
 
+    @Test func aSchemaShapesTheReplyIntoOutputOverTheProtocol() async throws {
+        let pair = try await connected(steps: [.say(#"{"verdict":"pass","count":2}"#), .say("prose")])
+        let schema: Value = .object([
+            "type": .string("object"),
+            "properties": .object([
+                "verdict": .object(["type": .string("string"), "enum": .array([.string("pass"), .string("fail")])]),
+                "count": .object(["type": .string("integer")]),
+            ]),
+            "required": .array([.string("verdict")]),
+        ])
+        let result = try await call(
+            pair.client, "respond", ["prompt": .string("judge"), "thread_id": .string("t5"), "schema": schema])
+        #expect(result.isError == false, "\(result)")
+        let output = result.structuredContent?.objectValue?["output"]?.objectValue
+        #expect(output?["verdict"] == .string("pass"))
+        #expect(output?["count"] == .int(2))
+        guard case .text(let text, _, _)? = result.content.first else { Issue.record("no text"); return }
+        #expect(text.contains("\"verdict\""))
+        #expect(pair.sink.events.first { $0.kind == .prompt && $0.session == "t5" }?.details["schema"] != nil)
+        // The schema is per call: the next turn is prose again, and a bad schema is a tool error.
+        let prose = try await call(pair.client, "respond", ["prompt": .string("again"), "thread_id": .string("t5")])
+        #expect(prose.structuredContent?.objectValue?["output"] == .null)
+        let bad = try await call(
+            pair.client, "respond",
+            ["prompt": .string("x"), "thread_id": .string("t5"), "schema": .object(["type": .string("string")])])
+        #expect(bad.isError == true)
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
     @Test func settingsOnAnExistingThreadAndCloseThreadOverTheProtocol() async throws {
         let pair = try await connected(steps: [.say("one"), .say("two")])
         _ = try await call(pair.client, "respond", ["prompt": .string("a"), "thread_id": .string("t4")])

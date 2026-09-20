@@ -47,8 +47,12 @@ extension AuditEvent {
             reason.map { ["reason": .string($0)] } ?? [:]
         }
 
-        /// `prompt`.
-        public static func prompt(text: String) -> [String: JSONValue] { ["text": .string(text)] }
+        /// `prompt`; `schema` is the caller's JSON Schema when the reply had to be shaped.
+        public static func prompt(text: String, schema: JSONValue? = nil) -> [String: JSONValue] {
+            var details: [String: JSONValue] = ["text": .string(text)]
+            if let schema { details["schema"] = schema }
+            return details
+        }
 
         /// `response`.
         public static func response(text: String, condensed: Bool, seconds: TimeInterval) -> [String: JSONValue] {
@@ -199,7 +203,7 @@ extension AuditEvent {
             ]
         case .sessionEnd: ["reason"]
         case .modelResolved: ["model", "backend", "asset", "capabilities", "capabilitySource", "tools"]
-        case .prompt: ["text"]
+        case .prompt: ["text", "schema"]
         case .response: ["text", "condensed", "seconds"]
         case .toolCall: ["tool", "arguments"]
         case .toolResult: ["tool", "output", "bytes", "seconds"]

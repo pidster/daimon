@@ -77,15 +77,32 @@ struct Respond: AsyncParsableCommand {
     @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking (non-interactive).")
     var yes = false
 
+    @Option(
+        name: .customLong("schema"),
+        help: "Path to a JSON Schema; the reply is JSON of that shape (not streamed).")
+    var schemaPath: String?
+
     mutating func run() async throws {
         let text = try prompt ?? Self.readStdin()
+        let schema = try schemaPath.map { path in
+            do {
+                let data = try Data(contentsOf: URL(fileURLWithPath: path))
+                return try OutputSchema(json: try JSONDecoder().decode(JSONValue.self, from: data))
+            } catch let failure as OutputSchema.Failure {
+                throw ValidationError("\(failure)")
+            } catch {
+                throw ValidationError("cannot read the schema at \(path): \(error.localizedDescription)")
+            }
+        }
         let session = try Daimon.begin(try options.request(entryPoint: .respond, autoApprove: yes))
         defer { session.end() }
         let agent = try session.openAgent(
             approver: DenyingApprover(
                 reason: "approval required; re-run with --yes, use daimon chat to be asked, or lower approval.threshold"
             ))
-        if stream {
+        if let schema {
+            print(try await agent.respond(to: text, schema: schema).text)
+        } else if stream {
             try await agent.stream(text) { delta in
                 print(delta, terminator: "")
                 fflush(stdout)

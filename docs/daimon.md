@@ -19,11 +19,13 @@ terminal with no prompt, `daimon` prints its help instead of waiting for input.
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
 | `-m, --model <model>` | `system` (default, on device), `private-cloud` (alias `pcc`; Apple Private Cloud Compute; data leaves the Mac, noted on stderr), or `<backend>:<name>` for a local runtime (`ollama:qwen3-coder`; `daimon models` lists every backend's models). A request that needs tool calling is refused before generation when the model does not declare it; see [ADR 0019](decisions/0019-model-backends.md). Defaults to `config.json`. |
 | `-y, --yes` | Approve risky commands without asking. Without it, `respond` refuses commands at or above the approval threshold. |
+| `--schema <path>` | A JSON Schema file; the reply is JSON of that shape through guided generation, printed whole (not streamed). The accepted subset and the capability rule are in [mcp.md](mcp.md), "Structured output". |
 
 ```
 daimon "What is the date in Tokyo?"
 echo "Summarise this" | daimon --tool current_date
 daimon --no-stream --instructions "Answer in French" "How are you?"
+daimon --no-tools --schema verdict.json "Which language is this: fn main() {}"
 ```
 
 ### `daimon chat`

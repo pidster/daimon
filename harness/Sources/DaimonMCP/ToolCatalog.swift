@@ -51,6 +51,13 @@ public enum ToolCatalog {
                             + "Compute; data leaves the Mac), or ollama:<name> (a local Ollama model). Only when a "
                             + "thread starts."),
                 ]),
+                "schema": .object([
+                    "type": .string("object"),
+                    "description": .string(
+                        "JSON Schema for this reply: an object with typed properties (string with enum, integer, "
+                            + "number, boolean, array of one type, nested objects; required marks the rest optional). "
+                            + "The reply is JSON of that shape, also in structuredContent.output. Per call."),
+                ]),
             ]),
             "required": .array([.string("prompt")]),
         ]),
@@ -151,6 +158,8 @@ public struct RespondRequest: Equatable, Sendable {
     public var threadID: String?
     /// Model for a new thread; nil means the server default.
     public var model: ModelSelection?
+    /// JSON Schema the reply must take, for this call only; nil means prose.
+    public var schema: JSONValue?
 
     /// Decodes and validates MCP call arguments.
     ///
@@ -187,6 +196,10 @@ public struct RespondRequest: Equatable, Sendable {
             } catch {
                 throw MCPError.invalidParams("\(error)")
             }
+        }
+        if let raw = arguments?["schema"] {
+            guard raw.objectValue != nil else { throw MCPError.invalidParams("'schema' must be a JSON Schema object") }
+            schema = JSONValue(raw)
         }
     }
 }

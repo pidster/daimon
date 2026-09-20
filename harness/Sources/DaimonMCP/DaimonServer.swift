@@ -178,6 +178,14 @@ public struct DaimonServer: Sendable {
         }
     }
 
+    /// The reply's JSON as an MCP value, or the text itself if it does not parse (it always should:
+    /// guided generation produced it).
+    private static func parse(_ text: String) -> Value {
+        guard let data = text.data(using: .utf8), let value = try? JSONDecoder().decode(JSONValue.self, from: data)
+        else { return .string(text) }
+        return Value(value)
+    }
+
     /// A compact JSON rendering of MCP arguments for the audit log.
     private static func render(_ value: [String: Value]) -> String {
         guard let data = try? JSONEncoder().encode(value) else { return "{}" }
@@ -204,8 +212,14 @@ public struct DaimonServer: Sendable {
         if !opened.created, request.instructions != nil || request.tools != .all || request.model != nil {
             return failure("instructions, tools, and model apply only when a thread is created; \(id) already exists")
         }
+        let schema: OutputSchema?
         do {
-            let reply = try await opened.thread.thread.respond(to: request.prompt)
+            schema = try request.schema.map { try OutputSchema(json: $0) }
+        } catch {
+            return failure(String(describing: error))
+        }
+        do {
+            let reply = try await opened.thread.thread.respond(to: request.prompt, schema: schema)
             let refusals = await opened.thread.gate.takeRefusals()
             let receipt = opened.thread.receipts.take(turn: opened.thread.audit.currentTurn)
             return .init(
@@ -216,6 +230,7 @@ public struct DaimonServer: Sendable {
                     "refusals": .array(
                         refusals.map { .object(["command": .string($0.command), "reason": .string($0.reason)]) }),
                     "receipt": Value(receipt.json),
+                    "output": schema == nil ? .null : Self.parse(reply.text),
                 ]),
                 isError: false
             )

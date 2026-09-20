@@ -1,4 +1,5 @@
 import DaimonCore
+import Foundation
 import MCP
 import Testing
 
@@ -26,6 +27,18 @@ import Testing
         #expect(request.prompt == "hi")
         #expect(request.instructions == "be brief")
         #expect(request.tools == .named(["current_date"]))
+        #expect(request.schema == nil)
+        let shaped = try RespondRequest(arguments: [
+            "prompt": .string("hi"), "schema": .object(["type": .string("object"), "properties": .object([:])]),
+        ])
+        #expect(shaped.schema == ["type": "object", "properties": [:]])
+        #expect(throws: MCPError.self) {
+            try RespondRequest(arguments: ["prompt": .string("hi"), "schema": .string("x")])
+        }
+        // The bridge from MCP values covers every shape.
+        let bridged = JSONValue(
+            MCP.Value.array([.null, .bool(true), .int(1), .double(1.5), .data(mimeType: nil, Data([1])), .string("s")]))
+        #expect(bridged == [nil, true, 1, 1.5, "AQ==", "s"])
     }
 
     @Test func respondRequestDefaults() throws {

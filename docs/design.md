@@ -191,7 +191,10 @@ concurrently. Results carry `structuredContent.thread_id`; see
 [ADR 0007](decisions/0007-conversation-threads.md). Each `Conversation` tees its audit log into a
 `ReceiptCollector`, a bounded in-memory sink; after a turn the server folds that turn's events into a
 `Receipt` for `structuredContent.receipt` ([ADR 0021](decisions/0021-receipts.md)), so the result and
-the log never disagree.
+the log never disagree. A call may give a JSON Schema; `OutputSchema` converts the accepted subset to a
+`DynamicGenerationSchema`, `Agent.respond(to:schema:)` runs guided generation after checking the model
+declares it, and the reply's JSON is parsed into `structuredContent.output`
+([ADR 0022](decisions/0022-structured-output.md)).
 
 ```
 MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools

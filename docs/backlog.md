@@ -18,8 +18,8 @@ not the differentiator. Items, in order of leverage:
   calls, commands with exit status, denials, approvals, and errors, folded from the audit events
   ([ADR 0021](decisions/0021-receipts.md)). Open: token usage, once daimon records what a runtime reports
   (see "Context estimation from the runtime").
-- **Structured output.** `respond` accepts a JSON schema and returns validated JSON via guided
-  generation, so results feed straight into the caller's logic.
+- Done 2026-09-20: structured output. `respond` and the CLI (`--schema`) take a JSON Schema and return
+  JSON of that shape through guided generation ([ADR 0022](decisions/0022-structured-output.md)).
 - **Condensing tools.** Purpose-built MCP tools that keep raw content on the device and return small
   results: summarise a file or a diff (chunked map-reduce inside daimon), triage test or build output
   into a structured failure list, answer a question over a set of files, extract fields to a schema.

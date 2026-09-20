@@ -84,12 +84,15 @@ Run a prompt on the on-device model, with daimon's tools available to it, on a c
 | `instructions` | string | no | Instructions for this thread, added under daimon's own system prompt and the server's configured extension; replaces the server's `--instructions` for the thread. Only when a thread starts; an error afterwards. |
 | `tools` | string[] | no | Names of daimon tools to enable. Only when a thread starts. Omitted: all. `[]`: a text-only thread, which a model that declares no tool calling can still run; a thread that needs tools on such a model is refused with a hint before generation. |
 | `model` | string | no | `system` (default), `private-cloud` (alias `pcc`; data leaves the Mac), or `ollama:<name>` (a model the local Ollama serves; `daimon models` lists them). Only when a thread starts. |
+| `schema` | object | no | A JSON Schema for this reply. The reply is JSON of that shape through the framework's guided generation, also parsed into `structuredContent.output`. Per call, on any thread; see "Structured output" below. |
 
 Result content is the reply text. `structuredContent`:
 
 ```json
-{ "thread_id": "…", "created": true, "condensed": false, "text": "…", "refusals": [], "receipt": { … } }
+{ "thread_id": "…", "created": true, "condensed": false, "text": "…", "refusals": [], "receipt": { … }, "output": null }
 ```
+
+`output` is the reply parsed as JSON when the call gave a `schema`, and null otherwise.
 
 `refusals` lists every command the gate refused during the turn, as `{ "command", "reason" }`, so a
 harness can detect a refusal structurally instead of parsing the model's prose. The result is not
@@ -128,6 +131,36 @@ for Apple's models, and daimon does not record what local runtimes report (`docs
 the server's lifetime; the least recently used is evicted beyond `maxThreads` (32), which is audited as a
 `session.end` with reason `evicted`. Naming a new `thread_id` from two concurrent calls creates it once. Calls on one thread run
 in order; different threads run concurrently.
+
+## Structured output
+
+Give `schema` and the reply is JSON of that shape rather than prose: the framework constrains
+generation to the schema ([ADR 0022](decisions/0022-structured-output.md)), so the result parses and
+has the declared properties, and `structuredContent.output` carries it parsed. The model must declare
+guided generation (`system`, `private-cloud`, Ollama models that report `completion`, Core AI bundles
+whose engine supports it); otherwise the call is refused before generation with a hint. The schema is
+per call: the next call on the thread is prose again unless it gives one too.
+
+The accepted subset is what a small model can fill and the framework can constrain:
+
+| Construct | Accepted |
+| --- | --- |
+| root | `type: object` with `properties`; `required` names the properties that must appear, the rest are optional |
+| `string` | plain, or with `enum` of strings |
+| `integer`, `number`, `boolean` | plain |
+| `array` | `items` of one accepted schema; `minItems`, `maxItems` |
+| `object` | nested, same rules; at least one property |
+| `description` | passed to the model on the root and on each property |
+
+`$ref`, `anyOf`/`oneOf`/`allOf`/`not`, `pattern`, `format`, `additionalProperties`, and a `type` list
+are refused by name with the path (`schema at /notes/items/: '$ref' is not supported`) as a tool error.
+The audit `prompt` event carries the schema. Example:
+
+```json
+{ "prompt": "Which language is this: fn main() {}", "tools": [],
+  "schema": { "type": "object", "properties": { "language": { "type": "string", "enum": ["swift", "rust", "other"] },
+              "confidence": { "type": "number" } }, "required": ["language", "confidence"] } }
+```
 
 ## Approval
 

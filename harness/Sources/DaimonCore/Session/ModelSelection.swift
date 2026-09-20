@@ -264,6 +264,24 @@ public struct ResolvedModel: Sendable {
         return names
     }
 
+    /// Refuses a request for schema-shaped output when the model does not declare guided generation.
+    ///
+    /// - Throws: `ModelSelection.Failure.unsupportedCapability` with a hint for the declaring source.
+    public func checkGuidedGeneration() throws {
+        guard !capabilities.contains(.guidedGeneration) else { return }
+        let hint =
+            switch capabilitySource {
+            case .framework: "choose another model"
+            case .runtime:
+                "the runtime reports this model cannot follow a schema; drop the schema or choose another model"
+            case .configuration:
+                "add \"guidedGeneration\" to this model's capabilities in config.json if it really can, or drop the schema"
+            case .undeclared: "declare the model's capabilities in config.json, or drop the schema"
+            }
+        throw ModelSelection.Failure.unsupportedCapability(
+            model: selection.description, capability: "guided generation", declaredBy: capabilitySource, hint: hint)
+    }
+
     /// Refuses a request that needs what the model did not declare, before any generation.
     ///
     /// - Parameter tools: The tools the conversation wants; empty needs nothing.

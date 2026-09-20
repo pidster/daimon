@@ -172,6 +172,21 @@ public final class Agent {
         try await turn(prompt) { try await session.respond(to: prompt).content }
     }
 
+    /// Sends one user turn and returns the reply as JSON shaped by `schema`, through the framework's
+    /// guided generation. The model must declare that capability; the check happens before the turn.
+    ///
+    /// - Parameters:
+    ///   - prompt: The task.
+    ///   - schema: The shape the reply must take.
+    /// - Returns: The reply, whose `text` is the JSON.
+    /// - Throws: `ModelSelection.Failure.unsupportedCapability`, or framework errors.
+    nonisolated(nonsending) public func respond(to prompt: String, schema: OutputSchema) async throws -> Reply {
+        try model.checkGuidedGeneration()
+        return try await turn(prompt, schema: schema.source) {
+            try await session.respond(to: prompt, schema: schema.schema).content.jsonString
+        }
+    }
+
     /// Sends one user turn, calling `onDelta` with each new fragment of the assistant text as it
     /// streams, and returns the reply.
     ///
@@ -200,10 +215,10 @@ public final class Agent {
 
     /// Records the prompt, runs `operation` with overflow recovery, and records the response or error.
     nonisolated(nonsending) private func turn(
-        _ prompt: String, _ operation: () async throws -> String
+        _ prompt: String, schema: JSONValue? = nil, _ operation: () async throws -> String
     ) async throws -> Reply {
         turns.advance()
-        audit?.record(.prompt, details: AuditEvent.Details.prompt(text: prompt))
+        audit?.record(.prompt, details: AuditEvent.Details.prompt(text: prompt, schema: schema))
         let started = Date()
         let before = condensations
         do {

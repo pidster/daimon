@@ -8,7 +8,9 @@ import Testing
 /// A thread that answers without a model.
 struct FakeThread: RespondingThread {
     let reply: String
-    func respond(to prompt: String) async throws -> Agent.Reply { .init(text: reply + prompt, condensed: false) }
+    func respond(to prompt: String, schema: OutputSchema?) async throws -> Agent.Reply {
+        .init(text: schema == nil ? reply + prompt : #"{"echo":"\#(prompt)"}"#, condensed: false)
+    }
 }
 
 /// A session over a scratch home, with a memory audit sink and a denying approver.

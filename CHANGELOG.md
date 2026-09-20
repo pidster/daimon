@@ -8,6 +8,9 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- Structured output: `respond` takes a `schema` (a JSON Schema object in an accepted subset) and
+  returns JSON of that shape, parsed into `structuredContent.output`; the CLI takes `--schema <path>`.
+  A model that does not declare guided generation is refused before generation.
 - `respond` results carry a `receipt`: the turn's tool calls with arguments and result sizes, commands
   with exit status, policy denials, approval decisions, and errors, folded from the thread's audit
   events so a calling harness can verify delegated work without reading the log.
