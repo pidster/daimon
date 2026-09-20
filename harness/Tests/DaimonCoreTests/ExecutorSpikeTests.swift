@@ -50,6 +50,6 @@ import Testing
         #expect(reply.text.hasPrefix("The date is"))
         #expect(reply.condensed, "the scripted overflow should have been recovered by condensing")
         #expect(sink.events.map(\.kind) == [.prompt, .condensation, .response])
-        #expect(try await agent.contextTokens() == nil)
+        #expect(try await agent.contextTokens() == 40)  // the runtime's report, since the model cannot count
     }
 }

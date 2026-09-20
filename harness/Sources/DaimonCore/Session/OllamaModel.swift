@@ -8,9 +8,12 @@ public struct OllamaSettings: Equatable, Sendable {
     public var baseURL: URL
     /// Wall-clock limit for one generation request, including streaming.
     public var timeout: Duration
+    /// The context window asked of the server on every request (`num_ctx`), so daimon knows the limit
+    /// it condenses against instead of guessing the server's default.
+    public var contextLength: Int
 
-    /// The Ollama defaults: the local server on port 11434, two minutes per request.
-    public static let `default` = OllamaSettings(baseURL: defaultBaseURL, timeout: .seconds(120))
+    /// The Ollama defaults: the local server on port 11434, two minutes per request, an 8k window.
+    public static let `default` = OllamaSettings(baseURL: defaultBaseURL, timeout: .seconds(120), contextLength: 8192)
 
     /// Ollama's own listen address, `http://127.0.0.1:11434`.
     public static let defaultBaseURL: URL = {
@@ -22,7 +25,8 @@ public struct OllamaSettings: Equatable, Sendable {
     }()
 
     /// Creates settings.
-    public init(baseURL: URL, timeout: Duration) {
+    public init(baseURL: URL, timeout: Duration, contextLength: Int = 8192) {
+        self.contextLength = contextLength
         self.baseURL = baseURL
         self.timeout = timeout
     }
@@ -92,12 +96,23 @@ public struct OllamaModel: LanguageModel, Sendable {
     public let settings: OllamaSettings
     /// What the server said this model can do (`/api/show` `capabilities`), or nil before `check()`.
     public let reported: [String]?
+    /// The last request's usage, written by the executor; a class so the value survives copies.
+    private let usage = UsageRecord()
 
     /// Creates a model; `resolve` on the selection checks it exists and reads its capabilities first.
     public init(name: String, settings: OllamaSettings = .default, reported: [String]? = nil) {
         self.name = name
         self.settings = settings
         self.reported = reported
+    }
+
+    /// Input tokens of the last request, from `prompt_eval_count`; nil before the first.
+    public var lastInputTokens: Int? { usage.inputTokens.withLock { $0 } }
+
+    /// Holds the last request's input token count behind a mutex.
+    final class UsageRecord: Sendable {
+        /// The count, or nil before any request.
+        let inputTokens = Mutex<Int?>(nil)
     }
 
     /// What Ollama reported for this model: `tools` gives tool calling, `completion` gives JSON-schema
@@ -238,6 +253,13 @@ public struct OllamaModel: LanguageModel, Sendable {
             var tools: [ToolSpec]?
             var stream: Bool
             var format: JSONValue?
+            /// Server options; `num_ctx` is the context window.
+            var options: Options
+
+            /// The options daimon sets.
+            struct Options: Encodable {
+                var num_ctx: Int
+            }
 
             /// A tool definition in Ollama's (OpenAI-style) shape.
             struct ToolSpec: Encodable {
@@ -310,7 +332,9 @@ public struct OllamaModel: LanguageModel, Sendable {
         }
 
         /// The request body for one generation.
-        static func body(for request: LanguageModelExecutorGenerationRequest, model: String) -> ChatRequest {
+        static func body(
+            for request: LanguageModelExecutorGenerationRequest, model: String, contextLength: Int
+        ) -> ChatRequest {
             let tools = request.enabledToolDefinitions.map { definition in
                 ChatRequest.ToolSpec(
                     function: .init(
@@ -320,7 +344,7 @@ public struct OllamaModel: LanguageModel, Sendable {
             }
             return ChatRequest(
                 model: model, messages: messages(from: request.transcript), tools: tools.isEmpty ? nil : tools,
-                stream: true, format: request.schema.map { json($0) })
+                stream: true, format: request.schema.map { json($0) }, options: .init(num_ctx: contextLength))
         }
 
         /// Sends the request and streams chunks back as events.
@@ -334,7 +358,8 @@ public struct OllamaModel: LanguageModel, Sendable {
             http.httpMethod = "POST"
             http.setValue("application/json", forHTTPHeaderField: "Content-Type")
             http.timeoutInterval = TimeInterval(configuration.timeoutSeconds)
-            http.httpBody = try JSONEncoder().encode(Self.body(for: request, model: model.name))
+            http.httpBody = try JSONEncoder().encode(
+                Self.body(for: request, model: model.name, contextLength: model.settings.contextLength))
             let bytes: URLSession.AsyncBytes
             let response: URLResponse
             do {
@@ -376,6 +401,7 @@ public struct OllamaModel: LanguageModel, Sendable {
                 input = chunk.prompt_eval_count ?? input
                 output = chunk.eval_count ?? output
             }
+            model.usage.inputTokens.withLock { $0 = input }
             await channel.send(
                 .response(
                     action: .updateUsage(
@@ -384,6 +410,8 @@ public struct OllamaModel: LanguageModel, Sendable {
         }
     }
 }
+
+extension OllamaModel: UsageReporting {}
 
 /// The built-in backend: Ollama on this Mac.
 public struct OllamaBackend: ModelBackend {
@@ -401,7 +429,7 @@ public struct OllamaBackend: ModelBackend {
             let model = try OllamaModel(name: name, settings: config.ollama).checked()
             return ResolvedModel(
                 selection: .ollama(name), custom: model, capabilitySource: .runtime,
-                asset: "\(config.ollama.baseURL.absoluteString) \(name)")
+                asset: "\(config.ollama.baseURL.absoluteString) \(name)", contextSize: config.ollama.contextLength)
         } catch let failure as OllamaModel.Failure {
             throw ModelSelection.Failure.unavailable(model: "ollama:\(name)", reason: failure.description)
         }
@@ -420,6 +448,7 @@ public struct OllamaBackend: ModelBackend {
         .object([
             "baseURL": .string(config.ollama.baseURL.absoluteString),
             "timeoutSeconds": .int(Int(config.ollama.timeout.components.seconds)),
+            "contextLength": .int(config.ollama.contextLength),
         ])
     }
 }

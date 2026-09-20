@@ -27,7 +27,7 @@ import Testing
         #expect(agent.turns.current == 2)
         #expect(sink.events.map(\.turn) == [1, 1, 2, 2])
         #expect(agent.transcript.turnCount == 2)
-        #expect(try await agent.contextTokens() == nil)
+        #expect(try await agent.contextTokens() == 40)  // the scripted runtime's report
     }
 
     @Test func streamRecoversFromOverflowAndReportsCondensed() async throws {
@@ -80,6 +80,67 @@ import Testing
         #expect(restart?.details["model"] == "system")
         _ = try await agent.respond(to: "b")
         #expect(agent.transcript.turnCount == 1)
+    }
+
+    @Test func condensesAheadOfAKnownWindowFromReportedUsage() async throws {
+        // The scripted model reports 40 input tokens per request. On a 50-token window at the default
+        // 85% budget the second prompt (40 + a little) passes it, so the transcript is condensed first;
+        // keeping zero turns makes the shrink visible.
+        let sink = MemoryAuditSink()
+        let windowed = Agent(
+            instructions: "x", tools: [],
+            model: ResolvedModel(
+                selection: .system, custom: ScriptedModel(steps: [.say("one"), .say("two"), .say("three")]),
+                contextSize: 50),
+            contextPolicy: .condense(keepTurns: 0), audit: AuditLog(session: "a", sink: sink))
+        #expect(windowed.contextSize == 50)
+        #expect(windowed.lastInputTokens == 0)
+        #expect(try await windowed.contextTokens() == nil)
+        #expect(try await windowed.respond(to: "first").text == "one")
+        #expect(windowed.lastInputTokens == 40)
+        #expect(try await windowed.contextTokens() == 40)
+        #expect(windowed.condensations == 0)
+        let reply = try await windowed.respond(to: "second prompt that is long enough to count")
+        #expect(reply.text == "two" && reply.condensed)
+        #expect(windowed.condensations == 1)
+        let event = sink.events.first { $0.kind == .condensation }
+        #expect(event?.details["reason"] == "budget")
+        #expect(event?.details["contextSize"] == 50)
+        #expect(event?.details["turnsBefore"] == 1 && event?.details["turnsAfter"] == 0)
+        // The third prompt finds one turn again and drops it again; only the third turn remains.
+        _ = try await windowed.respond(to: "third prompt, also long enough to pass the budget")
+        #expect(windowed.condensations == 2)
+        #expect(windowed.transcript.turnCount == 1)
+        // Condensing that cannot shrink the transcript is skipped: one turn kept from one turn.
+        let keeping = Agent(
+            instructions: "x", tools: [],
+            model: ResolvedModel(
+                selection: .system, custom: ScriptedModel(steps: [.say("a"), .say("b")]), contextSize: 50),
+            contextPolicy: .condense(keepTurns: 1))
+        _ = try await keeping.respond(to: "p")
+        _ = try await keeping.respond(to: "q")
+        #expect(keeping.condensations == 0 && keeping.transcript.turnCount == 2)
+        // A generous budget, an unknown window, or a fail-fast policy never condenses ahead.
+        let relaxed = Agent(
+            instructions: "x", tools: [],
+            model: ResolvedModel(
+                selection: .system, custom: ScriptedModel(steps: [.say("a"), .say("b")]), contextSize: 50))
+        relaxed.contextBudget = 2
+        _ = try await relaxed.respond(to: "p")
+        _ = try await relaxed.respond(to: "q")
+        #expect(relaxed.condensations == 0)
+        let unknown = Agent(
+            instructions: "x", tools: [],
+            model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("a"), .say("b")])))
+        #expect(unknown.contextSize == nil)
+        _ = try await unknown.respond(to: "p")
+        _ = try await unknown.respond(to: "q")
+        #expect(unknown.condensations == 0)
+        // An overflow teaches the window and is audited with its own reason.
+        let overflowing = agent(steps: [.say("after")], overflowOnce: true, sink: sink)
+        _ = try await overflowing.respond(to: "p")
+        #expect(overflowing.contextSize == 10)
+        #expect(sink.events.last { $0.kind == .condensation }?.details["reason"] == "overflow")
     }
 
     @Test func resumesATranscriptOnAResolvedModel() async throws {

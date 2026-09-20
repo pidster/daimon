@@ -1,3 +1,4 @@
+import DaimonCore
 import Foundation
 import FoundationModels
 import Synchronization
@@ -27,6 +28,8 @@ public struct ScriptedModel: LanguageModel {
         public let overflowOnce: Mutex<Bool>
         /// Text streamed before the scripted overflow, so a retry starts from a non-prefix.
         public let partialBeforeOverflow: String
+        /// Input tokens the last request reported; the model plays a runtime that reports usage.
+        public let lastInputTokens = Mutex<Int?>(nil)
 
         init(steps: [Step], overflowOnce: Bool, partialBeforeOverflow: String) {
             self.steps = Mutex(steps)
@@ -88,6 +91,7 @@ public struct ScriptedModel: LanguageModel {
                     let fragment = index == 0 ? String(word) : " " + word
                     await channel.send(.response(action: .appendText(fragment, tokenCount: 1)))
                 }
+                script.lastInputTokens.withLock { $0 = 40 }
                 await channel.send(
                     .response(
                         action: .updateUsage(
@@ -117,4 +121,9 @@ public struct ScriptedModel: LanguageModel {
     }
     /// Nothing to configure.
     public var executorConfiguration: Int { 0 }
+}
+
+extension ScriptedModel: UsageReporting {
+    /// 40 after any request that produced text; nil before.
+    public var lastInputTokens: Int? { script.lastInputTokens.withLock { $0 } }
 }

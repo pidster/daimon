@@ -34,9 +34,12 @@ import Testing
     @Test func configCarriesOllamaSettings() throws {
         #expect(Config().resolved.ollama == .default)
         #expect(OllamaSettings.default.baseURL.absoluteString == "http://127.0.0.1:11434")
-        let custom = Config(ollama: .init(baseURL: "http://gpu.local:11434", timeoutSeconds: 30)).resolved.ollama
+        let custom = Config(ollama: .init(baseURL: "http://gpu.local:11434", timeoutSeconds: 30, contextLength: 4096))
+            .resolved.ollama
         #expect(custom.baseURL.host() == "gpu.local")
         #expect(custom.timeout == .seconds(30))
+        #expect(custom.contextLength == 4096)
+        #expect(OllamaSettings.default.contextLength == 8192)
     }
 
     @Test func transcriptMapsOntoChatMessages() async throws {
@@ -59,8 +62,9 @@ import Testing
         let request = LanguageModelExecutorGenerationRequest(
             id: UUID(), transcript: Transcript(), enabledTools: [definition], schema: nil,
             generationOptions: .init(), contextOptions: .init(), metadata: [:])
-        let body = OllamaModel.Executor.body(for: request, model: "m")
+        let body = OllamaModel.Executor.body(for: request, model: "m", contextLength: 2048)
         #expect(body.model == "m")
+        #expect(body.options.num_ctx == 2048)
         #expect(body.stream)
         #expect(body.tools?.count == 1)
         #expect(body.tools?.first?.function.name == "current_date")
@@ -69,6 +73,7 @@ import Testing
         #expect(body.format == nil)
         let encoded = String(decoding: try JSONEncoder().encode(body), as: UTF8.self)
         #expect(encoded.contains(#""type":"function""#))
+        #expect(encoded.contains(#""options":{"num_ctx":2048}"#))
     }
 
     @Test func chunksDecode() throws {

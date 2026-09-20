@@ -121,13 +121,13 @@ extension AuditEvent {
 
         /// `context.condensation`.
         public static func condensation(
-            turnsBefore: Int, turnsAfter: Int, contextSize: Int, tokenCount: Int
+            turnsBefore: Int, turnsAfter: Int, contextSize: Int, tokenCount: Int, reason: String
         )
             -> [String: JSONValue]
         {
             [
                 "turnsBefore": .int(turnsBefore), "turnsAfter": .int(turnsAfter), "contextSize": .int(contextSize),
-                "tokenCount": .int(tokenCount),
+                "tokenCount": .int(tokenCount), "reason": .string(reason),
             ]
         }
 
@@ -220,7 +220,7 @@ extension AuditEvent {
         case .policyDecision: ["command", "workingDirectory", "verdict", "reason", "sandbox", "network", "nested"]
         case .commandOutcome: ["command", "exitStatus", "timedOut", "truncated", "stdout", "stderr", "seconds"]
         case .fileWrite: ["path", "mode", "created", "bytesBefore", "bytesAfter"]
-        case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount"]
+        case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount", "reason"]
         case .mcpRequest: ["tool", "arguments"]
         case .mcpResult: ["tool", "isError", "text", "seconds"]
         case .error: ["message", "context"]

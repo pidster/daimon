@@ -72,11 +72,14 @@ public struct Config: Codable, Equatable, Sendable {
         public var baseURL: String?
         /// Seconds allowed for one generation request; default 120.
         public var timeoutSeconds: Int?
+        /// Context window asked of the server (`num_ctx`) and condensed against; default 8192.
+        public var contextLength: Int?
 
         /// Creates settings; nil fields take defaults.
-        public init(baseURL: String? = nil, timeoutSeconds: Int? = nil) {
+        public init(baseURL: String? = nil, timeoutSeconds: Int? = nil, contextLength: Int? = nil) {
             self.baseURL = baseURL
             self.timeoutSeconds = timeoutSeconds
+            self.contextLength = contextLength
         }
     }
 
@@ -193,7 +196,8 @@ public struct Config: Codable, Equatable, Sendable {
             approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600),
             ollama: OllamaSettings(
                 baseURL: ollama?.baseURL.flatMap(URL.init(string:)) ?? OllamaSettings.default.baseURL,
-                timeout: .seconds(ollama?.timeoutSeconds ?? 120)),
+                timeout: .seconds(ollama?.timeoutSeconds ?? 120),
+                contextLength: ollama?.contextLength ?? OllamaSettings.default.contextLength),
             coreaiModelsDirectory: coreai?.modelsDirectory,
             mlxModelsDirectory: mlx?.modelsDirectory,
             mlxModels: (mlx?.models ?? [:]).mapValues { $0.capabilities ?? [] }

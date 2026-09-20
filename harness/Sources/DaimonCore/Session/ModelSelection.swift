@@ -185,9 +185,13 @@ public struct ResolvedModel: Sendable {
     public let capabilitySource: CapabilitySource
     /// The asset behind a local model (a path, a runtime's model id), for the audit; nil for Apple's.
     public let asset: String?
+    /// The context window in tokens when the model or its settings state it; nil when only an
+    /// overflow error will tell. `Agent` condenses ahead of it from the usage each turn reports.
+    public let contextSize: Int?
     private let makeFromInstructions: @Sendable ([any Tool], String) -> LanguageModelSession
     private let makeFromTranscript: @Sendable ([any Tool], Transcript) -> LanguageModelSession
     private let countTokens: (@Sendable (Transcript) async throws -> Int)?
+    private let reportedInput: (@Sendable () -> Int?)?
 
     /// Wraps the on-device model.
     init(selection: ModelSelection, system model: SystemLanguageModel) {
@@ -195,6 +199,7 @@ public struct ResolvedModel: Sendable {
         capabilities = model.capabilities
         capabilitySource = .framework
         asset = nil
+        contextSize = model.contextSize
         makeFromInstructions = { tools, instructions in
             LanguageModelSession(model: model, tools: tools, instructions: instructions)
         }
@@ -202,6 +207,7 @@ public struct ResolvedModel: Sendable {
             LanguageModelSession(model: model, tools: tools, transcript: transcript)
         }
         countTokens = { transcript in try await model.tokenCount(for: transcript) }
+        reportedInput = nil
     }
 
     /// Wraps Private Cloud Compute, which offers no token counting.
@@ -210,6 +216,7 @@ public struct ResolvedModel: Sendable {
         capabilities = model.capabilities
         capabilitySource = .framework
         asset = nil
+        contextSize = nil  // an async property on this model; learned from the first overflow
         makeFromInstructions = { tools, instructions in
             LanguageModelSession(model: model, tools: tools, instructions: instructions)
         }
@@ -217,6 +224,7 @@ public struct ResolvedModel: Sendable {
             LanguageModelSession(model: model, tools: tools, transcript: transcript)
         }
         countTokens = nil
+        reportedInput = nil
     }
 
     /// Wraps any `LanguageModel`, such as one backed by a daimon-supplied executor over a local runtime.
@@ -227,14 +235,16 @@ public struct ResolvedModel: Sendable {
     ///   - model: The model; its executor does the generation. Its `capabilities` are what it declares.
     ///   - capabilitySource: Who declared them; `.runtime` by default.
     ///   - asset: The asset behind it, for the audit.
+    ///   - contextSize: The window the runtime was asked for, when known.
     public init(
         selection: ModelSelection, custom model: some LanguageModel, capabilitySource: CapabilitySource = .runtime,
-        asset: String? = nil
+        asset: String? = nil, contextSize: Int? = nil
     ) {
         self.selection = selection
         capabilities = model.capabilities
         self.capabilitySource = capabilitySource
         self.asset = asset
+        self.contextSize = contextSize
         makeFromInstructions = { tools, instructions in
             LanguageModelSession(model: model, tools: tools, instructions: instructions)
         }
@@ -242,6 +252,11 @@ public struct ResolvedModel: Sendable {
             LanguageModelSession(model: model, tools: tools, transcript: transcript)
         }
         countTokens = nil
+        if let reporting = model as? any UsageReporting {
+            reportedInput = { reporting.lastInputTokens }
+        } else {
+            reportedInput = nil
+        }
     }
 
     /// A new session with instructions.
@@ -304,6 +319,10 @@ public struct ResolvedModel: Sendable {
         throw ModelSelection.Failure.unsupportedCapability(
             model: selection.description, capability: "tool calling", declaredBy: capabilitySource, hint: hint)
     }
+
+    /// Input tokens of the last request as the runtime reported them, for models whose executor keeps
+    /// the figure (`UsageReporting`); nil otherwise or before the first request.
+    public func reportedInputTokens() -> Int? { reportedInput?() ?? nil }
 
     /// Tokens a transcript occupies, or nil when this model cannot count.
     ///

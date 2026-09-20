@@ -41,10 +41,9 @@ not the differentiator. Items, in order of leverage:
 - Done 2026-09-20: a backend registry with declared capabilities, and MLX Swift and Core AI as backends
   ([ADR 0019](decisions/0019-model-backends.md)); a Core ML approval-risk classifier behind a versioned
   contract ([ADR 0020](decisions/0020-coreml-risk-classifier.md)).
-- **Context estimation from the runtime.** Ollama reports prompt and completion token counts on every
-  reply; use them to estimate context use so the condensing policy acts before the runtime silently
-  truncates. Repeated in practice: the git thread on the on-device model lost its instructions to hook
-  output. Belongs with `ContextPolicy`, not with a new backend.
+- Done 2026-09-20: context estimation from the runtime. `Agent` condenses ahead of a known window from
+  the usage every reply reports; Ollama is asked for an explicit `contextLength`
+  ([ADR 0025](decisions/0025-context-estimation.md)).
 - Done 2026-09-20: agent tests without the model. `ScriptedModel` drives `Agent`, the tool loop,
   `DaimonServer` over a real client and in its unit tests (the fake thread is gone), and the whole
   `daimon chat` loop, which moved into `DaimonCore` as `ChatLoop` with injected input and output.

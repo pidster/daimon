@@ -19,8 +19,16 @@ public final class Agent {
 
     /// What happens when a prompt no longer fits the context window.
     public let contextPolicy: ContextPolicy
-    /// How many times the transcript has been condensed to recover from overflow.
+    /// How many times the transcript has been condensed, to recover from overflow or ahead of it.
     public private(set) var condensations = 0
+    /// The fraction of the context window a turn may start at before the transcript is condensed
+    /// first. Runtimes such as Ollama truncate silently instead of failing, so the estimate is the
+    /// only warning; the framework's models fail loudly and this merely saves the failed call.
+    public var contextBudget = 0.85
+    /// The window as the model stated it, or as the last overflow error reported it; nil until known.
+    public private(set) var contextSize: Int?
+    /// Bytes of prompt per token assumed when estimating a new prompt's cost.
+    static let bytesPerToken = 4
     /// Where turns, responses, condensations, and errors are recorded.
     public let audit: AuditLog?
     /// The conversation's turn counter, advanced once per prompt; the approval gate reads it.
@@ -66,6 +74,7 @@ public final class Agent {
         self.contextPolicy = contextPolicy
         self.audit = audit
         self.turns = turns ?? audit?.turns ?? TurnClock()
+        contextSize = model.contextSize
         session = model.session(tools: tools, instructions: instructions)
     }
 
@@ -87,6 +96,7 @@ public final class Agent {
         self.contextPolicy = contextPolicy
         self.audit = audit
         self.turns = turns ?? audit?.turns ?? TurnClock()
+        contextSize = model.contextSize
         session = model.session(tools: tools, transcript: transcript)
     }
 
@@ -109,17 +119,46 @@ public final class Agent {
         self.contextPolicy = contextPolicy
         self.audit = audit
         self.turns = turns ?? audit?.turns ?? TurnClock()
+        contextSize = self.model.contextSize
         session = self.model.session(tools: tools, transcript: transcript)
     }
 
     /// The conversation so far, suitable for saving and resuming.
     public var transcript: Transcript { session.transcript }
 
-    /// Tokens the current transcript occupies, as counted by the model, or nil if it cannot count.
+    /// Tokens the last request occupied, as the runtime reported them (`UsageReporting`); 0 for a
+    /// model that does not report or before the first request. `LanguageModelSession.usage` cannot
+    /// serve: it accumulates across requests.
+    public var lastInputTokens: Int { model.reportedInputTokens() ?? 0 }
+
+    /// Tokens the current transcript occupies: counted by the model when it can, else the runtime's
+    /// report for the last request, else nil.
     ///
     /// - Throws: Framework errors if counting fails.
     nonisolated(nonsending) public func contextTokens() async throws -> Int? {
-        try await model.tokenCount(for: session.transcript)
+        if let counted = try await model.tokenCount(for: session.transcript) { return counted }
+        return lastInputTokens > 0 ? lastInputTokens : nil
+    }
+
+    /// Condenses before a prompt when the last request's reported usage plus a rough cost for the new
+    /// prompt would pass the budget of a known window, so a runtime that truncates silently never
+    /// gets the chance. Returns whether it did.
+    private func condenseAheadIfNeeded(for prompt: String) -> Bool {
+        guard case .condense(let keepTurns) = contextPolicy, let contextSize, lastInputTokens > 0 else { return false }
+        let estimate = lastInputTokens + prompt.utf8.count / Self.bytesPerToken
+        guard Double(estimate) >= Double(contextSize) * contextBudget else { return false }
+        let before = session.transcript
+        let condensed = before.condensed(keepTurns: keepTurns)
+        guard condensed.turnCount < before.turnCount else { return false }
+        session = model.session(tools: tools, transcript: condensed)
+        condensations += 1
+        audit?.record(
+            .condensation,
+            details: AuditEvent.Details.condensation(
+                turnsBefore: before.turnCount, turnsAfter: condensed.turnCount, contextSize: contextSize,
+                tokenCount: estimate, reason: "budget"))
+        Diagnostics.agent.info("condensed ahead of the window: \(estimate) of \(contextSize) tokens")
+        return true
     }
 
     /// Starts a fresh session with the same instructions and tools, discarding the conversation,
@@ -137,6 +176,7 @@ public final class Agent {
         do {
             return try await operation()
         } catch LanguageModelError.contextSizeExceeded(let details) {
+            contextSize = details.contextSize
             guard case .condense(let keepTurns) = contextPolicy else {
                 throw LanguageModelError.contextSizeExceeded(details)
             }
@@ -147,7 +187,7 @@ public final class Agent {
                 .condensation,
                 details: AuditEvent.Details.condensation(
                     turnsBefore: before.turnCount, turnsAfter: condensed.turnCount, contextSize: details.contextSize,
-                    tokenCount: details.tokenCount))
+                    tokenCount: details.tokenCount, reason: "overflow"))
             Diagnostics.agent.info("condensed \(before.turnCount) -> \(condensed.turnCount) turns")
             return try await operation()
         }
@@ -221,6 +261,7 @@ public final class Agent {
         audit?.record(.prompt, details: AuditEvent.Details.prompt(text: prompt, schema: schema))
         let started = Date()
         let before = condensations
+        _ = condenseAheadIfNeeded(for: prompt)
         do {
             let text = try await withOverflowRecovery(operation)
             let reply = Reply(text: text, condensed: condensations > before)

@@ -206,7 +206,10 @@ import Testing
                     nested: false)
             ),
             (.commandOutcome, D.commandOutcome(command: "c", outcome: outcome, seconds: 1)),
-            (.condensation, D.condensation(turnsBefore: 5, turnsAfter: 4, contextSize: 4096, tokenCount: 5000)),
+            (
+                .condensation,
+                D.condensation(turnsBefore: 5, turnsAfter: 4, contextSize: 4096, tokenCount: 5000, reason: "overflow")
+            ),
             (.mcpRequest, D.mcpRequest(tool: "respond", arguments: "{}")),
             (.mcpResult, D.mcpResult(tool: "respond", isError: false, text: "t", seconds: 1)),
             (.error, D.error(message: "m", context: "c")),

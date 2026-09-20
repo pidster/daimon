@@ -64,12 +64,16 @@ call tools badly, and only an evaluation says how well.
 Install and run [Ollama](https://ollama.com); `ollama pull <name>` fetches a model. `config.json`:
 
 ```json
-{ "model": "ollama:qwen3-coder", "ollama": { "baseURL": "http://127.0.0.1:11434", "timeoutSeconds": 120 } }
+{ "model": "ollama:qwen3-coder", "ollama": { "baseURL": "http://127.0.0.1:11434", "timeoutSeconds": 120, "contextLength": 8192 } }
 ```
 
 Errors: `no Ollama server at <url>` when nothing listens; `Ollama has no model '<name>'; installed: …`
-when the name is unknown (the `:latest` tag may be omitted). Ollama does not signal context overflow;
-it truncates silently, so daimon's condensing policy cannot trigger on it.
+when the name is unknown (the `:latest` tag may be omitted). Ollama does not signal context overflow; it silently drops the front of the prompt once it passes the
+server's window. daimon therefore asks for an explicit window on every request (`contextLength`, sent as
+`num_ctx`; larger windows cost memory) and reads the token usage every reply reports, and `Agent`
+condenses the transcript ahead of the window when the last request plus the new prompt would pass 85%
+of it (`docs/context-management.md`). `/tokens` in `daimon chat` shows that reported usage for these
+models.
 
 ## Core AI
 

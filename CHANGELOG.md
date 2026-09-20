@@ -4,6 +4,16 @@ Notable changes per release, written for people who run daimon. The release scri
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Changed:
+
+- Local runtimes that truncate silently no longer lose the instructions: `Agent` condenses the transcript
+  ahead of the window when the usage the last reply reported, plus the new prompt, would pass 85% of it,
+  audited as `context.condensation` with reason `budget`. Ollama is asked for an explicit window on every
+  request (`ollama.contextLength`, default 8192, sent as `num_ctx`), and `/tokens` shows the reported
+  usage for models that cannot count.
+
 ## 0.3.0
 
 Added:
