@@ -85,10 +85,13 @@ from its `/api/tags`, with parameter count and size). The configured default is 
 backend that does not answer gets one line saying so; the others are still listed.
 
 ```
-* system	available
-  private-cloud	available
+* system	available; toolCalling, guidedGeneration, vision
+  private-cloud	unavailable: model 'private-cloud' is unavailable: this binary lacks the com.apple.developer.private-cloud-compute entitlement, …
   ollama:qwen3-coder:latest	30.5B 18.6 GB
 ```
+
+`private-cloud` is refused from every unsigned build; see [backends.md](backends.md), "Private Cloud
+Compute".
 
 ### `daimon config`
 

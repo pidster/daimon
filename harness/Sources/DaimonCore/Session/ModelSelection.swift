@@ -121,6 +121,11 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
         }
     }
 
+    /// Why an unentitled binary cannot use Private Cloud Compute.
+    public static let missingPrivateCloudEntitlement =
+        "this binary lacks the \(Entitlements.privateCloudCompute) entitlement, which Apple grants to App Store apps "
+        + "on request and which an ad-hoc signed command-line tool cannot carry; use system or a local backend"
+
     /// A sentence for a Private Cloud Compute unavailability reason.
     public static func explain(_ reason: PrivateCloudComputeLanguageModel.Availability.UnavailableReason) -> String {
         switch reason {
@@ -135,10 +140,12 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
     /// - Parameters:
     ///   - config: The effective configuration; local backends read their settings from it.
     ///   - home: daimon's home, for backends that keep assets under it.
+    ///   - entitlements: This process's entitlements; Private Cloud Compute needs one.
     /// - Returns: A session maker over the checked model.
     /// - Throws: `Failure.unavailable`, `Failure.unknownBackend`.
     public func resolve(
-        config: Config.Resolved = Config().resolved, home: Home = Home.resolve()
+        config: Config.Resolved = Config().resolved, home: Home = Home.resolve(),
+        entitlements: Entitlements = .process
     ) throws -> ResolvedModel {
         switch self {
         case .local(let scheme, let name):
@@ -153,6 +160,11 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
             }
             return ResolvedModel(selection: self, system: model)
         case .privateCloud:
+            // The framework's availability check does not cover the entitlement; a request without it
+            // fails inside ModelManagerServices with an opaque error (probed 2026-09-20, docs/backends.md).
+            guard entitlements.has(Entitlements.privateCloudCompute) else {
+                throw Failure.unavailable(model: description, reason: Self.missingPrivateCloudEntitlement)
+            }
             let model = PrivateCloudComputeLanguageModel()
             if case .unavailable(let reason) = model.availability {
                 throw Failure.unavailable(model: description, reason: Self.explain(reason))

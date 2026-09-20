@@ -1,4 +1,5 @@
 import Foundation
+import FoundationModels
 import Testing
 
 @testable import DaimonCore
@@ -17,6 +18,23 @@ import Testing
         #expect(try ModelSelection(parsing: "adapter:x") == .local(backend: "adapter", name: "x"))
         #expect(throws: ModelSelection.Failure.self) { try ModelSelection(parsing: "adapter:x").resolve() }
         #expect(throws: ModelSelection.Failure.unknownModel("adapter:")) { try ModelSelection(parsing: "adapter:") }
+    }
+
+    @Test func privateCloudNeedsTheEntitlementBeforeTheFrameworkIsAsked() throws {
+        #expect(
+            throws: ModelSelection.Failure.unavailable(
+                model: "private-cloud", reason: ModelSelection.missingPrivateCloudEntitlement)
+        ) { try ModelSelection.privateCloud.resolve(entitlements: .none) }
+        // With the entitlement the framework's own availability decides; on an eligible Mac it resolves.
+        let granted = Entitlements.granting([Entitlements.privateCloudCompute])
+        #expect(granted.has(Entitlements.privateCloudCompute) && !granted.has("other"))
+        if case .available = PrivateCloudComputeLanguageModel().availability {
+            let resolved = try ModelSelection.privateCloud.resolve(entitlements: granted)
+            #expect(resolved.capabilitySource == .framework && resolved.asset == nil)
+        }
+        // The test binary is ad-hoc signed and holds no entitlements.
+        #expect(!Entitlements.process.has(Entitlements.privateCloudCompute))
+        #expect(throws: ModelSelection.Failure.self) { try ModelSelection.privateCloud.resolve() }
     }
 
     @Test func describesAndFlagsDeviceEgress() {

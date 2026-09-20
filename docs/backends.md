@@ -24,6 +24,24 @@ Every backend is the same above the model: the tool loop, the approval gate, the
 and the audit log are unchanged. When a conversation opens, daimon records `model.resolved` with the
 backend, the model, the asset behind it, and its declared capabilities (`docs/logging.md`).
 
+## Private Cloud Compute
+
+`private-cloud` needs the managed entitlement `com.apple.developer.private-cloud-compute`, which Apple
+assigns to an App ID on request (App Store Small Business Program, under two million first-time
+downloads) and which only a provisioning profile can authorise. An ad-hoc signed command-line tool such
+as the Homebrew or `swift build` binary cannot carry it. The framework does not say so: on this Mac on
+2026-09-20 `PrivateCloudComputeLanguageModel.availability` was `available` and `quotaUsage` below the
+limit, and the first request failed with `LanguageModelError` code -1 wrapping
+`ModelManagerServices.ModelManagerError` code 1046. daimon therefore checks its own code signature
+before asking the framework and refuses with a sentence:
+
+```
+model 'private-cloud' is unavailable: this binary lacks the com.apple.developer.private-cloud-compute entitlement, …
+```
+
+`daimon models` shows the same line. Until daimon ships as a signed app with the entitlement, the
+spelling is accepted for that future and every run of it is refused before any data leaves the Mac.
+
 ## Capabilities are declared, never assumed
 
 A model may run a conversation, call tools, produce schema-shaped output, or reason. daimon opens a

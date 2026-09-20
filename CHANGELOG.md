@@ -4,6 +4,15 @@ Notable changes per release, written for people who run daimon. The release scri
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Fixed:
+
+- `--model private-cloud` failed after the request with an opaque `ModelManagerError` 1046. Private
+  Cloud Compute needs the managed `com.apple.developer.private-cloud-compute` entitlement, which an
+  ad-hoc signed command-line tool cannot carry; daimon now checks its own signature and refuses the
+  model with a sentence before anything is sent. `daimon models` shows the same reason.
+
 ## 0.2.0
 
 Added:
