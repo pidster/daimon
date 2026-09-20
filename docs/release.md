@@ -39,7 +39,9 @@ Until a macOS 27 CI runner exists this runs on a developer's Mac with Xcode 27.
 coverage-gate` measures the current figure and refuses a release when it is lower. When it is higher,
 the gate also refuses until `scripts/check coverage-baseline` has recorded the new figure and it is
 committed, so the baseline only ever moves up through a commit that says so. Lowering it is possible
-by editing the file, and the commit must say why.
+by editing the file, and the commit must say why. A tenth of a point either way counts as unchanged:
+timing-dependent branches (sandbox nesting, timeouts) move the measured figure by a few hundredths
+between identical runs, observed on 2026-09-20 (93.05% against a 93.08% baseline).
 
 ## Bumping the version
 

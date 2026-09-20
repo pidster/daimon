@@ -90,16 +90,20 @@ coverage_total() {
 BASELINE_FILE="harness/coverage-baseline"
 
 # Refuses when total line coverage is below the recorded baseline; run before every release.
+# Timing-dependent branches (sandbox nesting, timeouts) move the figure by a few hundredths between
+# runs, so a tenth of a point either way counts as unchanged.
+COVERAGE_TOLERANCE=0.1
+
 coverage_gate() {
     echo "==> coverage gate"
     total="$(coverage_total)"
     baseline="$(cat "$BASELINE_FILE" 2>/dev/null || echo 0)"
-    echo "line coverage $total% (baseline $baseline%)"
-    if awk -v t="$total" -v b="$baseline" 'BEGIN { exit !(t + 0 < b + 0) }'; then
+    echo "line coverage $total% (baseline $baseline%, tolerance $COVERAGE_TOLERANCE)"
+    if awk -v t="$total" -v b="$baseline" -v e="$COVERAGE_TOLERANCE" 'BEGIN { exit !(t + 0 < b - e) }'; then
         echo "coverage fell below the baseline; add tests or, with a reason in the commit, lower $BASELINE_FILE" >&2
         exit 1
     fi
-    if awk -v t="$total" -v b="$baseline" 'BEGIN { exit !(t + 0 > b + 0) }'; then
+    if awk -v t="$total" -v b="$baseline" -v e="$COVERAGE_TOLERANCE" 'BEGIN { exit !(t + 0 > b + e) }'; then
         echo "coverage rose; record it with 'scripts/check coverage-baseline' and commit before releasing" >&2
         exit 1
     fi
