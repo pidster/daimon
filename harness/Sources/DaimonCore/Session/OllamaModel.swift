@@ -152,11 +152,11 @@ public struct OllamaModel: LanguageModel, Sendable {
     /// - Returns: The model with its reported capabilities.
     /// - Throws: `Failure`.
     public func checked() throws -> OllamaModel {
-        let installed = try Self.blocking { try await Self.installed(at: settings) }
+        let installed = try Blocking.run { try await Self.installed(at: settings) }
         guard Self.matches(name, installed: installed) else {
             throw Failure.noSuchModel(name, installed: installed.map(\.name))
         }
-        let reported = try Self.blocking { try await Self.show(name, at: settings) }
+        let reported = try Blocking.run { try await Self.show(name, at: settings) }
         return OllamaModel(name: name, settings: settings, reported: reported)
     }
 
@@ -186,26 +186,6 @@ public struct OllamaModel: LanguageModel, Sendable {
         } catch {
             throw Failure.badResponse("\(error)")
         }
-    }
-
-    /// Runs a short async probe to completion from synchronous code.
-    private static func blocking<T: Sendable>(_ operation: @escaping @Sendable () async throws -> T) throws -> T {
-        let slot = Slot<T>()
-        let done = DispatchSemaphore(value: 0)
-        Task.detached {
-            let result: Result<T, any Error>
-            do { result = .success(try await operation()) } catch { result = .failure(error) }
-            slot.result.withLock { $0 = result }
-            done.signal()
-        }
-        done.wait()
-        guard let result = slot.result.withLock({ $0 }) else { throw Failure.badResponse("probe produced no result") }
-        return try result.get()
-    }
-
-    /// A one-shot result slot for `blocking`.
-    private final class Slot<T: Sendable>: Sendable {
-        let result = Mutex<Result<T, any Error>?>(nil)
     }
 
     /// Talks to Ollama's `/api/chat` for one generation request and streams the reply back.
@@ -416,7 +396,7 @@ public struct OllamaBackend: ModelBackend {
     /// Checks the server lists the model, reads its capabilities, and wraps it.
     ///
     /// - Throws: `ModelSelection.Failure.unavailable` with the Ollama failure as the reason.
-    public func resolve(_ name: String, config: Config.Resolved) throws -> ResolvedModel {
+    public func resolve(_ name: String, config: Config.Resolved, home: Home) throws -> ResolvedModel {
         do {
             let model = try OllamaModel(name: name, settings: config.ollama).checked()
             return ResolvedModel(
@@ -428,7 +408,7 @@ public struct OllamaBackend: ModelBackend {
     }
 
     /// The server's tag list.
-    public func installed(config: Config.Resolved) async throws -> [InstalledModel] {
+    public func installed(config: Config.Resolved, home: Home) async throws -> [InstalledModel] {
         try await OllamaModel.installed(at: config.ollama).map { model in
             let size = ByteCountFormatter.string(fromByteCount: Int64(model.size), countStyle: .file)
             return InstalledModel(selection: .ollama(model.name), detail: "\(model.parameterSize ?? "?") \(size)")
@@ -436,7 +416,7 @@ public struct OllamaBackend: ModelBackend {
     }
 
     /// Base URL and timeout.
-    public func settings(in config: Config.Resolved) -> JSONValue {
+    public func settings(in config: Config.Resolved, home: Home) -> JSONValue {
         .object([
             "baseURL": .string(config.ollama.baseURL.absoluteString),
             "timeoutSeconds": .int(Int(config.ollama.timeout.components.seconds)),

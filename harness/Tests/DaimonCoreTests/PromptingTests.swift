@@ -12,6 +12,13 @@ import Testing
         #expect(all.rendered == expected)
     }
 
+    @Test func aConversationWithoutToolsIsToldSo() {
+        let text = Prompting(instructions: "x").rendered(toolsAvailable: false)
+        #expect(text.contains("This conversation has no tools"))
+        #expect(text.hasSuffix("Instructions for this conversation:\nx"))
+        #expect(!Prompting().rendered.contains("no tools"))
+    }
+
     @Test func emptyLayersAreOmittedAndTheSystemPromptCannotBe() {
         #expect(Prompting().rendered == Prompting.systemPrompt)
         #expect(Prompting(systemPromptExtension: "  \n", instructions: "").rendered == Prompting.systemPrompt)

@@ -44,7 +44,7 @@ configured under `commandPolicy` in `config.json`:
 | `allow` | `[]` | Regexes; when non-empty the command must match one. Deny wins. |
 | `sandbox.enabled` | `true` | Run under `sandbox-exec`. |
 | `sandbox.allowNetwork` | `true` | Set `false` to deny all networking inside the sandbox. |
-| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the directory daimon was launched in, `$TMPDIR`, and `/private/tmp`. A command's own `workingDirectory` never widens this. `~` expands. |
+| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the directory daimon was launched in, `$TMPDIR`, the per-user cache directory (`getconf DARWIN_USER_CACHE_DIR`, where Clang keeps its module cache), and `/private/tmp`. A command's own `workingDirectory` never widens this. `~` expands. |
 
 Inside the sandbox everything is readable and executable, but writes outside the writable set fail with
 `Operation not permitted`. A denied pattern comes back to the model as `error: command denied by policy: …`
@@ -103,7 +103,8 @@ Seatbelt lets a process re-apply an identical profile but refuses a different on
 ### Writable root and working directory
 
 The sandbox's writable set is rooted at the directory daimon was launched in (`Options.writableRoot`),
-plus the temporary directory, `/private/tmp`, and configured paths. A `workingDirectory` chosen by the
+plus the temporary directory, the per-user cache directory, `/private/tmp`, and configured paths. A
+`workingDirectory` chosen by the
 model changes where the command runs, never what it may write: a command run in `/Users/me` with the
 root at the project can read there but its writes fail. Before 2026-09-19 the per-command directory was
 the writable root, so `workingDirectory: "/"` made everything writable.

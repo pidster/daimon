@@ -63,7 +63,8 @@ public struct Introspection: Sendable {
             ]),
             "maxThreads": .int(config.maxThreads),
             "backends": .object(
-                Dictionary(uniqueKeysWithValues: ModelBackends.all.map { ($0.scheme, $0.settings(in: config)) })),
+                Dictionary(
+                    uniqueKeysWithValues: ModelBackends.all.map { ($0.scheme, $0.settings(in: config, home: home)) })),
         ])
     }
 

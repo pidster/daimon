@@ -94,12 +94,14 @@ final class FakeOllama: URLProtocol {
         #expect(OllamaModel(name: "q", settings: Self.settings).executorConfiguration.timeoutSeconds == 5)
         // The backend wraps all of it with the source and asset recorded.
         FakeOllama.serve("/api/show", body: Self.shown)
-        let resolved = try OllamaBackend().resolve("q", config: Self.config)
+        let resolved = try OllamaBackend().resolve("q", config: Self.config, home: Home.resolve())
         #expect(resolved.capabilitySource == .runtime)
         #expect(resolved.capabilityNames == ["toolCalling", "guidedGeneration"])
         #expect(resolved.asset == "http://fake.ollama:1 q")
-        #expect(try await OllamaBackend().installed(config: Self.config).first?.selection == .ollama("q:latest"))
-        #expect(OllamaBackend().settings(in: Self.config).objectValue?["timeoutSeconds"] == 5)
+        #expect(
+            try await OllamaBackend().installed(config: Self.config, home: Home.resolve()).first?.selection
+                == .ollama("q:latest"))
+        #expect(OllamaBackend().settings(in: Self.config, home: Home.resolve()).objectValue?["timeoutSeconds"] == 5)
         FakeOllama.serve("/api/tags", status: 500, body: "down")
         await #expect(throws: OllamaModel.Failure.serverError(status: 500, body: "down")) {
             _ = try await OllamaModel.installed(at: Self.settings)

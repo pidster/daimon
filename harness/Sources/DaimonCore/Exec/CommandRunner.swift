@@ -165,6 +165,14 @@ public struct CommandRunner: Sendable {
         return outcome
     }
 
+    /// The per-user cache directory (`getconf DARWIN_USER_CACHE_DIR`), or nil if the system has none.
+    static var userCacheDirectory: String? {
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let length = confstr(_CS_DARWIN_USER_CACHE_DIR, &buffer, buffer.count)
+        guard length > 0, length <= buffer.count else { return nil }
+        return String(decoding: buffer.prefix(Int(length) - 1).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+
     /// Spawns `/bin/sh -c command` in its own process group, under `sandbox-exec` when `sandboxed`,
     /// and captures its outcome. Exactly one launch per call.
     private func launch(_ command: String, in workingDirectory: String, sandboxed: Bool) async throws -> Outcome {
@@ -173,6 +181,7 @@ public struct CommandRunner: Sendable {
             let profile = options.policy.seatbeltProfile(
                 writableRoot: options.writableRoot,
                 temporaryDirectory: FileManager.default.temporaryDirectory.path,
+                userCacheDirectory: Self.userCacheDirectory,
                 home: FileManager.default.homeDirectoryForCurrentUser.path
             )
             argv = ["/usr/bin/sandbox-exec", "-p", profile] + argv

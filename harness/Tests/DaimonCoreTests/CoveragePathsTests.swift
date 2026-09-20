@@ -125,7 +125,7 @@ private struct Boom: DaimonTool {
         let home = Home(root: root)
         try home.ensure()
         try Data(#"{"maxThreads":4}"#.utf8).write(to: home.configFile)
-        let probes = Doctor.Probes(systemModel: { nil }, configuredModel: { _, _ in nil })
+        let probes = Doctor.Probes(systemModel: { nil }, configuredModel: { _, _, _ in nil })
         var findings = Doctor(home: home, probes: probes).run()
         #expect(findings[3].ok && findings[3].detail.hasSuffix("parses"))
         #expect(Doctor(home: home, model: .ollama("q"), probes: probes).run()[2].detail == "ollama:q available")

@@ -21,6 +21,7 @@
 | [release.md](release.md) | How a release is cut: tag, tarball, GitHub release, Homebrew tap formula |
 | [backlog.md](backlog.md) | Agreed work not yet started: compound-command policy checks, receipts, structured output, condensing tools, sampling |
 | [engineering.md](engineering.md) | Standards, tooling, the pre-commit gate, and CI |
+| [backends.md](backends.md) | Model backends: Apple's, Ollama, Core AI, MLX; asset preparation, naming, declared capabilities, errors |
 | [decisions/](decisions/) | Architecture Decision Records, one per significant decision |
 | [proposals/2026-09-20-escalations.md](proposals/2026-09-20-escalations.md) | For review: two escalation verbs (approval, inquiry) and a choice of channels, including a non-blocking hand-off to the calling agent |
 | [reviews/](reviews/) | Dated code and documentation reviews with their todo lists and status |

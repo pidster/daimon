@@ -10,7 +10,7 @@ import Testing
 private struct ScriptedBackend: ModelBackend {
     let scheme = "scripted"
 
-    func resolve(_ name: String, config: Config.Resolved) throws -> ResolvedModel {
+    func resolve(_ name: String, config: Config.Resolved, home: Home) throws -> ResolvedModel {
         switch name {
         case "tools":
             return ResolvedModel(
@@ -25,11 +25,11 @@ private struct ScriptedBackend: ModelBackend {
         }
     }
 
-    func installed(config: Config.Resolved) async throws -> [InstalledModel] {
+    func installed(config: Config.Resolved, home: Home) async throws -> [InstalledModel] {
         [InstalledModel(selection: .local(backend: scheme, name: "tools"), detail: "scripted")]
     }
 
-    func settings(in config: Config.Resolved) -> JSONValue { ["scripts": 2] }
+    func settings(in config: Config.Resolved, home: Home) -> JSONValue { ["scripts": 2] }
 }
 
 @Suite(.serialized) struct ModelBackendTests {
@@ -42,7 +42,8 @@ private struct ScriptedBackend: ModelBackend {
         #expect(resolved.capabilitySource == .configuration)
         #expect(resolved.asset == "memory")
         #expect(
-            try await ModelBackends.backend(for: "scripted")?.installed(config: Config().resolved).first?.detail
+            try await ModelBackends.backend(for: "scripted")?.installed(config: Config().resolved, home: Home.resolve())
+                .first?.detail
                 == "scripted")
         let views = Introspection(home: Home(root: URL(filePath: "/tmp")), config: Config().resolved)
         #expect(views.configuration.objectValue?["backends"]?.objectValue?["scripted"] == ["scripts": 2])

@@ -24,8 +24,18 @@ public struct Prompting: Equatable, Sendable {
 
     /// The three layers as one text, in order, each optional layer under a short heading so the model
     /// and a log reader can tell whose words they are.
-    public var rendered: String {
+    public var rendered: String { rendered(toolsAvailable: true) }
+
+    /// `rendered`, with one more sentence of daimon's own when the conversation has no tools, so a
+    /// model told about tool discipline does not invent tool calls it cannot make.
+    ///
+    /// - Parameter toolsAvailable: Whether the conversation has any tools.
+    /// - Returns: The text the framework is given as instructions.
+    public func rendered(toolsAvailable: Bool) -> String {
         var parts = [Self.systemPrompt]
+        if !toolsAvailable {
+            parts[0] += " This conversation has no tools; answer directly from what you know."
+        }
         if let extra = systemPromptExtension?.trimmingCharacters(in: .whitespacesAndNewlines), !extra.isEmpty {
             parts.append("Guidance for this Mac:\n\(extra)")
         }

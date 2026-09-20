@@ -132,16 +132,20 @@ public enum ModelSelection: Equatable, Sendable, CustomStringConvertible, Codabl
 
     /// Checks availability and returns a session maker for this model, with its capabilities declared.
     ///
-    /// - Parameter config: The effective configuration; local backends read their settings from it.
+    /// - Parameters:
+    ///   - config: The effective configuration; local backends read their settings from it.
+    ///   - home: daimon's home, for backends that keep assets under it.
     /// - Returns: A session maker over the checked model.
     /// - Throws: `Failure.unavailable`, `Failure.unknownBackend`.
-    public func resolve(config: Config.Resolved = Config().resolved) throws -> ResolvedModel {
+    public func resolve(
+        config: Config.Resolved = Config().resolved, home: Home = Home.resolve()
+    ) throws -> ResolvedModel {
         switch self {
         case .local(let scheme, let name):
             guard let backend = ModelBackends.backend(for: scheme) else {
                 throw Failure.unknownBackend(scheme, registered: ModelBackends.schemes)
             }
-            return try backend.resolve(name, config: config)
+            return try backend.resolve(name, config: config, home: home)
         case .system:
             let model = SystemLanguageModel.default
             if case .unavailable(let reason) = model.availability {

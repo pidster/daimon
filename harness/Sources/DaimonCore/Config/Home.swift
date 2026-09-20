@@ -34,6 +34,9 @@ public struct Home: Sendable, Equatable {
     public var auditFile: URL { logs.appending(path: "audit.jsonl") }
     /// Standing command approvals.
     public var approvalsFile: URL { root.appending(path: "approvals.json") }
+    /// Model assets kept under the home, one subdirectory per backend.
+    public var models: URL { root.appending(path: "models", directoryHint: .isDirectory) }
+
     /// Where saved conversation transcripts go.
     public var transcripts: URL { root.appending(path: "transcripts", directoryHint: .isDirectory) }
 

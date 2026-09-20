@@ -1,5 +1,6 @@
 import ArgumentParser
 import DaimonCore
+import DaimonCoreAI
 import DaimonMCP
 import Foundation
 import FoundationModels
@@ -18,6 +19,12 @@ struct Daimon: AsyncParsableCommand {
         ],
         defaultSubcommand: Respond.self
     )
+
+    /// Registers the model backends this build carries, then parses and runs.
+    static func main() async {
+        ModelBackends.register(CoreAIBackend())
+        await main(nil)
+    }
 }
 
 /// The flags every session-starting subcommand shares, declared once.
@@ -345,7 +352,7 @@ struct Models: AsyncParsableCommand {
         for selection in [ModelSelection.system, .privateCloud] {
             let state: String
             do {
-                let resolved = try selection.resolve(config: config)
+                let resolved = try selection.resolve(config: config, home: Daimon.home)
                 state = "available; \(resolved.capabilityNames.joined(separator: ", "))"
             } catch {
                 state = "unavailable: \(error)"
@@ -355,7 +362,7 @@ struct Models: AsyncParsableCommand {
         }
         for backend in ModelBackends.all {
             do {
-                for model in try await backend.installed(config: config) {
+                for model in try await backend.installed(config: config, home: Daimon.home) {
                     let mark = model.selection == config.model ? "*" : " "
                     print("\(mark) \(model.selection)\t\(model.detail)")
                 }

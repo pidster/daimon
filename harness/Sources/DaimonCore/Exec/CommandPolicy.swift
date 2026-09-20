@@ -120,8 +120,20 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     /// Everything is allowed except writes outside the writable set and,
     /// when `allowNetwork` is false, all networking. Paths are canonicalised.
     /// The root is fixed by the harness, never by a per-command working directory.
-    public func seatbeltProfile(writableRoot: String, temporaryDirectory: String, home: String) -> String {
+    ///
+    /// - Parameters:
+    ///   - writableRoot: The project directory commands may write under.
+    ///   - temporaryDirectory: The process's `$TMPDIR`.
+    ///   - userCacheDirectory: The per-user cache directory (`DARWIN_USER_CACHE_DIR`), where Clang keeps
+    ///     its module cache; without it a build that compiles a C module inside the sandbox fails. Nil
+    ///     omits it.
+    ///   - home: The user's home, for expanding `~` in the configured paths.
+    /// - Returns: The profile text for `sandbox-exec -p`.
+    public func seatbeltProfile(
+        writableRoot: String, temporaryDirectory: String, userCacheDirectory: String? = nil, home: String
+    ) -> String {
         var writable = [writableRoot, temporaryDirectory, "/private/tmp"]
+        if let userCacheDirectory { writable.append(userCacheDirectory) }
         writable += sandbox.writablePaths.map { $0.hasPrefix("~") ? home + $0.dropFirst() : $0 }
         let subpaths = writable.map { Self.canonical($0) }.map { "(subpath \(Self.quote($0)))" }
         var lines = [

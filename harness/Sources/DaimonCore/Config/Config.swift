@@ -25,6 +25,19 @@ public struct Config: Codable, Equatable, Sendable {
     public var approval: ApprovalConfig?
     /// Where a local Ollama serves `ollama:<name>` models.
     public var ollama: OllamaConfig?
+    /// Where Core AI bundles for `coreai:<name>` models live.
+    public var coreai: CoreAIConfig?
+
+    /// Core AI settings in the file.
+    public struct CoreAIConfig: Codable, Equatable, Sendable {
+        /// Directory holding one exported bundle per subdirectory; default `<home>/models/coreai`.
+        public var modelsDirectory: String?
+
+        /// Creates settings; nil takes the default.
+        public init(modelsDirectory: String? = nil) {
+            self.modelsDirectory = modelsDirectory
+        }
+    }
 
     /// Ollama settings in the file.
     public struct OllamaConfig: Codable, Equatable, Sendable {
@@ -85,7 +98,8 @@ public struct Config: Codable, Equatable, Sendable {
         systemPromptExtension: String? = nil, instructions: String? = nil, model: ModelSelection? = nil,
         commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
-        audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil
+        audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil,
+        coreai: CoreAIConfig? = nil
     ) {
         self.systemPromptExtension = systemPromptExtension
         self.instructions = instructions
@@ -97,6 +111,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.audit = audit
         self.approval = approval
         self.ollama = ollama
+        self.coreai = coreai
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
@@ -139,7 +154,8 @@ public struct Config: Codable, Equatable, Sendable {
             approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600),
             ollama: OllamaSettings(
                 baseURL: ollama?.baseURL.flatMap(URL.init(string:)) ?? OllamaSettings.default.baseURL,
-                timeout: .seconds(ollama?.timeoutSeconds ?? 120))
+                timeout: .seconds(ollama?.timeoutSeconds ?? 120)),
+            coreaiModelsDirectory: coreai?.modelsDirectory
         )
     }
 
@@ -167,5 +183,7 @@ public struct Config: Codable, Equatable, Sendable {
         public var approvalLifetime: Duration
         /// Where Ollama is for `ollama:<name>` models.
         public var ollama: OllamaSettings
+        /// Where Core AI bundles live, as configured; nil means `<home>/models/coreai`.
+        public var coreaiModelsDirectory: String?
     }
 }

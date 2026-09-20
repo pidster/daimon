@@ -36,10 +36,13 @@ import Testing
     @Test func profileListsCanonicalWritablePathsAndNetwork() {
         var policy = CommandPolicy(sandbox: .init(allowNetwork: false, writablePaths: ["~/.cache", "/var/tmp/"]))
         let profile = policy.seatbeltProfile(
-            writableRoot: "/tmp/work", temporaryDirectory: "/var/folders/x", home: "/Users/me")
+            writableRoot: "/tmp/work", temporaryDirectory: "/var/folders/x", userCacheDirectory: "/var/folders/x/C/",
+            home: "/Users/me")
         #expect(profile.hasPrefix("(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*"))
         #expect(profile.contains("(subpath \"/private/tmp/work\")"))
         #expect(profile.contains("(subpath \"/private/var/folders/x\")"))
+        #expect(profile.contains("(subpath \"/private/var/folders/x/C\")"))
+        #expect(CommandRunner.userCacheDirectory?.hasSuffix("/C/") == true)
         #expect(profile.contains("(subpath \"/Users/me/.cache\")"))
         #expect(profile.contains("(subpath \"/private/var/tmp\")"))
         #expect(profile.hasSuffix("(deny network*)"))

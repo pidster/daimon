@@ -304,6 +304,8 @@ public struct Conversation: Sendable {
     public let model: ModelSelection
     /// The effective configuration, which local backends read their settings from.
     let config: Config.Resolved
+    /// daimon's home, for backends that keep assets under it.
+    let home: Home
 
     /// Builds the gate and the tool registry for one conversation of `session`.
     ///
@@ -323,7 +325,7 @@ public struct Conversation: Sendable {
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(
             gate: gate, tools: selection.tools.map { $0 }, audit: audit, prompting: prompting, model: model,
-            config: session.config)
+            config: session.config, home: session.home)
     }
 
     /// Resolves the model, refuses a request its declared capabilities cannot serve, records
@@ -333,7 +335,7 @@ public struct Conversation: Sendable {
     /// - Returns: The agent, recording to this conversation's audit log and advancing its turn clock.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used or lacks a needed capability.
     public func openAgent(transcript: Transcript? = nil) throws -> Agent {
-        let resolved = try model.resolve(config: config)
+        let resolved = try model.resolve(config: config, home: home)
         try resolved.check(tools: tools)
         audit.record(
             .modelResolved,
@@ -344,6 +346,8 @@ public struct Conversation: Sendable {
         if let transcript {
             return Agent(transcript: transcript, tools: tools, model: resolved, audit: audit)
         }
-        return Agent(instructions: prompting.rendered, tools: tools, model: resolved, audit: audit)
+        return Agent(
+            instructions: prompting.rendered(toolsAvailable: !tools.isEmpty), tools: tools, model: resolved,
+            audit: audit)
     }
 }

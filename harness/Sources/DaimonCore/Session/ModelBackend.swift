@@ -26,14 +26,19 @@ public protocol ModelBackend: Sendable {
     var scheme: String { get }
     /// Checks the named model can serve and returns it with its capabilities declared.
     ///
+    /// - Parameters:
+    ///   - name: The part after the scheme.
+    ///   - config: The effective configuration, for the backend's settings.
+    ///   - home: daimon's home, for backends that keep assets under it.
+    /// - Returns: The checked model with its declared capabilities.
     /// - Throws: `ModelSelection.Failure.unavailable` with an actionable reason.
-    func resolve(_ name: String, config: Config.Resolved) throws -> ResolvedModel
+    func resolve(_ name: String, config: Config.Resolved, home: Home) throws -> ResolvedModel
     /// The models this runtime can serve right now.
     ///
     /// - Throws: A backend failure when the runtime cannot be asked.
-    func installed(config: Config.Resolved) async throws -> [InstalledModel]
+    func installed(config: Config.Resolved, home: Home) async throws -> [InstalledModel]
     /// This backend's effective settings, for `daimon config` and the `inspect` tool.
-    func settings(in config: Config.Resolved) -> JSONValue
+    func settings(in config: Config.Resolved, home: Home) -> JSONValue
 }
 
 /// The backends this process knows, by scheme. Ollama is built in; the executable registers the

@@ -16,6 +16,11 @@ Added:
   run; a request that needs tool calling on a model that does not declare it is refused with a hint.
 - The audit log records `model.resolved` when a conversation opens: backend, model, asset, declared
   capabilities and who declared them, and the tools in use.
+- Core AI: `--model coreai:<bundle>` runs a model exported to Apple's Core AI format, in daimon's own
+  process, through the bridge from `apple/coreai-models`. Bundles live under `<home>/models/coreai`
+  (`config.json` `coreai.modelsDirectory`) or are named by path; `daimon models` lists them with kind,
+  compression, source, and size; a missing bundle is refused with where daimon looked and the export
+  command. Capabilities come from the bundle. See `docs/backends.md`.
 
 - `inspect`, a read-only tool the model can call to see daimon's effective config, this conversation's
   status, the standing approvals, or recent audit events, bounded to 4 KiB.
@@ -26,6 +31,10 @@ Added:
 
 Changed:
 
+- The `run_command` sandbox also allows writes under the per-user cache directory
+  (`getconf DARWIN_USER_CACHE_DIR`), where Clang keeps its module cache; a build that compiles a C
+  module inside the sandbox (SwiftPM compiling a dependency's manifest, say) used to fail with "could
+  not build Objective-C module 'Darwin'".
 - `daimon` with no prompt on a terminal prints its help instead of waiting silently for stdin; a piped
   stdin is still read.
 

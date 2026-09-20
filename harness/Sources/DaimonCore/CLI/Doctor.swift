@@ -24,8 +24,8 @@ public struct Doctor: Sendable {
     public struct Probes: Sendable {
         /// Nil when the system model is available, else the reason it is not.
         public var systemModel: @Sendable () -> String?
-        /// Nil when the given model resolves under this configuration, else the failure text.
-        public var configuredModel: @Sendable (ModelSelection, Config.Resolved) -> String?
+        /// Nil when the given model resolves under this configuration and home, else the failure text.
+        public var configuredModel: @Sendable (ModelSelection, Config.Resolved, Home) -> String?
 
         /// Probes that ask the framework.
         public static let live = Probes(
@@ -35,9 +35,9 @@ public struct Doctor: Sendable {
                 }
                 return nil
             },
-            configuredModel: { model, config in
+            configuredModel: { model, config, home in
                 do {
-                    _ = try model.resolve(config: config)
+                    _ = try model.resolve(config: config, home: home)
                     return nil
                 } catch {
                     return "\(error)"
@@ -47,7 +47,7 @@ public struct Doctor: Sendable {
         /// Creates probes.
         public init(
             systemModel: @escaping @Sendable () -> String?,
-            configuredModel: @escaping @Sendable (ModelSelection, Config.Resolved) -> String?
+            configuredModel: @escaping @Sendable (ModelSelection, Config.Resolved, Home) -> String?
         ) {
             self.systemModel = systemModel
             self.configuredModel = configuredModel
@@ -81,7 +81,7 @@ public struct Doctor: Sendable {
     }
 
     private func configuredModel() -> Finding {
-        if let problem = probes.configuredModel(model, resolvedConfig) {
+        if let problem = probes.configuredModel(model, resolvedConfig, home) {
             return Finding(name: "configured model", ok: false, detail: problem)
         }
         return Finding(name: "configured model", ok: true, detail: "\(model) available")
