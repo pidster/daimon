@@ -39,12 +39,18 @@ public struct OpenThread: Sendable {
     public let gate: ApprovalGate
     /// The thread's audit session.
     public let audit: AuditLog
+    /// The turn's events, folded into the result's `receipt`.
+    public let receipts: ReceiptCollector
 
     /// Creates the record.
-    public init(thread: any RespondingThread, gate: ApprovalGate, audit: AuditLog) {
+    public init(
+        thread: any RespondingThread, gate: ApprovalGate, audit: AuditLog,
+        receipts: ReceiptCollector = ReceiptCollector()
+    ) {
         self.thread = thread
         self.gate = gate
         self.audit = audit
+        self.receipts = receipts
     }
 }
 

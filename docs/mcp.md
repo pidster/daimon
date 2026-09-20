@@ -88,12 +88,41 @@ Run a prompt on the on-device model, with daimon's tools available to it, on a c
 Result content is the reply text. `structuredContent`:
 
 ```json
-{ "thread_id": "…", "created": true, "condensed": false, "text": "…", "refusals": [] }
+{ "thread_id": "…", "created": true, "condensed": false, "text": "…", "refusals": [], "receipt": { … } }
 ```
 
 `refusals` lists every command the gate refused during the turn, as `{ "command", "reason" }`, so a
 harness can detect a refusal structurally instead of parsing the model's prose. The result is not
 `isError` in that case: the model answered, and its answer says what it could not do.
+
+`receipt` is what the turn did, folded from the thread's audit events so the caller can verify
+delegated work without reading the log ([ADR 0021](decisions/0021-receipts.md)):
+
+```json
+{
+  "turn": 3,
+  "tools": [{ "name": "run_command", "arguments": "{\"command\":\"git status\"}", "bytes": 212, "seconds": 0.4 }],
+  "commands": [{ "command": "git status", "exitStatus": 0, "timedOut": false, "truncated": false, "seconds": 0.3 }],
+  "denials": [],
+  "approvals": [{ "command": "git status", "level": "moderate", "decision": "approved", "scope": "session" }],
+  "errors": [],
+  "condensed": false,
+  "seconds": 2.1
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `turn` | The thread's turn number, which `daimon://audit/{thread_id}` events carry as `turn`. |
+| `tools` | Every tool call in order: `name`, the model's `arguments` JSON, and the result's `bytes` and `seconds`; a call that threw has `error` instead. |
+| `commands` | Every command that ran: `exitStatus`, `timedOut`, `truncated`, `seconds`. Output is not repeated; the audit log has it verbatim. |
+| `denials` | Commands turned away before running: `verdict` is `denied` (policy, with `reason`) or `disapproved` (the gate; also in `refusals`). |
+| `approvals` | Every gate decision: `decision` (`approved`, `denied`, `timed-out`, `cached…`), the `level` it was asked at, the `scope` given. |
+| `errors` | Errors not tied to a tool call, such as a failed turn. |
+| `condensed`, `seconds` | As for the turn; `seconds` is null when the turn did not complete. |
+
+Lists hold at most 64 entries each. Token usage is not reported yet: the framework does not expose it
+for Apple's models, and daimon does not record what local runtimes report (`docs/backlog.md`).
 
 `condensed` is true when older turns were dropped to fit the window on this call. Threads live in memory for
 the server's lifetime; the least recently used is evicted beyond `maxThreads` (32), which is audited as a

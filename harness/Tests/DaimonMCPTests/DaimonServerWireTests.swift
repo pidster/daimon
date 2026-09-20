@@ -34,7 +34,8 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
                 model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: steps)), audit: conversation.audit
             )
             return OpenThread(
-                thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit)
+                thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit,
+                receipts: conversation.receipts)
         }
         let transports = await InMemoryTransport.createConnectedPair()
         try await server.serve(transport: transports.server)
@@ -115,6 +116,15 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(structured?["condensed"] == .bool(false))
         #expect(structured?["text"] == .string(text))
         #expect(structured?["refusals"] == .array([]))
+        // The receipt folds the turn's audit events for the caller.
+        let receipt = structured?["receipt"]?.objectValue
+        #expect(receipt?["turn"] == .int(1))
+        let tool = receipt?["tools"]?.arrayValue?.first?.objectValue
+        #expect(tool?["name"] == .string("current_date"))
+        #expect(tool?["arguments"]?.stringValue?.contains("Asia/Tokyo") == true)  // the framework re-serialises
+        #expect((tool?["bytes"]?.intValue ?? 0) > 0)
+        #expect(receipt?["commands"] == .array([]) && receipt?["errors"] == .array([]))
+        #expect(receipt?["condensed"] == .bool(false))
         // The thread's audit session saw the whole loop.
         let thread = pair.sink.events.filter { $0.session == "t1" }.map(\.kind)
         #expect(thread == [.sessionStart, .prompt, .toolCall, .toolResult, .response])
@@ -138,6 +148,13 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(refusals?.count == 1)
         #expect(refusals?.first?.objectValue?["command"] == .string("touch spike.txt"))
         #expect(refusals?.first?.objectValue?["reason"] == .string("not in tests"))
+        let receipt = result.structuredContent?.objectValue?["receipt"]?.objectValue
+        let approval = receipt?["approvals"]?.arrayValue?.first?.objectValue
+        #expect(approval?["command"] == .string("touch spike.txt"))
+        #expect(approval?["decision"] == .string("denied"))
+        #expect(approval?["level"] == .string("moderate"))
+        #expect(receipt?["denials"]?.arrayValue?.first?.objectValue?["verdict"] == .string("disapproved"))
+        #expect(receipt?["commands"] == .array([]))
         await pair.client.disconnect()
         await pair.server.stop()
     }
@@ -163,7 +180,8 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
                 model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: steps)), audit: conversation.audit
             )
             return OpenThread(
-                thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit)
+                thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit,
+                receipts: conversation.receipts)
         }
         let transports = await InMemoryTransport.createConnectedPair()
         try await server.serve(transport: transports.server)
@@ -179,6 +197,11 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         let decided = sink.events.last { $0.kind == .approvalDecided }
         #expect(decided?.details["decision"] == "approved")
         #expect(decided?.details["scope"] == "session")
+        let receipt = result.structuredContent?.objectValue?["receipt"]?.objectValue
+        let command = receipt?["commands"]?.arrayValue?.first?.objectValue
+        #expect(command?["command"] == .string("touch marker.txt && echo approved"))
+        #expect(command?["exitStatus"] == .int(0))
+        #expect(receipt?["approvals"]?.arrayValue?.first?.objectValue?["scope"] == .string("session"))
         await client.disconnect()
         await server.stop()
     }

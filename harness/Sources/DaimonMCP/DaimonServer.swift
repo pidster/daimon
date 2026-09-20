@@ -48,7 +48,7 @@ public struct DaimonServer: Sendable {
                 id: id, approver: approver, instructions: instructions, tools: tools, model: model)
             return OpenThread(
                 thread: ConversationThread(id: id, agent: try conversation.openAgent()), gate: conversation.gate,
-                audit: conversation.audit)
+                audit: conversation.audit, receipts: conversation.receipts)
         }
     ) {
         server = Server(
@@ -184,7 +184,8 @@ public struct DaimonServer: Sendable {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// Finds or creates the thread, runs the prompt, and reports the thread id and whether it was condensed.
+    /// Finds or creates the thread, runs the prompt, and reports the thread id, whether it was condensed,
+    /// the gate's refusals, and the turn's receipt.
     private func respond(_ request: RespondRequest) async -> CallTool.Result {
         let id = request.threadID ?? UUID().uuidString.lowercased()
         let opened: ThreadStore<OpenThread>.Opened
@@ -206,6 +207,7 @@ public struct DaimonServer: Sendable {
         do {
             let reply = try await opened.thread.thread.respond(to: request.prompt)
             let refusals = await opened.thread.gate.takeRefusals()
+            let receipt = opened.thread.receipts.take(turn: opened.thread.audit.currentTurn)
             return .init(
                 content: [.text(text: reply.text, annotations: nil, _meta: nil)],
                 structuredContent: .object([
@@ -213,6 +215,7 @@ public struct DaimonServer: Sendable {
                     "text": .string(reply.text),
                     "refusals": .array(
                         refusals.map { .object(["command": .string($0.command), "reason": .string($0.reason)]) }),
+                    "receipt": Value(receipt.json),
                 ]),
                 isError: false
             )

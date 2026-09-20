@@ -75,3 +75,18 @@ actor CompatibilityTransport: Transport {
         return rewritten
     }
 }
+
+extension Value {
+    /// The MCP value with the same shape as a daimon JSON value.
+    init(_ json: JSONValue) {
+        switch json {
+        case .null: self = .null
+        case .bool(let b): self = .bool(b)
+        case .int(let i): self = .int(i)
+        case .double(let d): self = .double(d)
+        case .string(let s): self = .string(s)
+        case .array(let a): self = .array(a.map(Value.init))
+        case .object(let o): self = .object(o.mapValues(Value.init))
+        }
+    }
+}

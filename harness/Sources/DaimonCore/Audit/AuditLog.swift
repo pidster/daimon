@@ -41,6 +41,12 @@ public final class AuditLog: Sendable {
         AuditLog(session: session, sink: sink)
     }
 
+    /// The same session and clock, also writing every event to `other`; a conversation records its
+    /// receipts this way.
+    public func alsoRecording(to other: any AuditSink) -> AuditLog {
+        AuditLog(session: session, sink: TeeAuditSink([sink, other]), turns: turns)
+    }
+
     /// The current turn number (0 before the first turn).
     public var currentTurn: Int { turns.current }
 

@@ -14,10 +14,10 @@ tokens on a remote model: reading, condensing, classifying, extracting, and answ
 the caller's model never ingests the raw material. Other harnesses already run commands locally; that is
 not the differentiator. Items, in order of leverage:
 
-- **Receipts.** Every `respond` result reports what happened: tools called with arguments, files read,
-  commands run with exit status, approvals asked and answered, tokens used. Makes delegated work
-  verifiable by the caller. Since 2026-09-20 a caller can already pull this from
-  `daimon://audit/{thread_id}`; receipts would put a summary in the result itself.
+- Done 2026-09-20: receipts. Every `respond` result carries `structuredContent.receipt`, the turn's tool
+  calls, commands with exit status, denials, approvals, and errors, folded from the audit events
+  ([ADR 0021](decisions/0021-receipts.md)). Open: token usage, once daimon records what a runtime reports
+  (see "Context estimation from the runtime").
 - **Structured output.** `respond` accepts a JSON schema and returns validated JSON via guided
   generation, so results feed straight into the caller's logic.
 - **Condensing tools.** Purpose-built MCP tools that keep raw content on the device and return small

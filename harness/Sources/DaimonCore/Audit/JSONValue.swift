@@ -40,6 +40,21 @@ public enum JSONValue: Codable, Equatable, Sendable, ExpressibleByStringLiteral,
         return nil
     }
 
+    /// The double, or the integer widened, if this is a number.
+    public var doubleValue: Double? {
+        switch self {
+        case .double(let d): d
+        case .int(let i): Double(i)
+        default: nil
+        }
+    }
+
+    /// The boolean, if this is one.
+    public var boolValue: Bool? {
+        if case .bool(let b) = self { return b }
+        return nil
+    }
+
     /// The object's members, if this is one.
     public var objectValue: [String: JSONValue]? {
         if case .object(let members) = self { return members }

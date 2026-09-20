@@ -188,7 +188,10 @@ The request types decode and validate arguments as pure, testable values; see
 `respond` runs on a conversation thread. `ThreadStore` is an actor keeping threads by id with LRU eviction;
 `ConversationThread` is an actor owning one `Agent`, so calls on a thread serialise while threads run
 concurrently. Results carry `structuredContent.thread_id`; see
-[ADR 0007](decisions/0007-conversation-threads.md).
+[ADR 0007](decisions/0007-conversation-threads.md). Each `Conversation` tees its audit log into a
+`ReceiptCollector`, a bounded in-memory sink; after a turn the server folds that turn's events into a
+`Receipt` for `structuredContent.receipt` ([ADR 0021](decisions/0021-receipts.md)), so the result and
+the log never disagree.
 
 ```
 MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools

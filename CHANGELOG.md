@@ -6,6 +6,12 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 ## Unreleased
 
+Added:
+
+- `respond` results carry a `receipt`: the turn's tool calls with arguments and result sizes, commands
+  with exit status, policy denials, approval decisions, and errors, folded from the thread's audit
+  events so a calling harness can verify delegated work without reading the log.
+
 Fixed:
 
 - `--model private-cloud` failed after the request with an opaque `ModelManagerError` 1046. Private
