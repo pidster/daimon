@@ -37,8 +37,9 @@ gate, and Seatbelt; `read_file` runs the gate's rules only; `inspect` and `curre
 
 - A conversation that should not write leaves `edit_file` out with `--tool` or `tools`; a conversation
   with it can write only where the sandbox would have let a command write, after the same approval.
-- The file is written in place, not atomically; a failure mid-write can leave it partial. Acceptable for
-  now: the sizes are small and the audit shows the attempt.
+- Writes are atomic (a temporary file beside the target, renamed over it, mode preserved), so a
+  crash or a full disk leaves the original; the cost is one extra file operation. Amended the same
+  day: the first version wrote in place.
 - Probed once with the system model on 2026-09-20: `find` came back verbatim after a `read_file` page,
   but `content` carried the following line too, duplicating it. The tool cannot tell intent from
   accident; the tool description now says `content` replaces only `find`, and a proper measurement

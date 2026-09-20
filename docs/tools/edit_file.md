@@ -51,7 +51,7 @@ program. Where nobody can answer the edit is refused and the file is untouched.
 | `replace` file size | 1 MiB; larger files are refused (`FileWriter(maxBytes:)`, fixed in code) |
 | Binary files | Refused for `replace` (a NUL byte); `write` and `append` do not read the file |
 | Directories, missing parent directory, unknown `mode`, `replace` without `find` | Errors |
-| Atomicity | The file is written in place; a failure during the write can leave it partial |
+| Atomicity | Every write goes to a temporary file beside the target (same directory, the existing mode copied) and is renamed over it, so a reader never sees a partial file and a failure leaves the original untouched |
 
 ## Audit and receipts
 

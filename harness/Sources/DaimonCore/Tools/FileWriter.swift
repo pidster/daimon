@@ -5,7 +5,8 @@ import Foundation
 ///
 /// Three edits: write the whole file (created if absent), append, or replace one exact occurrence of
 /// a piece of text. Replacement demands exactly one match so the model cannot change more than it
-/// showed it meant to. Nothing here creates directories or follows the model outside the set.
+/// showed it meant to. Every write is atomic: a temporary file beside the target, renamed over it.
+/// Nothing here creates directories or follows the model outside the set.
 public struct FileWriter: Sendable {
     /// What to do to the file.
     public enum Edit: Equatable, Sendable {
@@ -132,6 +133,27 @@ public struct FileWriter: Sendable {
         }
     }
 
+    /// Writes `data` to a temporary file beside `url`, gives it the existing file's mode, and renames
+    /// it over the target, so a reader never sees a partial file and a failure leaves the original.
+    ///
+    /// - Throws: A file-system error; the temporary file is removed on failure.
+    static func writeAtomically(_ data: Data, to url: URL, replacing exists: Bool) throws {
+        let directory = url.deletingLastPathComponent()
+        let temporary = directory.appending(path: ".\(url.lastPathComponent).daimon-\(ShortID.make())")
+        do {
+            try data.write(to: temporary)
+            if exists, let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] {
+                try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: temporary.path)
+            }
+            guard rename(temporary.path, url.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+    }
+
     /// Applies `edit` to the file at `path`.
     ///
     /// - Parameters:
@@ -168,7 +190,7 @@ public struct FileWriter: Sendable {
             line = text[..<range.lowerBound].count(where: { $0 == "\n" }) + 1
             after = Data(text.replacingCharacters(in: range, with: replacement).utf8)
         }
-        try after.write(to: url)
+        try Self.writeAtomically(after, to: url, replacing: exists)
         return Result(
             path: path, mode: edit.mode, created: !exists, bytesBefore: before.count, bytesAfter: after.count,
             line: line)

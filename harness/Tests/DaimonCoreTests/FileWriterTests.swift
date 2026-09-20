@@ -28,6 +28,12 @@ import Testing
         #expect(try String(contentsOfFile: file, encoding: .utf8) == "one\n2\nthree\n")
         let overwritten = try writer.apply(.write("x"), to: file)
         #expect(overwritten.rendered == "wrote \(file); now 1 bytes")
+        // Writes are atomic: the mode survives the rename and no temporary file is left behind.
+        try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: file)
+        _ = try writer.apply(.append("y"), to: file)
+        #expect(try FileManager.default.attributesOfItem(atPath: file)[.posixPermissions] as? Int == 0o640)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path) == ["a.txt"])
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "xy")
         #expect(throws: FileWriter.Failure.notFound(find: "zzz")) {
             try writer.apply(.replace(find: "zzz", replacement: ""), to: file)
         }
@@ -56,6 +62,17 @@ import Testing
         // The check follows symlinks: /tmp is /private/tmp.
         #expect(FileWriter(roots: ["/private/tmp"]).permits("/tmp/x"))
         #expect(throws: FileWriter.Failure.isDirectory(dir.path)) { try inside.apply(.write("x"), to: dir.path) }
+        // A rename that cannot happen leaves no temporary file and the original untouched.
+        let locked = dir.appending(path: "locked")
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        let target = locked.appending(path: "t.txt")
+        try Data("keep".utf8).write(to: target)
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: locked.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path) }
+        #expect(throws: (any Error).self) { try inside.apply(.write("new"), to: target.path) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path)
+        #expect(try String(contentsOfFile: target.path, encoding: .utf8) == "keep")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: locked.path) == ["t.txt"])
         let orphan = dir.appending(path: "missing/x.txt").path
         #expect(throws: FileWriter.Failure.noParent(orphan)) { try inside.apply(.write("x"), to: orphan) }
         let binary = dir.appending(path: "b.bin").path

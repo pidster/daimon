@@ -9,8 +9,8 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 Added:
 
 - `edit_file`, a new model tool: write a whole text file, append to it, or replace one exact
-  occurrence of a piece of text. Writes are confined to the directories the sandbox lets commands
-  write under, every edit passes the risk classifier and approval as `edit_file <mode> <path>`, and
+  occurrence of a piece of text. Writes are atomic and confined to the directories the sandbox lets
+  commands write under, every edit passes the risk classifier and approval as `edit_file <mode> <path>`, and
   each edit is audited as `file.write` and listed in the receipt's `files`.
 - `triage`, a new MCP tool: run a build or test command on this Mac (or read an output file) and get
   back only the failures as `kind`, `location`, `message`, judged chunk by chunk by the on-device model.
