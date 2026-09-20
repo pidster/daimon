@@ -8,6 +8,15 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- Model backends are a registry: `--model <backend>:<name>` names a local runtime by scheme, `daimon
+  models` lists every backend's models with their declared capabilities, and a backend this build lacks
+  is a clear error. Ollama now reports each model's real capabilities from its `/api/show`, so an
+  embedding model is refused for tool use before generation rather than failing during it.
+- `--no-tools` on the CLI and `tools: []` over MCP open a text-only conversation, which any model can
+  run; a request that needs tool calling on a model that does not declare it is refused with a hint.
+- The audit log records `model.resolved` when a conversation opens: backend, model, asset, declared
+  capabilities and who declared them, and the tools in use.
+
 - `inspect`, a read-only tool the model can call to see daimon's effective config, this conversation's
   status, the standing approvals, or recent audit events, bounded to 4 KiB.
 - MCP resources `daimon://config`, `daimon://status`, `daimon://approvals`, `daimon://audit`, and the

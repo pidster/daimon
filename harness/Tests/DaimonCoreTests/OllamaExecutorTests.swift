@@ -11,8 +11,13 @@ import Testing
 final class FakeOllama: URLProtocol {
     /// What the next requests get, keyed by path.
     static let responses = Mutex<[String: (status: Int, body: String)]>([:])
-    /// Every request body received, for assertions.
-    static let requests = Mutex<[Data]>([])
+    /// Every request received, as path and body, for assertions.
+    static let requests = Mutex<[(path: String, body: Data)]>([])
+
+    /// The bodies sent to `path`, as text.
+    static func bodies(for path: String) -> [String] {
+        requests.withLock { $0 }.filter { $0.path == path }.map { String(decoding: $0.body, as: UTF8.self) }
+    }
 
     static func serve(_ path: String, status: Int = 200, body: String) {
         responses.withLock { $0[path] = (status, body) }
@@ -40,9 +45,9 @@ final class FakeOllama: URLProtocol {
                 if read <= 0 { break }
                 data.append(buffer, count: read)
             }
-            Self.requests.withLock { $0.append(data) }
+            Self.requests.withLock { $0.append((path, data)) }
         } else if let body = request.httpBody {
-            Self.requests.withLock { $0.append(body) }
+            Self.requests.withLock { $0.append((path, body)) }
         }
         guard let canned = Self.responses.withLock({ $0[path] }), let url = request.url,
             let response = HTTPURLResponse(url: url, statusCode: canned.status, httpVersion: nil, headerFields: nil)
@@ -60,7 +65,9 @@ final class FakeOllama: URLProtocol {
 
 @Suite(.serialized) struct OllamaExecutorTests {
     static let settings = OllamaSettings(baseURL: URL(string: "http://fake.ollama:1")!, timeout: .seconds(5))
+    static let config = Config(ollama: .init(baseURL: "http://fake.ollama:1", timeoutSeconds: 5)).resolved
     static let tags = #"{"models":[{"name":"q:latest","size":10,"details":{"parameter_size":"3B"}}]}"#
+    static let shown = #"{"capabilities":["completion","tools"]}"#
 
     init() {
         URLProtocol.registerClass(FakeOllama.self)
@@ -69,14 +76,30 @@ final class FakeOllama: URLProtocol {
 
     @Test func listsAndChecksInstalledModels() async throws {
         FakeOllama.serve("/api/tags", body: Self.tags)
+        FakeOllama.serve("/api/show", body: Self.shown)
         let installed = try await OllamaModel.installed(at: Self.settings)
         #expect(installed.map(\.name) == ["q:latest"])
-        try OllamaModel(name: "q", settings: Self.settings).check()
+        let checked = try OllamaModel(name: "q", settings: Self.settings).checked()
+        #expect(checked.reported == ["completion", "tools"])
+        #expect(checked.capabilities.contains(.toolCalling) && checked.capabilities.contains(.guidedGeneration))
+        #expect(!checked.capabilities.contains(.reasoning))
         #expect(throws: OllamaModel.Failure.noSuchModel("z", installed: ["q:latest"])) {
-            try OllamaModel(name: "z", settings: Self.settings).check()
+            try OllamaModel(name: "z", settings: Self.settings).checked()
         }
-        #expect(OllamaModel(name: "q").capabilities.contains(.toolCalling))
+        // Before a check nothing is declared; an embedding model declares nothing after one either.
+        #expect(!OllamaModel(name: "q").capabilities.contains(.toolCalling))
+        FakeOllama.serve("/api/show", body: #"{"capabilities":["embedding"]}"#)
+        let embedding = try OllamaModel(name: "q", settings: Self.settings).checked()
+        #expect(!embedding.capabilities.contains(.toolCalling) && !embedding.capabilities.contains(.guidedGeneration))
         #expect(OllamaModel(name: "q", settings: Self.settings).executorConfiguration.timeoutSeconds == 5)
+        // The backend wraps all of it with the source and asset recorded.
+        FakeOllama.serve("/api/show", body: Self.shown)
+        let resolved = try OllamaBackend().resolve("q", config: Self.config)
+        #expect(resolved.capabilitySource == .runtime)
+        #expect(resolved.capabilityNames == ["toolCalling", "guidedGeneration"])
+        #expect(resolved.asset == "http://fake.ollama:1 q")
+        #expect(try await OllamaBackend().installed(config: Self.config).first?.selection == .ollama("q:latest"))
+        #expect(OllamaBackend().settings(in: Self.config).objectValue?["timeoutSeconds"] == 5)
         FakeOllama.serve("/api/tags", status: 500, body: "down")
         await #expect(throws: OllamaModel.Failure.serverError(status: 500, body: "down")) {
             _ = try await OllamaModel.installed(at: Self.settings)
@@ -87,6 +110,7 @@ final class FakeOllama: URLProtocol {
 
     @Test func chatStreamsTextToolCallsAndUsageThroughTheFrameworkLoop() async throws {
         FakeOllama.serve("/api/tags", body: Self.tags)
+        FakeOllama.serve("/api/show", body: Self.shown)
         // Two responses in order: a tool call, then text once the tool output is in the transcript.
         let call =
             #"{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"current_date","arguments":{"timeZone":"UTC"}}}]},"done":false}"#
@@ -95,15 +119,15 @@ final class FakeOllama: URLProtocol {
             #"{"message":{"role":"assistant","content":"date."},"done":true,"prompt_eval_count":12,"eval_count":3}"#,
         ]
         FakeOllama.serve("/api/chat", body: call + "\n")
-        let model = try ModelSelection.ollama("q").resolve(ollama: Self.settings)
+        let model = try ModelSelection.ollama("q").resolve(config: Self.config)
         let agent = Agent(instructions: "x", tools: [CurrentDateTool()], model: model)
         // The fake serves one canned body per path, so swap it once the first request has been made.
         let task = Task { try await agent.stream("date?") { _ in } }
-        while FakeOllama.requests.withLock({ $0.count }) < 1 { try await Task.sleep(for: .milliseconds(5)) }
+        while FakeOllama.bodies(for: "/api/chat").count < 1 { try await Task.sleep(for: .milliseconds(5)) }
         FakeOllama.serve("/api/chat", body: text.joined(separator: "\n") + "\n")
         let reply = try await task.value
         #expect(reply.text == "The date.")
-        let bodies = FakeOllama.requests.withLock { $0 }.map { String(decoding: $0, as: UTF8.self) }
+        let bodies = FakeOllama.bodies(for: "/api/chat")
         #expect(bodies.count >= 2)
         #expect(bodies[0].contains(#""name":"current_date""#))
         #expect(bodies[0].contains(#""stream":true"#))
@@ -113,7 +137,8 @@ final class FakeOllama: URLProtocol {
 
     @Test func serverErrorsAndBadChunksAreTyped() async throws {
         FakeOllama.serve("/api/tags", body: Self.tags)
-        let model = try ModelSelection.ollama("q").resolve(ollama: Self.settings)
+        FakeOllama.serve("/api/show", body: Self.shown)
+        let model = try ModelSelection.ollama("q").resolve(config: Self.config)
         FakeOllama.serve("/api/chat", status: 404, body: "no model")
         let agent = Agent(instructions: "x", tools: [], model: model)
         await #expect(throws: OllamaModel.Failure.serverError(status: 404, body: "no model")) {
@@ -131,6 +156,7 @@ final class FakeOllama: URLProtocol {
 
     @Test func aSessionOpensAgentsOnAnOllamaModel() async throws {
         FakeOllama.serve("/api/tags", body: Self.tags)
+        FakeOllama.serve("/api/show", body: Self.shown)
         FakeOllama.serve("/api/chat", body: #"{"message":{"role":"assistant","content":"ok"},"done":true}"# + "\n")
         let root = FileManager.default.temporaryDirectory.appending(path: "daimon-ollama-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -143,11 +169,29 @@ final class FakeOllama: URLProtocol {
         #expect(session.notes.isEmpty)  // Ollama is local: no egress note
         let agent = try session.openAgent(approver: DenyingApprover(reason: "x"))
         #expect(try await agent.respond(to: "hi").text == "ok")
+        let resolvedEvent = sink.events.first { $0.kind == .modelResolved }
+        #expect(resolvedEvent?.details["backend"] == "ollama")
+        #expect(resolvedEvent?.details["capabilitySource"] == "runtime")
+        #expect(resolvedEvent?.details["capabilities"] == .array(["toolCalling", "guidedGeneration"]))
+        #expect(resolvedEvent?.details["asset"] == "http://fake.ollama:1 q")
         let resumed = try session.openAgent(approver: DenyingApprover(reason: "x"), transcript: agent.transcript)
         #expect(resumed.transcript.turnCount == 1)
         #expect(sink.events.first?.details["model"] == "ollama:q")
         // A thread conversation resolves the same way.
         let thread = try session.conversation(id: "t", approver: DenyingApprover(reason: "x"))
         #expect(try await thread.openAgent().respond(to: "hi").text == "ok")
+        // A text-only model refuses tools with a hint, and runs with none.
+        FakeOllama.serve("/api/show", body: #"{"capabilities":["completion"]}"#)
+        #expect(throws: ModelSelection.Failure.self) { try session.openAgent(approver: DenyingApprover(reason: "x")) }
+        do {
+            _ = try session.openAgent(approver: DenyingApprover(reason: "x"))
+        } catch ModelSelection.Failure.unsupportedCapability(let model, let capability, let declaredBy, let hint) {
+            #expect(model == "ollama:q" && capability == "tool calling" && declaredBy == .runtime)
+            #expect(hint.contains("no tools"))
+        }
+        let textOnly = try session.conversation(
+            id: "t2", approver: DenyingApprover(reason: "x"), tools: ToolSelection.none)
+        #expect(textOnly.tools.isEmpty)
+        #expect(try await textOnly.openAgent().respond(to: "hi").text == "ok")
     }
 }

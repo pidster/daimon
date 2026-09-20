@@ -90,15 +90,28 @@ public struct OllamaModel: LanguageModel, Sendable {
     public let name: String
     /// Where the server is.
     public let settings: OllamaSettings
+    /// What the server said this model can do (`/api/show` `capabilities`), or nil before `check()`.
+    public let reported: [String]?
 
-    /// Creates a model; `resolve` on the selection checks it exists first.
-    public init(name: String, settings: OllamaSettings = .default) {
+    /// Creates a model; `resolve` on the selection checks it exists and reads its capabilities first.
+    public init(name: String, settings: OllamaSettings = .default, reported: [String]? = nil) {
         self.name = name
         self.settings = settings
+        self.reported = reported
     }
 
-    /// Tool calling and JSON-schema output, both of which Ollama's chat API supports.
-    public var capabilities: LanguageModelCapabilities { .init([.toolCalling, .guidedGeneration]) }
+    /// What Ollama reported for this model: `tools` gives tool calling, `completion` gives JSON-schema
+    /// output through the chat API's `format`. Nothing is declared before `check()`, and an embedding
+    /// model declares nothing at all.
+    public var capabilities: LanguageModelCapabilities {
+        var capabilities: [LanguageModelCapabilities.Capability] = []
+        let reported = reported ?? []
+        if reported.contains("tools") { capabilities.append(.toolCalling) }
+        if reported.contains("completion") { capabilities.append(.guidedGeneration) }
+        if reported.contains("thinking") { capabilities.append(.reasoning) }
+        if reported.contains("vision") { capabilities.append(.vision) }
+        return .init(capabilities)
+    }
     /// The executor's configuration: base URL and timeout, as one hashable string.
     public var executorConfiguration: Executor.Configuration {
         .init(baseURL: settings.baseURL, timeoutSeconds: Int(settings.timeout.components.seconds))
@@ -133,14 +146,45 @@ public struct OllamaModel: LanguageModel, Sendable {
         installed.contains { $0.name == name || $0.name == "\(name):latest" }
     }
 
-    /// Checks the server is up and has this model, blocking briefly; `ModelSelection.resolve` is
-    /// synchronous because agents are created synchronously.
+    /// Checks the server is up and has this model and reads what it can do, blocking briefly;
+    /// `ModelSelection.resolve` is synchronous because agents are created synchronously.
     ///
+    /// - Returns: The model with its reported capabilities.
     /// - Throws: `Failure`.
-    public func check() throws {
+    public func checked() throws -> OllamaModel {
         let installed = try Self.blocking { try await Self.installed(at: settings) }
         guard Self.matches(name, installed: installed) else {
             throw Failure.noSuchModel(name, installed: installed.map(\.name))
+        }
+        let reported = try Self.blocking { try await Self.show(name, at: settings) }
+        return OllamaModel(name: name, settings: settings, reported: reported)
+    }
+
+    /// Asks `/api/show` what a model can do; the `capabilities` array (`completion`, `tools`,
+    /// `thinking`, `vision`, `embedding`), or empty when the server does not report one.
+    ///
+    /// - Throws: `Failure.unreachable`, `Failure.serverError`, or `Failure.badResponse`.
+    public static func show(_ name: String, at settings: OllamaSettings) async throws -> [String] {
+        struct Shown: Decodable { var capabilities: [String]? }
+        var request = URLRequest(url: settings.baseURL.appending(path: "api/show"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["model": name])
+        request.timeoutInterval = 5
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw Failure.unreachable(settings.baseURL, error.localizedDescription)
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
+            throw Failure.serverError(status: status, body: String(decoding: data.prefix(200), as: UTF8.self))
+        }
+        do {
+            return try JSONDecoder().decode(Shown.self, from: data).capabilities ?? []
+        } catch {
+            throw Failure.badResponse("\(error)")
         }
     }
 
@@ -358,5 +402,44 @@ public struct OllamaModel: LanguageModel, Sendable {
                         input: .init(totalTokenCount: input, cachedTokenCount: 0),
                         output: .init(totalTokenCount: output, reasoningTokenCount: 0))))
         }
+    }
+}
+
+/// The built-in backend: Ollama on this Mac.
+public struct OllamaBackend: ModelBackend {
+    /// `ollama:`.
+    public let scheme = "ollama"
+
+    /// Creates the backend.
+    public init() {}
+
+    /// Checks the server lists the model, reads its capabilities, and wraps it.
+    ///
+    /// - Throws: `ModelSelection.Failure.unavailable` with the Ollama failure as the reason.
+    public func resolve(_ name: String, config: Config.Resolved) throws -> ResolvedModel {
+        do {
+            let model = try OllamaModel(name: name, settings: config.ollama).checked()
+            return ResolvedModel(
+                selection: .ollama(name), custom: model, capabilitySource: .runtime,
+                asset: "\(config.ollama.baseURL.absoluteString) \(name)")
+        } catch let failure as OllamaModel.Failure {
+            throw ModelSelection.Failure.unavailable(model: "ollama:\(name)", reason: failure.description)
+        }
+    }
+
+    /// The server's tag list.
+    public func installed(config: Config.Resolved) async throws -> [InstalledModel] {
+        try await OllamaModel.installed(at: config.ollama).map { model in
+            let size = ByteCountFormatter.string(fromByteCount: Int64(model.size), countStyle: .file)
+            return InstalledModel(selection: .ollama(model.name), detail: "\(model.parameterSize ?? "?") \(size)")
+        }
+    }
+
+    /// Base URL and timeout.
+    public func settings(in config: Config.Resolved) -> JSONValue {
+        .object([
+            "baseURL": .string(config.ollama.baseURL.absoluteString),
+            "timeoutSeconds": .int(Int(config.ollama.timeout.components.seconds)),
+        ])
     }
 }

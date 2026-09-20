@@ -43,7 +43,12 @@ availability and shapes the API.
 
 ### `ModelSelection` and `ResolvedModel`
 
-Any `LanguageModel` can be wrapped by `ResolvedModel(selection:custom:)`. `OllamaModel` is the first:
+Local runtimes are `ModelBackend`s in the `ModelBackends` registry, keyed by scheme; `ModelSelection.local`
+is spelled `<backend>:<name>` and resolves through the registry. A `ResolvedModel` carries the model's
+declared capabilities and their source, and `Conversation.openAgent` refuses a request that needs tool
+calling the model did not declare, then records `model.resolved`; see
+[ADR 0019](decisions/0019-model-backends.md). Any `LanguageModel` can be wrapped by
+`ResolvedModel(selection:custom:)`. `OllamaModel` is the first backend:
 its `Executor` maps the transcript onto Ollama's chat API (system, user, assistant with tool calls, tool
 messages), sends tool definitions as JSON Schema and an output schema as `format`, and streams chunks back
 as `response` and `toolCalls` events with usage at the end. `resolve` checks the server lists the model

@@ -12,7 +12,19 @@ import Testing
         #expect(try ModelSelection(parsing: "ollama:qwen3-coder") == .ollama("qwen3-coder"))
         #expect(try ModelSelection(parsing: " ollama:qwen3-coder:latest ") == .ollama("qwen3-coder:latest"))
         #expect(ModelSelection.ollama("x").description == "ollama:x")
+        #expect(ModelSelection.ollama("x") == .local(backend: "ollama", name: "x"))
+        #expect(ModelSelection.ollama("x").backend == "ollama")
         #expect(!ModelSelection.ollama("x").leavesDevice)
+        #expect(try ModelSelection(parsing: "CoreAI:/models/q") == .local(backend: "coreai", name: "/models/q"))
+        #expect(throws: ModelSelection.Failure.unknownModel("bad scheme:x")) {
+            try ModelSelection(parsing: "bad scheme:x")
+        }
+        #expect(throws: ModelSelection.Failure.self) { try ModelSelection.local(backend: "nope", name: "m").resolve() }
+        do {
+            _ = try ModelSelection.local(backend: "nope", name: "m").resolve()
+        } catch ModelSelection.Failure.unknownBackend(let scheme, let registered) {
+            #expect(scheme == "nope" && registered.contains("ollama"))
+        }
         #expect(throws: ModelSelection.Failure.unknownModel("ollama:")) { try ModelSelection(parsing: "ollama:") }
         #expect(throws: ModelSelection.Failure.unknownModel("ollama:a b")) { try ModelSelection(parsing: "ollama:a b") }
         let encoded = try JSONEncoder().encode(Config(model: .ollama("qwen3-coder")))
@@ -78,11 +90,10 @@ import Testing
     }
 
     @Test func nothingListeningIsUnavailable() {
-        let settings = OllamaSettings(
-            baseURL: URL(string: "http://127.0.0.1:1")!, timeout: .seconds(1))
-        #expect(throws: ModelSelection.Failure.self) { try ModelSelection.ollama("x").resolve(ollama: settings) }
+        let config = Config(ollama: .init(baseURL: "http://127.0.0.1:1", timeoutSeconds: 1)).resolved
+        #expect(throws: ModelSelection.Failure.self) { try ModelSelection.ollama("x").resolve(config: config) }
         do {
-            _ = try ModelSelection.ollama("x").resolve(ollama: settings)
+            _ = try ModelSelection.ollama("x").resolve(config: config)
         } catch ModelSelection.Failure.unavailable(let model, let reason) {
             #expect(model == "ollama:x")
             #expect(reason.contains("no Ollama server"))

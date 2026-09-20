@@ -16,6 +16,7 @@ public struct AuditEvent: Codable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
         case sessionStart = "session.start"
         case sessionEnd = "session.end"
+        case modelResolved = "model.resolved"
         case prompt = "prompt"
         case response = "response"
         case toolCall = "tool.call"

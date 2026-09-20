@@ -77,4 +77,9 @@ import Testing
         #expect(throws: MCPError.self) { try CloseThreadRequest(arguments: ["thread_id": .string("a/b")]) }
     }
 
+    @Test func emptyToolsMeansATextOnlyThread() throws {
+        let request = try RespondRequest(arguments: ["prompt": .string("hi"), "tools": .array([])])
+        #expect(request.tools == ToolSelection.none)
+        #expect(ToolSelection.none.resolved(or: ["a"]).isEmpty)
+    }
 }

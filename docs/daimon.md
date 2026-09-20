@@ -14,9 +14,10 @@ terminal with no prompt, `daimon` prints its help instead of waiting for input.
 | --- | --- |
 | `-i, --instructions <text>` | Instructions for this conversation, added under daimon's own system prompt and `config.json`'s `systemPromptExtension`. See [ADR 0017](decisions/0017-three-layer-instructions.md). |
 | `--tool <name>` (repeatable) | Enable only these tools. Default: all registered tools. |
+| `--no-tools` | Give the model no tools: a text-only conversation, which a model that declares no tool calling can still run. |
 | `--stream` / `--no-stream` | Stream the reply as it is generated (default on). |
 | `--unsafe` | Disable the `run_command` policy and sandbox (warns on stderr). |
-| `-m, --model <model>` | `system` (default, on device), `private-cloud` (alias `pcc`; Apple Private Cloud Compute; data leaves the Mac, noted on stderr), or `ollama:<name>` (a model served by the local Ollama, such as `ollama:qwen3-coder`; `daimon models` lists them). Defaults to `config.json`. |
+| `-m, --model <model>` | `system` (default, on device), `private-cloud` (alias `pcc`; Apple Private Cloud Compute; data leaves the Mac, noted on stderr), or `<backend>:<name>` for a local runtime (`ollama:qwen3-coder`; `daimon models` lists every backend's models). A request that needs tool calling is refused before generation when the model does not declare it; see [ADR 0019](decisions/0019-model-backends.md). Defaults to `config.json`. |
 | `-y, --yes` | Approve risky commands without asking. Without it, `respond` refuses commands at or above the approval threshold. |
 
 ```
@@ -78,10 +79,10 @@ See [logging.md](logging.md) for the event catalogue.
 
 ### `daimon models`
 
-Lists what `--model` and `config.json` can name: `system` and `private-cloud` with their availability as
-the framework reports it, then every model the local Ollama serves (from its `/api/tags`), with parameter
-count and size. The configured default is marked with `*`. If no Ollama answers, the last line says so;
-the Apple models are still listed.
+Lists what `--model` and `config.json` can name: `system` and `private-cloud` with their availability and
+declared capabilities as the framework reports them, then every model each local backend serves (Ollama
+from its `/api/tags`, with parameter count and size). The configured default is marked with `*`. A
+backend that does not answer gets one line saying so; the others are still listed.
 
 ```
 * system	available

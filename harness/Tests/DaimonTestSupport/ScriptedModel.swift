@@ -100,18 +100,21 @@ public struct ScriptedModel: LanguageModel {
     /// The script this model plays.
     public let script: Script
 
+    /// What this model declares; tool calling and guided generation by default, so every framework
+    /// path is open. Pass fewer to test capability gating.
+    public let capabilities: LanguageModelCapabilities
+
     /// Creates a model that first asks for `current_date` in Asia/Tokyo, then reports it.
     public init(
         steps: [Step] = [
             .call(name: "current_date", arguments: #"{"timeZone":"Asia/Tokyo"}"#), .say("The date is {tool}"),
         ],
-        overflowOnce: Bool = false, partialBeforeOverflow: String = ""
+        overflowOnce: Bool = false, partialBeforeOverflow: String = "",
+        capabilities: [LanguageModelCapabilities.Capability] = [.toolCalling, .guidedGeneration]
     ) {
         script = Script(steps: steps, overflowOnce: overflowOnce, partialBeforeOverflow: partialBeforeOverflow)
+        self.capabilities = LanguageModelCapabilities(capabilities)
     }
-
-    /// Tool calling and guided generation, so every framework path is open.
-    public var capabilities: LanguageModelCapabilities { .init([.toolCalling, .guidedGeneration]) }
     /// Nothing to configure.
     public var executorConfiguration: Int { 0 }
 }

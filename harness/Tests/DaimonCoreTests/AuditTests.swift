@@ -188,6 +188,12 @@ import Testing
             ),
             (.sessionStart, D.sessionRestart(tools: ["t"], model: .system)),
             (.sessionEnd, D.sessionEnd(reason: "closed")),
+            (
+                .modelResolved,
+                D.modelResolved(
+                    model: .ollama("q"), backend: "ollama", asset: "a", capabilities: ["toolCalling"],
+                    capabilitySource: .runtime, tools: ["run_command"])
+            ),
             (.prompt, D.prompt(text: "hi")),
             (.response, D.response(text: "yo", condensed: true, seconds: 1)),
             (.toolCall, D.toolCall(tool: "t", arguments: "{}")),

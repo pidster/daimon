@@ -41,7 +41,8 @@ public enum ToolCatalog {
                     "type": .string("array"),
                     "items": .object(["type": .string("string")]),
                     "description": .string(
-                        "Names of daimon tools the model may call. Omit to allow all registered tools."),
+                        "Names of daimon tools the model may call. Omit to allow all registered tools; an empty "
+                            + "array gives a text-only thread, which any model can run."),
                 ]),
                 "model": .object([
                     "type": .string("string"),
@@ -166,13 +167,11 @@ public struct RespondRequest: Equatable, Sendable {
         }
         if let raw = arguments?["tools"] {
             guard let items = raw.arrayValue else { throw MCPError.invalidParams("'tools' must be an array") }
-            tools = ToolSelection(
-                try items.map {
-                    guard let name = $0.stringValue else {
-                        throw MCPError.invalidParams("'tools' items must be strings")
-                    }
-                    return name
-                })
+            let names = try items.map {
+                guard let name = $0.stringValue else { throw MCPError.invalidParams("'tools' items must be strings") }
+                return name
+            }
+            tools = names.isEmpty ? ToolSelection.none : .named(names)
         } else {
             tools = .all
         }

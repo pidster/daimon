@@ -11,9 +11,12 @@ import Testing
         #expect(try ModelSelection(parsing: "pcc") == .privateCloud)
     }
 
-    @Test func rejectsUnknownSpellings() {
+    @Test func rejectsUnknownSpellings() throws {
         #expect(throws: ModelSelection.Failure.unknownModel("gpt-5")) { try ModelSelection(parsing: "gpt-5") }
-        #expect(throws: ModelSelection.Failure.unknownModel("adapter:x")) { try ModelSelection(parsing: "adapter:x") }
+        // Any scheme parses; a backend this build lacks fails when the model is resolved.
+        #expect(try ModelSelection(parsing: "adapter:x") == .local(backend: "adapter", name: "x"))
+        #expect(throws: ModelSelection.Failure.self) { try ModelSelection(parsing: "adapter:x").resolve() }
+        #expect(throws: ModelSelection.Failure.unknownModel("adapter:")) { try ModelSelection(parsing: "adapter:") }
     }
 
     @Test func describesAndFlagsDeviceEgress() {

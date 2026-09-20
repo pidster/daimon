@@ -28,6 +28,20 @@ extension AuditEvent {
             ["reason": "new", "tools": .array(tools.map { .string($0) }), "model": .string(model.description)]
         }
 
+        /// `model.resolved`: which model a conversation actually opened on, what it declared, and who
+        /// declared it.
+        public static func modelResolved(
+            model: ModelSelection, backend: String, asset: String?, capabilities: [String],
+            capabilitySource: CapabilitySource, tools: [String]
+        ) -> [String: JSONValue] {
+            [
+                "model": .string(model.description), "backend": .string(backend),
+                "asset": asset.map { .string($0) } ?? .null,
+                "capabilities": .array(capabilities.map { .string($0) }),
+                "capabilitySource": .string(capabilitySource.rawValue), "tools": .array(tools.map { .string($0) }),
+            ]
+        }
+
         /// `session.end`, with why for MCP threads.
         public static func sessionEnd(reason: String? = nil) -> [String: JSONValue] {
             reason.map { ["reason": .string($0)] } ?? [:]
@@ -182,6 +196,7 @@ extension AuditEvent {
                 "resume", "parent", "reason",
             ]
         case .sessionEnd: ["reason"]
+        case .modelResolved: ["model", "backend", "asset", "capabilities", "capabilitySource", "tools"]
         case .prompt: ["text"]
         case .response: ["text", "condensed", "seconds"]
         case .toolCall: ["tool", "arguments"]

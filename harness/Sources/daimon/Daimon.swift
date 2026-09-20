@@ -30,6 +30,9 @@ struct SessionOptions: ParsableArguments {
     @Option(name: .customLong("tool"), help: "Tool to enable (repeatable). All tools are enabled when omitted.")
     var toolNames: [String] = []
 
+    @Flag(name: .customLong("no-tools"), help: "Give the model no tools: a text-only conversation any model can run.")
+    var noTools = false
+
     @Flag(help: "Disable the run_command policy and sandbox.")
     var unsafe = false
 
@@ -44,7 +47,8 @@ struct SessionOptions: ParsableArguments {
     func request(entryPoint: EntryPoint, autoApprove: Bool = false, resume: String? = nil) throws -> Session.Request {
         .init(
             entryPoint: entryPoint, instructions: instructions, model: try model.map(Daimon.parseModel),
-            tools: ToolSelection(toolNames), unsafe: unsafe, autoApprove: autoApprove, resume: resume)
+            tools: noTools ? .none : ToolSelection(toolNames), unsafe: unsafe, autoApprove: autoApprove,
+            resume: resume)
     }
 }
 
@@ -330,34 +334,34 @@ struct ConfigCommand: ParsableCommand {
     }
 }
 
-/// Lists the models a session can run on: Apple's two and whatever the local Ollama serves.
+/// Lists the models a session can run on: Apple's two and whatever each local backend serves.
 struct Models: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "List the models available to --model and config.json.",
-        discussion: "Apple's models are checked with the framework; Ollama's are read from its /api/tags.")
+        discussion: "Apple's models are checked with the framework; each local backend lists what it serves.")
 
     func run() async throws {
         let config = try Daimon.usage { try Session.loadConfig(home: Daimon.home) }
         for selection in [ModelSelection.system, .privateCloud] {
             let state: String
             do {
-                _ = try selection.resolve()
-                state = "available"
+                let resolved = try selection.resolve(config: config)
+                state = "available; \(resolved.capabilityNames.joined(separator: ", "))"
             } catch {
                 state = "unavailable: \(error)"
             }
             let mark = selection == config.model ? "*" : " "
             print("\(mark) \(selection)\t\(state)")
         }
-        do {
-            for model in try await OllamaModel.installed(at: config.ollama) {
-                let selection = ModelSelection.ollama(model.name)
-                let mark = selection == config.model ? "*" : " "
-                let size = ByteCountFormatter.string(fromByteCount: Int64(model.size), countStyle: .file)
-                print("\(mark) \(selection)\t\(model.parameterSize ?? "?") \(size)")
+        for backend in ModelBackends.all {
+            do {
+                for model in try await backend.installed(config: config) {
+                    let mark = model.selection == config.model ? "*" : " "
+                    print("\(mark) \(model.selection)\t\(model.detail)")
+                }
+            } catch {
+                print("  \(backend.scheme):*\tunavailable: \(error)")
             }
-        } catch {
-            print("  ollama:*\tunavailable: \(error)")
         }
     }
 }
@@ -370,7 +374,7 @@ struct DoctorCommand: ParsableCommand {
 
     func run() throws {
         let config = try? Session.loadConfig(home: Daimon.home)
-        let findings = Doctor(home: Daimon.home, model: config?.model ?? .default, ollama: config?.ollama ?? .default)
+        let findings = Doctor(home: Daimon.home, model: config?.model ?? .default, config: config ?? Config().resolved)
             .run()
         print("daimon \(DaimonVersion.current)")
         print(Doctor.render(findings))

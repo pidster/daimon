@@ -302,8 +302,8 @@ public struct Conversation: Sendable {
     public let prompting: Prompting
     /// The model the agent runs on.
     public let model: ModelSelection
-    /// Where Ollama is, should the model be one of its.
-    let ollama: OllamaSettings
+    /// The effective configuration, which local backends read their settings from.
+    let config: Config.Resolved
 
     /// Builds the gate and the tool registry for one conversation of `session`.
     ///
@@ -323,16 +323,24 @@ public struct Conversation: Sendable {
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(
             gate: gate, tools: selection.tools.map { $0 }, audit: audit, prompting: prompting, model: model,
-            ollama: session.config.ollama)
+            config: session.config)
     }
 
-    /// Creates the agent that runs this conversation.
+    /// Resolves the model, refuses a request its declared capabilities cannot serve, records
+    /// `model.resolved`, and creates the agent that runs this conversation.
     ///
     /// - Parameter transcript: A saved conversation to resume, or nil to start from the instructions.
     /// - Returns: The agent, recording to this conversation's audit log and advancing its turn clock.
-    /// - Throws: `ModelSelection.Failure` if the model cannot be used.
+    /// - Throws: `ModelSelection.Failure` if the model cannot be used or lacks a needed capability.
     public func openAgent(transcript: Transcript? = nil) throws -> Agent {
-        let resolved = try model.resolve(ollama: ollama)
+        let resolved = try model.resolve(config: config)
+        try resolved.check(tools: tools)
+        audit.record(
+            .modelResolved,
+            details: AuditEvent.Details.modelResolved(
+                model: resolved.selection, backend: resolved.selection.backend, asset: resolved.asset,
+                capabilities: resolved.capabilityNames, capabilitySource: resolved.capabilitySource,
+                tools: tools.map(\.name)))
         if let transcript {
             return Agent(transcript: transcript, tools: tools, model: resolved, audit: audit)
         }

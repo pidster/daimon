@@ -62,10 +62,8 @@ public struct Introspection: Sendable {
                 "keepFiles": .int(config.auditLimits.keepFiles),
             ]),
             "maxThreads": .int(config.maxThreads),
-            "ollama": .object([
-                "baseURL": .string(config.ollama.baseURL.absoluteString),
-                "timeoutSeconds": .int(Int(config.ollama.timeout.components.seconds)),
-            ]),
+            "backends": .object(
+                Dictionary(uniqueKeysWithValues: ModelBackends.all.map { ($0.scheme, $0.settings(in: config)) })),
         ])
     }
 

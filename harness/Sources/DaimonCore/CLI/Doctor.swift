@@ -24,8 +24,8 @@ public struct Doctor: Sendable {
     public struct Probes: Sendable {
         /// Nil when the system model is available, else the reason it is not.
         public var systemModel: @Sendable () -> String?
-        /// Nil when the given model resolves (with these Ollama settings), else the failure text.
-        public var configuredModel: @Sendable (ModelSelection, OllamaSettings) -> String?
+        /// Nil when the given model resolves under this configuration, else the failure text.
+        public var configuredModel: @Sendable (ModelSelection, Config.Resolved) -> String?
 
         /// Probes that ask the framework.
         public static let live = Probes(
@@ -35,9 +35,9 @@ public struct Doctor: Sendable {
                 }
                 return nil
             },
-            configuredModel: { model, ollama in
+            configuredModel: { model, config in
                 do {
-                    _ = try model.resolve(ollama: ollama)
+                    _ = try model.resolve(config: config)
                     return nil
                 } catch {
                     return "\(error)"
@@ -47,7 +47,7 @@ public struct Doctor: Sendable {
         /// Creates probes.
         public init(
             systemModel: @escaping @Sendable () -> String?,
-            configuredModel: @escaping @Sendable (ModelSelection, OllamaSettings) -> String?
+            configuredModel: @escaping @Sendable (ModelSelection, Config.Resolved) -> String?
         ) {
             self.systemModel = systemModel
             self.configuredModel = configuredModel
@@ -58,16 +58,18 @@ public struct Doctor: Sendable {
     public var home: Home
     /// The configured model, checked in addition to the system model.
     public var model: ModelSelection
-    /// Where Ollama is, for an `ollama:` model.
-    public var ollama: OllamaSettings
+    /// The configuration local backends read their settings from.
+    public var resolvedConfig: Config.Resolved
     private let probes: Probes
 
     /// Creates a doctor for `home` and the configured `model`.
-    public init(home: Home, model: ModelSelection = .default, ollama: OllamaSettings = .default, probes: Probes = .live)
-    {
+    public init(
+        home: Home, model: ModelSelection = .default, config: Config.Resolved = Config().resolved,
+        probes: Probes = .live
+    ) {
         self.home = home
         self.model = model
-        self.ollama = ollama
+        resolvedConfig = config
         self.probes = probes
     }
 
@@ -79,7 +81,7 @@ public struct Doctor: Sendable {
     }
 
     private func configuredModel() -> Finding {
-        if let problem = probes.configuredModel(model, ollama) {
+        if let problem = probes.configuredModel(model, resolvedConfig) {
             return Finding(name: "configured model", ok: false, detail: problem)
         }
         return Finding(name: "configured model", ok: true, detail: "\(model) available")

@@ -82,7 +82,7 @@ Run a prompt on the on-device model, with daimon's tools available to it, on a c
 | `prompt` | string | yes | The task. Keep it short; the model's window is about 4k tokens. |
 | `thread_id` | string | no | Omit to start a thread (an id is generated). Supply an unused id to name a new thread. Supply a known id to continue it. `[A-Za-z0-9._-]{1,64}`. |
 | `instructions` | string | no | Instructions for this thread, added under daimon's own system prompt and the server's configured extension; replaces the server's `--instructions` for the thread. Only when a thread starts; an error afterwards. |
-| `tools` | string[] | no | Names of daimon tools to enable. Only when a thread starts. Default: all. |
+| `tools` | string[] | no | Names of daimon tools to enable. Only when a thread starts. Omitted: all. `[]`: a text-only thread, which a model that declares no tool calling can still run; a thread that needs tools on such a model is refused with a hint before generation. |
 | `model` | string | no | `system` (default), `private-cloud` (alias `pcc`; data leaves the Mac), or `ollama:<name>` (a model the local Ollama serves; `daimon models` lists them). Only when a thread starts. |
 
 Result content is the reply text. `structuredContent`:
