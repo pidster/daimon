@@ -45,9 +45,9 @@ not the differentiator. Items, in order of leverage:
   reply; use them to estimate context use so the condensing policy acts before the runtime silently
   truncates. Repeated in practice: the git thread on the on-device model lost its instructions to hook
   output. Belongs with `ContextPolicy`, not with a new backend.
-- **Agent tests without the model.** `ScriptedModel` (`Tests/DaimonTestSupport`) already drives `Agent`,
-  the tool loop, and `DaimonServer.respond` over a real client. Left: replace `FakeThread` in the server
-  tests with it and cover the chat loop.
+- Done 2026-09-20: agent tests without the model. `ScriptedModel` drives `Agent`, the tool loop,
+  `DaimonServer` over a real client and in its unit tests (the fake thread is gone), and the whole
+  `daimon chat` loop, which moved into `DaimonCore` as `ChatLoop` with injected input and output.
 
 ## Model backends, deferred
 

@@ -219,7 +219,9 @@ MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ T
 `--[no-]stream`, repeatable `--tool`. `daimon chat` is a line-oriented REPL with slash commands parsed by
 `ChatInput` (`/help`, `/tools`, `/tokens`, `/save`, `/new`, `/quit`), `--resume <name>`, and `--save <name>`.
 `daimon tools` lists the registry. `daimon mcp` serves MCP on stdio. Instructions default to `config.json`.
-Exit codes follow swift-argument-parser conventions (64 for usage errors).
+Exit codes follow swift-argument-parser conventions (64 for usage errors). The chat loop itself is
+`ChatLoop` in `DaimonCore`, with its input and output injected, so the executable only wires the
+terminal to it and `ChatLoopTests` runs the whole loop over a scripted model.
 
 ## Error handling
 

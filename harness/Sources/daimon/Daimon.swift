@@ -236,67 +236,21 @@ struct Chat: AsyncParsableCommand {
             agent = try session.openAgent(approver: TerminalApprover())
         }
         Self.note("audit log: \(Daimon.home.auditFile.path) session \(session.audit.session)")
-        var saveName = save ?? resume
-        Self.note("daimon chat. /help for commands, /quit or Ctrl-D to exit.")
-
-        loop: while true {
-            FileHandle.standardError.write(Data("> ".utf8))
-            guard let line = readLine() else { break loop }
-            switch ChatInput(line: line) {
-            case .quit:
-                break loop
-            case .help:
-                print(ChatInput.helpText)
-            case .tools:
-                for tool in agent.tools { print("\(tool.name)\t\(tool.description)") }
-            case .tokens:
-                do {
-                    let tokens = try await agent.contextTokens().map(String.init) ?? "unknown"
-                    print(
-                        "\(tokens) tokens in \(agent.transcript.turnCount) turns; condensed \(agent.condensations) times"
-                    )
-                } catch {
-                    Self.note("error: \(error)")
-                }
-            case .save(let name):
-                guard let name = name ?? saveName else {
-                    Self.note("usage: /save <name>")
-                    continue
-                }
-                do {
-                    try store.save(agent.transcript, as: name)
-                    saveName = name
-                    Self.note("saved '\(name)'")
-                } catch {
-                    Self.note("error: \(error)")
-                }
-            case .new:
-                agent.reset()
-                Self.note("new conversation")
-            case .unknown(let command):
-                Self.note("unknown command /\(command); /help lists commands")
-            case .message(let text):
-                guard !text.isEmpty else { continue }
-                do {
-                    let reply = try await agent.stream(text) { delta in
-                        print(delta, terminator: "")
+        var loop = ChatLoop(
+            agent: agent, store: store, saveName: save ?? resume,
+            io: .init(
+                readLine: { readLine() },
+                print: { print($0) },
+                write: {
+                    if $0 == "> " {
+                        FileHandle.standardError.write(Data($0.utf8))
+                    } else {
+                        print($0, terminator: "")
                         fflush(stdout)
                     }
-                    print()
-                    if reply.condensed {
-                        Self.note("(context was full; older turns were dropped to continue)")
-                    }
-                } catch {
-                    print()
-                    Self.note("error: \(error)")
-                }
-            }
-        }
-
-        if let saveName {
-            try store.save(agent.transcript, as: saveName)
-            Self.note("saved '\(saveName)'")
-        }
+                },
+                note: Self.note))
+        try await loop.run()
     }
 
     /// Writes a status line to stderr so stdout stays clean for replies.

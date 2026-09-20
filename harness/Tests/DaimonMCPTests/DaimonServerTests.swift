@@ -1,16 +1,27 @@
 import DaimonCore
+import DaimonTestSupport
 import Foundation
 import MCP
 import Testing
 
 @testable import DaimonMCP
 
-/// A thread that answers without a model.
-struct FakeThread: RespondingThread {
-    let reply: String
-    func respond(to prompt: String, schema: OutputSchema?) async throws -> Agent.Reply {
-        .init(text: schema == nil ? reply + prompt : #"{"echo":"\#(prompt)"}"#, condensed: false)
-    }
+/// A thread factory whose threads run a `ScriptedModel` through the real `ConversationThread` and
+/// `Agent`, so the server is tested over the same objects it uses in production, with no model. Each
+/// new thread says its id, then "again", then "done".
+func scriptedThreads(
+    _ session: Session, _ approver: any Approver, _ id: String, _ instructions: String?, _ tools: ToolSelection,
+    _ model: ModelSelection?
+) throws -> OpenThread {
+    let conversation = try session.conversation(
+        id: id, approver: approver, instructions: instructions, tools: tools, model: model)
+    let agent = Agent(
+        instructions: conversation.prompting.rendered, tools: conversation.tools,
+        model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("\(id):"), .say("again")])),
+        audit: conversation.audit)
+    return OpenThread(
+        thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit,
+        receipts: conversation.receipts)
 }
 
 /// A session over a scratch home, with a memory audit sink and a denying approver.
@@ -27,10 +38,7 @@ func scratchSession(entryPoint: EntryPoint = .mcp, dependencies: Session.Depende
 
     init() throws {
         server = DaimonServer(session: try scratchSession())
-        fakeServer = DaimonServer(session: try scratchSession()) { session, approver, id, _, _, _ in
-            let conversation = try session.conversation(id: id, approver: approver)
-            return OpenThread(thread: FakeThread(reply: "\(id):"), gate: conversation.gate, audit: conversation.audit)
-        }
+        fakeServer = DaimonServer(session: try scratchSession(), makeThread: scriptedThreads)
     }
 
     @Test func respondUsesTheThreadFactoryAndReportsCreation() async throws {
@@ -38,10 +46,12 @@ func scratchSession(entryPoint: EntryPoint = .mcp, dependencies: Session.Depende
             .init(name: "respond", arguments: ["prompt": .string("hi"), "thread_id": .string("t")]))
         #expect(first.isError == false)
         #expect(first.structuredContent?.objectValue?["created"] == .bool(true))
-        #expect(first.structuredContent?.objectValue?["text"] == .string("t:hi"))
+        #expect(first.structuredContent?.objectValue?["text"] == .string("t:"))
         let second = try await fakeServer.call(
             .init(name: "respond", arguments: ["prompt": .string("again"), "thread_id": .string("t")]))
         #expect(second.structuredContent?.objectValue?["created"] == .bool(false))
+        #expect(second.structuredContent?.objectValue?["text"] == .string("again"))
+        #expect(second.structuredContent?.objectValue?["receipt"]?.objectValue?["turn"] == .int(2))
     }
 
     @Test func threadsShareTheSessionsStoreAndSessionApprovals() async throws {
