@@ -33,4 +33,55 @@ import Testing
             await tool.call(arguments: .init(path: "/nonexistent/x", offset: nil, limit: nil))
                 == "error: file not found: /nonexistent/x")
     }
+
+    @Test func editFileClearsTheGateAppliesAndAuditsOrExplains() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-edit-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sink = MemoryAuditSink()
+        let audit = AuditLog(session: "s", sink: sink)
+        let writer = FileWriter(roots: [CommandPolicy.canonical(dir.path)])
+        let file = dir.appending(path: "f.txt").path
+        let open = EditFileTool(writer: writer, audit: audit)
+        #expect(
+            await open.call(arguments: .init(path: file, mode: "write", content: "hello\n", find: nil))
+                == "created \(file); now 6 bytes")
+        #expect(
+            await open.call(arguments: .init(path: file, mode: " Replace ", content: "bye", find: "hello"))
+                == "replaced at line 1 of \(file); now 4 bytes")
+        let write = sink.events.first { $0.kind == .fileWrite }
+        #expect(write?.details["mode"] == "write" && write?.details["created"] == true)
+        #expect(write?.details["bytesAfter"] == 6 && write?.details["path"] == .string(file))
+        #expect(write?.summary.hasSuffix("file.write session=s: write \(file) 0->6 bytes") == true)
+        #expect(
+            await open.call(arguments: .init(path: file, mode: "replace", content: "x", find: nil))
+                == "error: replace needs find, the exact text to replace")
+        #expect(
+            await open.call(arguments: .init(path: file, mode: "delete", content: "x", find: nil))
+                == "error: mode must be write, append, or replace")
+        #expect(
+            await open.call(arguments: .init(path: file, mode: "replace", content: "x", find: "nope"))
+                == "error: text to replace not found: nope")
+        // With a gate: every edit is at least moderate, so a denying approver refuses it and nothing changes.
+        let gate = ApprovalGate(
+            classifier: RuleRiskClassifier.standard, approver: DenyingApprover(reason: "not now"),
+            threshold: .level(.moderate), audit: audit)
+        let gated = EditFileTool(writer: writer, approval: gate, audit: audit)
+        let refused = await gated.call(arguments: .init(path: file, mode: "append", content: "!", find: nil))
+        #expect(refused.hasPrefix("error: edit not approved: "), "\(refused)")
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "bye\n")
+        let decided = sink.events.last { $0.kind == .approvalDecided }
+        #expect(decided?.details["command"] == .string("edit_file append \(file)"))
+        #expect(decided?.details["pattern"] == "edit_file *")
+        // A credential path is dangerous by the rules, whatever the mode.
+        let verdict = await RuleRiskClassifier.standard.classify(
+            command: "edit_file write /Users/me/.ssh/authorized_keys", workingDirectory: "/")
+        #expect(verdict.level == .dangerous)
+        #expect(
+            await RuleRiskClassifier.standard.classify(command: "edit_file write /tmp/x", workingDirectory: "/").level
+                == .moderate)
+        #expect(gated.limits.contains("Writes only under") && gated.limits.contains("exactly one match"))
+        #expect(EditFileTool(writer: FileWriter(roots: nil)).limits.hasPrefix("No write confinement"))
+        #expect(ToolRegistry().all.map(\.name).contains("edit_file"))
+    }
 }

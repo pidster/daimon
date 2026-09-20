@@ -44,6 +44,7 @@ sensitive; it is why it is user-only.
 | `tool.result` | `tool`, `output`, `bytes`, `seconds` | `AuditedTool` |
 | `policy.decision` | `command`, `workingDirectory`, `verdict` (`allowed`, `denied` by pattern, `disapproved` by the gate), `reason`, `sandbox`, `network`, `nested`; recorded once, after the directory check, patterns, and approval | `CommandRunner` |
 | `command.outcome` | `command`, `exitStatus`, `timedOut`, `truncated`, `stdout`, `stderr`, `seconds` | `CommandRunner` |
+| `file.write` | `path`, `mode` (`write`, `append`, `replace`), `created`, `bytesBefore`, `bytesAfter`; recorded after an `edit_file` edit lands, the content being in the `tool.call` arguments | `EditFileTool` |
 | `context.condensation` | `turnsBefore`, `turnsAfter`, `contextSize`, `tokenCount` | `Agent` |
 | `mcp.request` | `tool`, `arguments` | `DaimonServer` |
 | `mcp.result` | `tool`, `isError`, `text`, `seconds` | `DaimonServer` |

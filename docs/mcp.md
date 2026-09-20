@@ -106,6 +106,7 @@ delegated work without reading the log ([ADR 0021](decisions/0021-receipts.md)):
   "turn": 3,
   "tools": [{ "name": "run_command", "arguments": "{\"command\":\"git status\"}", "bytes": 212, "seconds": 0.4 }],
   "commands": [{ "command": "git status", "exitStatus": 0, "timedOut": false, "truncated": false, "seconds": 0.3 }],
+  "files": [],
   "denials": [],
   "approvals": [{ "command": "git status", "level": "moderate", "decision": "approved", "scope": "session" }],
   "errors": [],
@@ -118,6 +119,7 @@ delegated work without reading the log ([ADR 0021](decisions/0021-receipts.md)):
 | --- | --- |
 | `turn` | The thread's turn number, which `daimon://audit/{thread_id}` events carry as `turn`. |
 | `tools` | Every tool call in order: `name`, the model's `arguments` JSON, and the result's `bytes` and `seconds`; a call that threw has `error` instead. |
+| `files` | Every file `edit_file` wrote: `path`, `mode`, `created`, `bytes` after the edit. |
 | `commands` | Every command that ran: `exitStatus`, `timedOut`, `truncated`, `seconds`. Output is not repeated; the audit log has it verbatim. |
 | `denials` | Commands turned away before running: `verdict` is `denied` (policy, with `reason`) or `disapproved` (the gate; also in `refusals`). |
 | `approvals` | Every gate decision: `decision` (`approved`, `denied`, `timed-out`, `cached…`), the `level` it was asked at, the `scope` given. |

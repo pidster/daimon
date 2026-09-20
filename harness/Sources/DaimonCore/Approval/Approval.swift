@@ -216,6 +216,21 @@ public actor ApprovalGate {
             classifier: RuleRiskClassifier.standard)
     }
 
+    /// Returns normally if the model may edit the file, judged as the command `edit_file <mode> <path>`
+    /// by the full classifier (rules and, when configured, the model): every edit is at least moderate
+    /// and credential paths are dangerous, so the same threshold and scopes apply as to a command.
+    ///
+    /// - Parameters:
+    ///   - path: The file.
+    ///   - mode: `write`, `append`, or `replace`.
+    ///   - workingDirectory: Where the conversation runs, for project-scoped approvals.
+    /// - Throws: `Failure.refused` with the reason otherwise.
+    public func clear(editingFile path: String, mode: String, workingDirectory: String) async throws {
+        let line = "edit_file \(mode) \(path)"
+        try await clear(
+            parts: [SimpleCommand(text: line, executable: "edit_file")], line: line, workingDirectory: workingDirectory)
+    }
+
     /// Returns normally if the command line may run, splitting it into simple commands first.
     ///
     /// - Throws: `Failure.refused` with the reason otherwise.

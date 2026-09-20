@@ -23,6 +23,7 @@ public struct AuditEvent: Codable, Equatable, Sendable {
         case toolResult = "tool.result"
         case policyDecision = "policy.decision"
         case commandOutcome = "command.outcome"
+        case fileWrite = "file.write"
         case classifierVerdict = "classifier.verdict"
         case approvalRequested = "approval.requested"
         case approvalDecided = "approval.decided"
@@ -85,6 +86,10 @@ public struct AuditEvent: Codable, Equatable, Sendable {
             body = "\(details["verdict"]?.stringValue ?? "?") \(details["command"]?.stringValue ?? "")"
         case .commandOutcome:
             body = "exit=\(details["exitStatus"]?.intValue ?? 0) \(details["command"]?.stringValue ?? "")"
+        case .fileWrite:
+            body =
+                "\(details["mode"]?.stringValue ?? "?") \(details["path"]?.stringValue ?? "") "
+                + "\(details["bytesBefore"]?.intValue ?? 0)->\(details["bytesAfter"]?.intValue ?? 0) bytes"
         case .error: body = details["message"]?.stringValue ?? ""
         default:
             body = details.keys.sorted().compactMap { key in details[key]?.stringValue.map { "\(key)=\($0)" } }.joined(

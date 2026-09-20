@@ -9,10 +9,10 @@ public struct ToolRegistry: Sendable {
     ///
     /// Every tool is wrapped so its calls and results are recorded; without an audit log the wrapper
     /// records to a log that discards everything, so there is one list and one code path. With an
-    /// approval gate, `run_command` and `read_file` classify and ask before acting.
+    /// approval gate, `run_command`, `read_file`, and `edit_file` classify and ask before acting.
     ///
     /// - Parameters:
-    ///   - runner: Limits and policy for `run_command`.
+    ///   - runner: Limits and policy for `run_command`, whose writable set also confines `edit_file`.
     ///   - reader: Page limits for `read_file`.
     ///   - audit: Where tool calls are recorded; nil records nothing.
     ///   - approval: The gate risky tools consult; nil never asks.
@@ -28,6 +28,8 @@ public struct ToolRegistry: Sendable {
             AuditedTool(CurrentDateTool(), audit: audit),
             AuditedTool(RunCommandTool(runner: commandRunner), audit: audit),
             AuditedTool(ReadFileTool(reader: reader, approval: approval), audit: audit),
+            AuditedTool(
+                EditFileTool(writer: FileWriter(options: runner), approval: approval, audit: audit), audit: audit),
             AuditedTool(InspectTool(introspection: introspection), audit: audit),
         ]
     }

@@ -109,6 +109,16 @@ extension AuditEvent {
             ]
         }
 
+        /// `file.write`.
+        public static func fileWrite(
+            path: String, mode: String, created: Bool, bytesBefore: Int, bytesAfter: Int
+        ) -> [String: JSONValue] {
+            [
+                "path": .string(path), "mode": .string(mode), "created": .bool(created),
+                "bytesBefore": .int(bytesBefore), "bytesAfter": .int(bytesAfter),
+            ]
+        }
+
         /// `context.condensation`.
         public static func condensation(
             turnsBefore: Int, turnsAfter: Int, contextSize: Int, tokenCount: Int
@@ -209,6 +219,7 @@ extension AuditEvent {
         case .toolResult: ["tool", "output", "bytes", "seconds"]
         case .policyDecision: ["command", "workingDirectory", "verdict", "reason", "sandbox", "network", "nested"]
         case .commandOutcome: ["command", "exitStatus", "timedOut", "truncated", "stdout", "stderr", "seconds"]
+        case .fileWrite: ["path", "mode", "created", "bytesBefore", "bytesAfter"]
         case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount"]
         case .mcpRequest: ["tool", "arguments"]
         case .mcpResult: ["tool", "isError", "text", "seconds"]

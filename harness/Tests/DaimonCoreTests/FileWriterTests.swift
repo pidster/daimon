@@ -1,0 +1,88 @@
+import Foundation
+import Testing
+
+@testable import DaimonCore
+
+@Suite struct FileWriterTests {
+    /// A scratch directory under the temporary directory, which is inside the default writable set.
+    private func scratch() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-writer-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    @Test func writesAppendsAndReplacesOnce() throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let writer = FileWriter(roots: [CommandPolicy.canonical(dir.path)])
+        let file = dir.appending(path: "a.txt").path
+        let created = try writer.apply(.write("one\ntwo\n"), to: file)
+        #expect(created == .init(path: file, mode: "write", created: true, bytesBefore: 0, bytesAfter: 8, line: nil))
+        #expect(created.rendered == "created \(file); now 8 bytes")
+        let appended = try writer.apply(.append("three\n"), to: file)
+        #expect(appended.created == false && appended.bytesBefore == 8 && appended.bytesAfter == 14)
+        #expect(appended.rendered == "appended to \(file); now 14 bytes")
+        let replaced = try writer.apply(.replace(find: "two", replacement: "2"), to: file)
+        #expect(replaced.line == 2 && replaced.bytesAfter == 12)
+        #expect(replaced.rendered == "replaced at line 2 of \(file); now 12 bytes")
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "one\n2\nthree\n")
+        let overwritten = try writer.apply(.write("x"), to: file)
+        #expect(overwritten.rendered == "wrote \(file); now 1 bytes")
+        #expect(throws: FileWriter.Failure.notFound(find: "zzz")) {
+            try writer.apply(.replace(find: "zzz", replacement: ""), to: file)
+        }
+        try Data("ab ab".utf8).write(to: URL(fileURLWithPath: file))
+        #expect(throws: FileWriter.Failure.ambiguous(find: "ab", count: 2)) {
+            try writer.apply(.replace(find: "ab", replacement: "c"), to: file)
+        }
+        #expect(throws: FileWriter.Failure.notFound(find: "")) {
+            try writer.apply(.replace(find: "", replacement: "c"), to: file)
+        }
+    }
+
+    @Test func refusesOutsideTheWritableSetAndUnusablePaths() throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let inside = FileWriter(roots: [CommandPolicy.canonical(dir.path)])
+        let outside = FileManager.default.homeDirectoryForCurrentUser.appending(path: "daimon-must-not-exist.txt").path
+        #expect(
+            throws: FileWriter.Failure.outsideWritableSet(path: outside, roots: [CommandPolicy.canonical(dir.path)])
+        ) {
+            try inside.apply(.write("x"), to: outside)
+        }
+        #expect(!FileManager.default.fileExists(atPath: outside))
+        // A sibling whose name merely starts with the root is outside it.
+        #expect(!inside.permits(dir.path + "-sibling/x"))
+        // The check follows symlinks: /tmp is /private/tmp.
+        #expect(FileWriter(roots: ["/private/tmp"]).permits("/tmp/x"))
+        #expect(throws: FileWriter.Failure.isDirectory(dir.path)) { try inside.apply(.write("x"), to: dir.path) }
+        let orphan = dir.appending(path: "missing/x.txt").path
+        #expect(throws: FileWriter.Failure.noParent(orphan)) { try inside.apply(.write("x"), to: orphan) }
+        let binary = dir.appending(path: "b.bin").path
+        try Data([0x61, 0x00, 0x62]).write(to: URL(fileURLWithPath: binary))
+        #expect(throws: FileWriter.Failure.binary(binary)) {
+            try inside.apply(.replace(find: "a", replacement: "b"), to: binary)
+        }
+        let small = FileWriter(roots: nil, maxBytes: 2)
+        let big = dir.appending(path: "big.txt").path
+        try Data("abc".utf8).write(to: URL(fileURLWithPath: big))
+        #expect(throws: FileWriter.Failure.tooLarge(path: big, bytes: 3, limit: 2)) {
+            try small.apply(.replace(find: "a", replacement: "b"), to: big)
+        }
+        // Unconfined when the sandbox is off; confined to the runner's roots otherwise.
+        #expect(FileWriter(options: .init(policy: .unrestricted)).roots == nil)
+        let confined = FileWriter(options: .init(writableRoot: dir.path))
+        #expect(confined.roots?.first == CommandPolicy.canonical(dir.path))
+        #expect(confined.roots?.contains("/private/tmp") == true)
+        #expect(confined.permits(dir.appending(path: "new.txt").path))
+        #expect(!confined.permits(outside))
+        for failure: FileWriter.Failure in [
+            .outsideWritableSet(path: "/p", roots: ["/r"]), .noParent("/p"), .isDirectory("/p"), .binary("/p"),
+            .tooLarge(path: "/p", bytes: 2, limit: 1), .notFound(find: String(repeating: "x", count: 70) + "\nmore"),
+            .ambiguous(find: "y", count: 3), .notApproved("no"),
+        ] {
+            #expect(!failure.description.isEmpty)
+        }
+        #expect(FileWriter.Failure.notFound(find: String(repeating: "x", count: 70)).description.hasSuffix("…"))
+    }
+}

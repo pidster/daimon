@@ -111,6 +111,7 @@ public struct RuleRiskClassifier: RiskClassifier {
         Rule(
             start + #"(rm|mv|cp|touch|mkdir|rmdir|ln|truncate|tee|sed\s+-i|perl\s+-i)\b"#, .moderate, "modifies files"),
         Rule(#"(^|[^>])>{1,2}\s*[^&\s]"#, .moderate, "writes to a file"),
+        Rule(start + #"edit_file\b"#, .moderate, "edits a file"),
         Rule(
             start
                 + #"(swift\s+build|swift\s+test|cargo\s+(build|test|run)|make|xcodebuild|npm\s+(run|test)|pytest|go\s+(build|test))\b"#,

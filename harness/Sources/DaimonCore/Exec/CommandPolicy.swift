@@ -132,10 +132,10 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
     public func seatbeltProfile(
         writableRoot: String, temporaryDirectory: String, userCacheDirectory: String? = nil, home: String
     ) -> String {
-        var writable = [writableRoot, temporaryDirectory, "/private/tmp"]
-        if let userCacheDirectory { writable.append(userCacheDirectory) }
-        writable += sandbox.writablePaths.map { $0.hasPrefix("~") ? home + $0.dropFirst() : $0 }
-        let subpaths = writable.map { Self.canonical($0) }.map { "(subpath \(Self.quote($0)))" }
+        let writable = writableRoots(
+            writableRoot: writableRoot, temporaryDirectory: temporaryDirectory,
+            userCacheDirectory: userCacheDirectory, home: home)
+        let subpaths = writable.map { "(subpath \(Self.quote($0)))" }
         var lines = [
             "(version 1)",
             "(allow default)",
@@ -146,6 +146,24 @@ public struct CommandPolicy: Codable, Equatable, Sendable {
             lines.append("(deny network*)")
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// The canonical directories the sandbox lets commands write under: the same list the profile is
+    /// built from, so `edit_file` is confined exactly as `run_command`'s writes are.
+    ///
+    /// - Parameters:
+    ///   - writableRoot: The project directory commands may write under.
+    ///   - temporaryDirectory: The process's `$TMPDIR`.
+    ///   - userCacheDirectory: The per-user cache directory; nil omits it.
+    ///   - home: The user's home, for expanding `~` in the configured paths.
+    /// - Returns: Canonical paths without trailing slashes.
+    public func writableRoots(
+        writableRoot: String, temporaryDirectory: String, userCacheDirectory: String? = nil, home: String
+    ) -> [String] {
+        var writable = [writableRoot, temporaryDirectory, "/private/tmp"]
+        if let userCacheDirectory { writable.append(userCacheDirectory) }
+        writable += sandbox.writablePaths.map { $0.hasPrefix("~") ? home + $0.dropFirst() : $0 }
+        return writable.map { Self.canonical($0) }
     }
 
     /// Why a policy is unusable.

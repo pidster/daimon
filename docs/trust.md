@@ -6,13 +6,14 @@ here is enforced by code and covered by tests; the linked pages hold the detail.
 
 ## What runs, and where
 
-The model has four tools: `current_date`, `read_file`, `inspect`, and `run_command`. Only `run_command` changes
-anything. It runs a shell command through `/bin/sh -c` with daimon's own privileges, inside a Seatbelt
-sandbox ([run_command](tools/run_command.md)):
+The model has five tools: `current_date`, `read_file`, `inspect`, `edit_file`, and `run_command`. Only the
+last two change anything. `edit_file` writes a text file under the same directories the sandbox allows
+([edit_file](tools/edit_file.md)). `run_command` runs a shell command through `/bin/sh -c` with daimon's
+own privileges, inside a Seatbelt sandbox ([run_command](tools/run_command.md)):
 
 | The sandbox confines | It does not confine |
 | --- | --- |
-| **Writes**: only under the directory daimon was launched in, the temporary directory, `/private/tmp`, and configured build caches. A command's own working directory never widens this. | **Reads**: any file the user can read. `read_file` and `run_command` can read your home directory. Credential-like paths ask first. |
+| **Writes**: only under the directory daimon was launched in, the temporary directory, `/private/tmp`, and configured build caches. A command's own working directory never widens this, and `edit_file` is held to the same list. | **Reads**: any file the user can read. `read_file` and `run_command` can read your home directory. Credential-like paths ask first. |
 | **Network**, only if you set `sandbox.allowNetwork: false`. | **Network by default**: on, because builds fetch dependencies. |
 | **The process tree**: a timeout kills the whole group. | **Inter-process messaging and the rest of macOS**: unchanged. |
 

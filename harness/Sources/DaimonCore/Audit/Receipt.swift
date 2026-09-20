@@ -36,6 +36,18 @@ public struct Receipt: Equatable, Sendable {
         public var seconds: Double
     }
 
+    /// One file the model wrote.
+    public struct FileWrite: Equatable, Sendable {
+        /// The path as given.
+        public var path: String
+        /// `write`, `append`, or `replace`.
+        public var mode: String
+        /// Whether the file was created.
+        public var created: Bool
+        /// Size after the edit.
+        public var bytes: Int
+    }
+
     /// One command the policy or the gate turned away before it ran.
     public struct Denial: Equatable, Sendable {
         /// The command line.
@@ -67,6 +79,8 @@ public struct Receipt: Equatable, Sendable {
     public var tools: [ToolUse] = []
     /// Commands that ran, in order.
     public var commands: [Command] = []
+    /// Files written, in order.
+    public var files: [FileWrite] = []
     /// Commands turned away before running.
     public var denials: [Denial] = []
     /// Approval decisions, in order.
@@ -108,6 +122,12 @@ public struct Receipt: Equatable, Sendable {
                         command: d["command"]?.stringValue ?? "", exitStatus: d["exitStatus"]?.intValue ?? -1,
                         timedOut: d["timedOut"]?.boolValue ?? false, truncated: d["truncated"]?.boolValue ?? false,
                         seconds: d["seconds"]?.doubleValue ?? 0))
+            case .fileWrite:
+                append(
+                    &files,
+                    FileWrite(
+                        path: d["path"]?.stringValue ?? "", mode: d["mode"]?.stringValue ?? "",
+                        created: d["created"]?.boolValue ?? false, bytes: d["bytesAfter"]?.intValue ?? 0))
             case .policyDecision:
                 let verdict = d["verdict"]?.stringValue ?? ""
                 if verdict != "allowed" {
@@ -171,6 +191,13 @@ public struct Receipt: Equatable, Sendable {
                         "command": .string($0.command), "exitStatus": .int($0.exitStatus),
                         "timedOut": .bool($0.timedOut),
                         "truncated": .bool($0.truncated), "seconds": .double($0.seconds),
+                    ])
+                }),
+            "files": .array(
+                files.map {
+                    .object([
+                        "path": .string($0.path), "mode": .string($0.mode), "created": .bool($0.created),
+                        "bytes": .int($0.bytes),
                     ])
                 }),
             "denials": .array(

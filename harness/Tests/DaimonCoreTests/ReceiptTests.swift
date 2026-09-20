@@ -26,6 +26,7 @@ import Testing
             event(.toolCall, call: "c2", ["tool": "read_file", "arguments": "{}"]),
             event(.error, call: "c2", ["message": "boom", "context": "tool read_file"]),
             event(.policyDecision, ["command": "rm -rf /", "verdict": "denied", "reason": "deny pattern"]),
+            event(.fileWrite, ["path": "/w/a.txt", "mode": "append", "created": false, "bytesAfter": 9]),
             event(.error, ["message": "turn failed"]),
             event(.condensation, ["turnsBefore": 3, "turnsAfter": 1]),
             event(.response, ["text": "done", "condensed": true, "seconds": 2]),
@@ -41,6 +42,8 @@ import Testing
         #expect(
             receipt.commands == [.init(command: "ls", exitStatus: 0, timedOut: false, truncated: true, seconds: 0.5)])
         #expect(receipt.denials == [.init(command: "rm -rf /", verdict: "denied", reason: "deny pattern")])
+        #expect(receipt.files == [.init(path: "/w/a.txt", mode: "append", created: false, bytes: 9)])
+        #expect(receipt.json.objectValue?["files"]?.arrayValue?.first?.objectValue?["bytes"] == 9)
         #expect(receipt.approvals == [.init(command: "ls", level: "moderate", decision: "approved", scope: "session")])
         #expect(receipt.errors == ["turn failed"])
         #expect(receipt.condensed && receipt.seconds == 2)

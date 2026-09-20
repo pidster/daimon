@@ -166,6 +166,14 @@ tool that changes an answer.
 the requested line, and stops when the page or its byte budget is full, so cost is bounded by the page, not
 the file. The rendering ends with an offset hint the model follows to continue.
 
+`EditFileTool` is its counterpart: `FileWriter` writes, appends, or replaces one exact match, and refuses
+any path outside `CommandPolicy.writableRoots`, the list the Seatbelt profile is built from, so the
+tool can change no more than a command could. Each edit is cleared by the gate as
+`edit_file <mode> <path>` and recorded as `file.write` ([ADR 0024](decisions/0024-edit-file.md)). The
+tools do not share one control path: `run_command` passes the policy patterns, the gate, and Seatbelt;
+`edit_file` the writable list and the gate; `read_file` the gate's rules only; `inspect` and
+`current_date` none.
+
 `RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which checks the
 `CommandPolicy` patterns, consults `ApprovalGate` (rules plus on-device model classifier, ask at
 `moderate` and above through an `Approver` per entry point), then spawns `/bin/sh -c` in its own process
