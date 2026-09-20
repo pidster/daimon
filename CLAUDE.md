@@ -78,6 +78,8 @@ only through `respond`. Details: `docs/design.md`.
 - **Definition of done.** A change is done when it is tested (without the model), documented in code, and
   documented under `docs/` in the same commit: tool page, `daimon.md`, `mcp.md`, `logging.md`, `design.md`,
   or an ADR as appropriate. If no doc needs changing, say so in the commit message. The hook reminds you.
+  A user-visible change also gets a line under `## Unreleased` in `CHANGELOG.md`; the release script
+  publishes that section as the release notes and refuses to release without one.
 - **Gate.** `scripts/check` must pass before every commit; the hook runs it. Strict lint, warnings as
   errors, strict concurrency, no escape hatches. Language rules are in `.claude/rules/`.
 - **Tests never need the model.** `ModelEvalTests` is the one model-dependent suite and runs only via

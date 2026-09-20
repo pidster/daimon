@@ -7,7 +7,8 @@ daimon ships as one arm64 binary through a Homebrew tap. This page is the proced
 
 - A git tag `vX.Y.Z` on `main` whose version equals `DaimonVersion.current` (semver, from 0.1.0).
 - A GitHub release for that tag with `daimon-X.Y.Z-arm64.tar.gz` (the stripped release binary and the
-  LICENSE) and `daimon-X.Y.Z-arm64.tar.gz.sha256`.
+  LICENSE) and `daimon-X.Y.Z-arm64.tar.gz.sha256`, whose notes are the `## X.Y.Z` section of
+  `CHANGELOG.md` followed by the install line.
 - A formula update in `pidster/homebrew-tap` (`Formula/daimon.rb`) pointing at that tarball with its
   checksum. Users run `brew install pidster/tap/daimon`, which installs to Homebrew's prefix
   (`/opt/homebrew/bin/daimon`), already on `PATH`.
@@ -21,8 +22,8 @@ intervene. A signed and notarised `.pkg` is a possible later channel.
 every local step and prints the remote ones instead of executing them.
 
 1. Preflight: clean tree on `main`, `DaimonVersion.current` equals `X.Y.Z`, no existing tag, `gh` is
-   authenticated, `scripts/check` passes (the full test run), `scripts/check coverage-gate` passes, and
-   `scripts/check eval` passes.
+   authenticated, `CHANGELOG.md` has a non-empty `## X.Y.Z` section, `scripts/check` passes (the full
+   test run), `scripts/check coverage-gate` passes, and `scripts/check eval` passes.
 2. Build: `swift build -c release`, `strip`, verify `daimon --version` prints `X.Y.Z` and `daimon doctor`
    passes on the build machine.
 3. Package: tarball with `daimon` and `LICENSE`; SHA-256 file.
@@ -43,10 +44,17 @@ by editing the file, and the commit must say why. A tenth of a point either way 
 timing-dependent branches (sandbox nesting, timeouts) move the measured figure by a few hundredths
 between identical runs, observed on 2026-09-20 (93.05% against a 93.08% baseline).
 
+## Release notes
+
+`CHANGELOG.md` is written for people who run daimon, not from commit subjects: what they can now do,
+what changed under them, what was broken and is fixed. Add a line under `## Unreleased` in the commit
+that makes a user-visible change; the version-bump commit renames that section to the version.
+
 ## Bumping the version
 
 `DaimonVersion.current` in `harness/Sources/DaimonCore/Audit/AuditEvent.swift` is the single source. Bump
-it in its own commit ("Bump version to X.Y.Z"), then run the release. The tag check in preflight makes a
+it in its own commit ("Bump version to X.Y.Z") that also renames `## Unreleased` in `CHANGELOG.md`, then
+run the release. The tag check in preflight makes a
 mismatch impossible to ship.
 
 ## First-run support

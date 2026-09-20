@@ -32,6 +32,12 @@ CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/S
 [ "$CURRENT" = "$VERSION" ] || { echo "DaimonVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
 gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated" >&2; exit 1; }
+NOTES="$(awk -v v="$VERSION" '
+    $0 == "## " v { on = 1; next }
+    /^## / { on = 0 }
+    on { print }
+' CHANGELOG.md | sed -e '/./,$!d')"
+[ -n "$NOTES" ] || { echo "CHANGELOG.md has no section '## $VERSION'; write the release notes first" >&2; exit 1; }
 scripts/check all
 scripts/check coverage-gate
 scripts/check eval
@@ -47,6 +53,10 @@ cp LICENSE "$OUT/stage/LICENSE"
 "$OUT/stage/daimon" doctor
 
 echo "==> package"
+{
+    printf '%s\n\n' "$NOTES"
+    printf 'Install or upgrade with Homebrew: `brew install pidster/tap/daimon`. Downloading the tarball directly leaves it quarantined; use Homebrew.\n'
+} > "$OUT/notes.md"
 (cd "$OUT/stage" && tar -czf "../$TARBALL" daimon LICENSE)
 (cd "$OUT" && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
 SHA="$(cut -d' ' -f1 "$OUT/$TARBALL.sha256")"
@@ -55,8 +65,8 @@ ls -la "$OUT/$TARBALL"; echo "sha256 $SHA"
 echo "==> publish"
 remote git tag -a "$TAG" -m "daimon $VERSION"
 remote git push origin "$TAG"
-remote gh release create "$TAG" "$OUT/$TARBALL" "$OUT/$TARBALL.sha256" --title "daimon $VERSION" --generate-notes \
-    --notes "Install with Homebrew: brew install pidster/tap/daimon. Downloading the tarball directly leaves it quarantined; use Homebrew."
+remote gh release create "$TAG" "$OUT/$TARBALL" "$OUT/$TARBALL.sha256" --title "daimon $VERSION" \
+    --notes-file "$OUT/notes.md"
 
 echo "==> tap formula"
 FORMULA="$OUT/daimon.rb"
