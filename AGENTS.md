@@ -24,7 +24,7 @@ only what applies everywhere and to every agent.
 
 | Path | Contents |
 | --- | --- |
-| `harness/` | Swift package. Targets: `DaimonCore` (all logic), `DaimonCoreAI` (Core AI model backend), `DaimonMCP` (MCP server), `daimon` (CLI, argument parsing only, registers backends), tests. |
+| `harness/` | Swift package. Targets: `DaimonCore` (all logic), `DaimonCoreAI` (Core AI model backend), `DaimonMLX` (MLX backend, real only under the `MLX` trait), `DaimonMCP` (MCP server), `daimon` (CLI, argument parsing only, registers backends), tests. |
 | `tools/` | Cargo workspace reserved for Rust tool binaries. Empty; checks activate with the first crate. |
 | `docs/` | Documentation and ADRs. Part of every change (see Definition of done). |
 | `scripts/check` | The quality gate and the pre-commit hook's body. |

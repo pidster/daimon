@@ -110,9 +110,44 @@ several GB.
 
 ## MLX Swift
 
-Planned behind a SwiftPM trait so the default build and the sandboxed pre-commit hook need no Metal
-toolchain. Not in this release; `mlx:` is refused as an unknown backend. See the changelog and
-`docs/backlog.md` for the state.
+[mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm)'s `MLXLanguageModel` bridge runs models in
+MLX or Hugging Face safetensors layout in daimon's own process on the GPU. MLX compiles Metal kernels at
+build time, so the bridge is behind the `MLX` package trait: the ordinary build and the sandboxed
+pre-commit hook never need the Metal toolchain, and a build without the trait refuses every `mlx:` model
+with a message saying so. To build with it:
+
+```
+xcodebuild -downloadComponent MetalToolchain     # once; several GB
+cd harness && swift build -c release --traits MLX
+```
+
+Preparing an asset: a model directory holding `config.json`, the `*.safetensors`, and the tokenizer files
+(`tokenizer.json`, `tokenizer_config.json`). A Hugging Face snapshot works as it is, and the
+`mlx-community` quantised repositories are the usual choice; daimon does not download. Put the directory
+under `<home>/models/mlx` (`config.json` `mlx.modelsDirectory`), or name it by path.
+
+Capabilities come from the operator, because the bridge never infers them: declare per model in
+`config.json`, only what you have verified, and an undeclared model runs text-only conversations.
+
+```json
+{
+  "model": "mlx:Qwen3-1.7B-4bit",
+  "mlx": {
+    "modelsDirectory": "~/.daimon/models/mlx",
+    "models": { "Qwen3-1.7B-4bit": { "capabilities": ["toolCalling", "reasoning"] } }
+  }
+}
+```
+
+Accepted capability names: `toolCalling`, `guidedGeneration`, `reasoning`, `vision`; another spelling is
+refused at resolve. `daimon models` lists the directories with architecture, quantisation, and the
+declaration. The live test (`DAIMON_MLX_TESTS=1 DAIMON_MLX_MODEL=<directory> swift test --traits MLX
+--filter MLXLiveTests`) runs a text conversation undeclared, then the tool loop with `toolCalling`
+declared, and reports the outcomes. What has been verified, and with which weights, is in the changelog.
+
+Errors: `this build has no MLX support` when the trait is off; `no MLX model at <path> (no config.json);
+models under <dir>: …` when the name points nowhere; `unknown capability '<x>'` for a bad declaration; the
+bridge's own message when weights fail to load. Weights load on first use, so the first reply is slow.
 
 ## Deferred candidates
 

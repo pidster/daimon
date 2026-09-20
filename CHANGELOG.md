@@ -29,6 +29,11 @@ Added:
   state without a model turn.
 - `daimon config` prints the effective configuration as JSON.
 
+- MLX Swift: `--model mlx:<directory>` runs a model in MLX or Hugging Face safetensors layout in
+  daimon's process through `mlx-swift-lm`'s bridge, in builds made with `--traits MLX` (the release
+  is); a build without the trait refuses `mlx:` models with the reason. Capabilities are declared by the
+  operator per model in `config.json`'s `mlx.models`; an undeclared model is text only. See
+  `docs/backends.md` for what was verified.
 - `approval.classifier` chooses what judges commands beside the rules: `rules`, `system-model` (the
   default, unchanged), or `coreml`, a Core ML text classifier you train from a `text,label` CSV with
   `scripts/train-risk-classifier`. The model must follow a versioned contract or it is rejected; every

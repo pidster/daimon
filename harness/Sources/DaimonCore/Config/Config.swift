@@ -27,6 +27,33 @@ public struct Config: Codable, Equatable, Sendable {
     public var ollama: OllamaConfig?
     /// Where Core AI bundles for `coreai:<name>` models live.
     public var coreai: CoreAIConfig?
+    /// Where MLX model directories for `mlx:<name>` models live, and what each may do.
+    public var mlx: MLXConfig?
+
+    /// MLX settings in the file.
+    public struct MLXConfig: Codable, Equatable, Sendable {
+        /// Directory holding one model directory per subdirectory; default `<home>/models/mlx`.
+        public var modelsDirectory: String?
+        /// Per model, what the operator declares it can do; an undeclared model is text only.
+        public var models: [String: MLXModelConfig]?
+
+        /// Creates settings; nil takes the defaults.
+        public init(modelsDirectory: String? = nil, models: [String: MLXModelConfig]? = nil) {
+            self.modelsDirectory = modelsDirectory
+            self.models = models
+        }
+    }
+
+    /// One MLX model's declaration.
+    public struct MLXModelConfig: Codable, Equatable, Sendable {
+        /// `toolCalling`, `guidedGeneration`, `reasoning`, `vision`; only what the operator has verified.
+        public var capabilities: [String]?
+
+        /// Creates a declaration.
+        public init(capabilities: [String]? = nil) {
+            self.capabilities = capabilities
+        }
+    }
 
     /// Core AI settings in the file.
     public struct CoreAIConfig: Codable, Equatable, Sendable {
@@ -109,7 +136,7 @@ public struct Config: Codable, Equatable, Sendable {
         commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
         audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil,
-        coreai: CoreAIConfig? = nil
+        coreai: CoreAIConfig? = nil, mlx: MLXConfig? = nil
     ) {
         self.systemPromptExtension = systemPromptExtension
         self.instructions = instructions
@@ -122,6 +149,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.approval = approval
         self.ollama = ollama
         self.coreai = coreai
+        self.mlx = mlx
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
@@ -166,7 +194,9 @@ public struct Config: Codable, Equatable, Sendable {
             ollama: OllamaSettings(
                 baseURL: ollama?.baseURL.flatMap(URL.init(string:)) ?? OllamaSettings.default.baseURL,
                 timeout: .seconds(ollama?.timeoutSeconds ?? 120)),
-            coreaiModelsDirectory: coreai?.modelsDirectory
+            coreaiModelsDirectory: coreai?.modelsDirectory,
+            mlxModelsDirectory: mlx?.modelsDirectory,
+            mlxModels: (mlx?.models ?? [:]).mapValues { $0.capabilities ?? [] }
         )
     }
 
@@ -203,5 +233,9 @@ public struct Config: Codable, Equatable, Sendable {
         public var ollama: OllamaSettings
         /// Where Core AI bundles live, as configured; nil means `<home>/models/coreai`.
         public var coreaiModelsDirectory: String?
+        /// Where MLX model directories live, as configured; nil means `<home>/models/mlx`.
+        public var mlxModelsDirectory: String?
+        /// Declared capability names per MLX model name.
+        public var mlxModels: [String: [String]]
     }
 }

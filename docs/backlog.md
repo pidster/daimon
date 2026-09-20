@@ -43,6 +43,17 @@ not the differentiator. Items, in order of leverage:
   drive `Agent`, `ConversationThread`, and `DaimonServer.respond` end to end without Apple's model;
   extend it to replace `FakeThread` and to cover the chat loop.
 
+## Model backends, deferred
+
+Candidates recorded on 2026-09-20 with the MLX and Core AI work, not implemented: llama.cpp; LM Studio
+(`llmster`); ONNX Runtime; PyTorch and Hugging Face Transformers; vLLM. Several serve an OpenAI-compatible
+HTTP API, so the Ollama executor's transcript-to-chat mapping is most of a shared HTTP executor for them,
+parameterised by base URL, auth, and the request dialect. Embeddings, reranking, and other
+non-conversational models are not `LanguageModel`s and need task-specific interfaces (an `embed` tool, a
+`rerank` tool) rather than a backend; that is a separate design. Also open: estimating context use from
+what a runtime reports so condensing can act before it truncates (Ollama), and verifying the MLX
+tool loop on a quantised model once the Metal toolchain is present.
+
 ## Upstream
 
 - Report to `modelcontextprotocol/swift-sdk`: `Client.Capabilities.experimental` is `[String: String]?`

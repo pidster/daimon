@@ -2,6 +2,7 @@ import ArgumentParser
 import DaimonCore
 import DaimonCoreAI
 import DaimonMCP
+import DaimonMLX
 import Foundation
 import FoundationModels
 
@@ -23,6 +24,7 @@ struct Daimon: AsyncParsableCommand {
     /// Registers the model backends this build carries, then parses and runs.
     static func main() async {
         ModelBackends.register(CoreAIBackend())
+        ModelBackends.register(MLXBackend())
         await main(nil)
     }
 }
