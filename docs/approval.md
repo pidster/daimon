@@ -110,13 +110,45 @@ not an audit log is attached, and the refusals `respond` reports are those of th
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `threshold` | `moderate` | Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`. |
-| `useModel` | `true` | Run the model classifier alongside the rules. `false` is faster and deterministic. |
+| `classifier` | `system-model` | What runs beside the rules: `rules` (nothing; fast and deterministic), `system-model` (Apple's on-device model), or `coreml` (a Core ML text classifier, below). Independent of `model`. |
+| `useModel` | `true` | The pre-0.2 switch; `false` means `classifier: rules`. Read only when `classifier` is absent. |
+| `coremlModel` | none | For `coreml`: the `.mlmodel` or `.mlmodelc`, absolute, `~`, or under `<home>/models/coreml`. |
+| `coremlMinimumConfidence` | `0.6` | For `coreml`: below this top-label probability the verdict is raised to at least `moderate`. |
 | `timeoutSeconds` | `600` | How long an approval may go unanswered before it counts as declined; `0` waits forever. |
 | `persistDays` | `30` | Lifetime of `project` and `always` approvals. |
 
 How approval should reach clients that do not render elicitation at all remains an open design question.
 
 `never` still classifies and audits; it just does not ask.
+
+### A Core ML classifier
+
+`classifier: coreml` runs a Core ML text classifier beside the rules ([ADR 0020](decisions/0020-coreml-risk-classifier.md)).
+The rules, the threshold, and the human stay authoritative: the higher of the two levels wins, and
+nothing the classifier does can lower a level or grant an approval.
+
+The model must follow contract version 1: input `text`, a string; output `label`, one of `safe`,
+`moderate`, `dangerous`; creator metadata `daimon.classifier.contract` = `1` and
+`daimon.classifier.labels` = `safe,moderate,dangerous`. daimon gives it the command line trimmed with
+runs of whitespace collapsed to one space, case kept. A model declaring anything else is rejected when
+it loads. Its metadata version string is its identity in the audit.
+
+Every failure is a `moderate` verdict with the reason: no path configured, a missing asset, a model
+Core ML cannot load, a contract mismatch, an inference error, no prediction, an unknown label, or a
+top-label probability below `coremlMinimumConfidence`. Confidence is recorded only when the model gives
+label probabilities (Create ML text classifiers do); it is uncalibrated, and the threshold guards
+against guessing rather than measuring accuracy. `daimon doctor` checks the configured model prepares.
+
+Train one from a `text,label` CSV, then measure it before relying on it:
+
+```
+scripts/train-risk-classifier docs/examples/risk-labels.csv ~/.daimon/models/coreml/risk.mlmodel
+DAIMON_MODEL_TESTS=1 DAIMON_COREML_MODEL=~/.daimon/models/coreml/risk.mlmodel scripts/check eval
+```
+
+`docs/examples/risk-labels.csv` is the 45-command eval set: enough to prove the pipeline, not to trust
+a model trained on it. Loading and producing valid labels is not evidence of suitability; the eval's
+hard requirement is that no dangerous command is rated safe, and its accuracy figure is what you judge.
 
 ## Audit
 

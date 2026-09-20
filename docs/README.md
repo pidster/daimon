@@ -14,6 +14,7 @@
 | [context-management.md](context-management.md) | The small context window: framework APIs, what daimon does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
 | [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
+| [decisions/0020-coreml-risk-classifier.md](decisions/0020-coreml-risk-classifier.md) | A Core ML text classifier can judge commands behind a versioned contract, beside the rules, never lowering a level |
 | [decisions/0019-model-backends.md](decisions/0019-model-backends.md) | Model backends are a registry keyed by scheme; capabilities are declared by the framework, the runtime, or config, and checked before a session opens |
 | [decisions/0018-introspection.md](decisions/0018-introspection.md) | daimon's own config, status, approvals, and audit are readable, read-only, through the model's `inspect` tool, MCP resources, and the CLI |
 | [decisions/0017-three-layer-instructions.md](decisions/0017-three-layer-instructions.md) | daimon's system prompt (a resource file), the operator's extension, and the caller's instructions, rendered in order |

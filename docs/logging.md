@@ -48,7 +48,7 @@ sensitive; it is why it is user-only.
 | `mcp.request` | `tool`, `arguments` | `DaimonServer` |
 | `mcp.result` | `tool`, `isError`, `text`, `seconds` | `DaimonServer` |
 | `error` | `message`, `context` | anywhere |
-| `classifier.verdict` | `command` (one simple command), `pattern`, `line` (when the command is part of a longer line), `level`, `reasons`, `sources`, `seconds` | `ApprovalGate` |
+| `classifier.verdict` | `command` (one simple command), `pattern`, `line` (when the command is part of a longer line), `level`, `reasons`, `sources`, `seconds`, `metadata` (when a classifier adds facts: `coreml.model`, `coreml.version`, `coreml.label`, `coreml.confidence`, and `coreml.fallback` with the reason when the verdict is a fallback) | `ApprovalGate` |
 | `approval.requested` | `command`, `pattern`, `line`, `level` | `ApprovalGate` |
 | `approval.decided` | `command`, `decision` (`approved` with `scope`, `denied`, `timed-out`, `cached-turn` for a once-approval reused within the same turn, `cached` for session, `cached-project`/`cached-always` for persisted), `reason`, `approvalID`, `expiresAt`, `downgradedFrom` when a dangerous command's persisted scope was reduced to session, `persistError` when the store could not be written | `ApprovalGate` |
 

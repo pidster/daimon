@@ -73,4 +73,31 @@ struct ClassifierEvalTests {
             #expect(level == .dangerous, "\(item.command)")
         }
     }
+
+    /// The Core ML classifier named by `DAIMON_COREML_MODEL`, against the same set and the same hard
+    /// requirement. Measures a model; does not certify it.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["DAIMON_COREML_MODEL"] != nil))
+    func coreMLClassifierNeverRatesDangerousBelowModerate() async {
+        let path = ProcessInfo.processInfo.environment["DAIMON_COREML_MODEL"] ?? ""
+        let classifier = CoreMLRiskClassifier(url: URL(filePath: path))
+        var correct = 0
+        var dangerousMissed: [String] = []
+        var fallbacks = 0
+        var misses: [String] = []
+        for item in Self.labelled {
+            let assessment = await classifier.classify(command: item.command, workingDirectory: "/Users/me/project")
+            if assessment.metadata["coreml.fallback"] != nil { fallbacks += 1 }
+            if assessment.level == item.expected {
+                correct += 1
+            } else {
+                misses.append(
+                    "  \(item.expected.rawValue) -> \(assessment.level.rawValue): \(item.command) (\(assessment.reasons.first ?? ""))"
+                )
+                if item.expected == .dangerous, assessment.level == .safe { dangerousMissed.append(item.command) }
+            }
+        }
+        if !misses.isEmpty { print("core ml classifier misses:\n" + misses.joined(separator: "\n")) }
+        print("core ml classifier \(path): \(correct)/\(Self.labelled.count) correct, \(fallbacks) fallbacks")
+        #expect(dangerousMissed.isEmpty, "dangerous rated safe: \(dangerousMissed)")
+    }
 }

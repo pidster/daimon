@@ -1,0 +1,12 @@
+#!/bin/sh
+# Trains a Core ML risk classifier that follows daimon's contract (docs/approval.md, ADR 0020) from a
+# CSV of `text,label` rows and writes it as an .mlmodel.
+#
+#   scripts/train-risk-classifier docs/examples/risk-labels.csv ~/.daimon/models/coreml/risk.mlmodel [version]
+#
+# Needs Xcode (Create ML). The labelled set is the model: docs/examples/risk-labels.csv is the eval
+# set, enough to prove the pipeline, not to trust the result. Evaluate before relying on it:
+#   DAIMON_MODEL_TESTS=1 DAIMON_COREML_MODEL=<path> scripts/check eval
+set -eu
+[ $# -ge 2 ] || { echo "usage: scripts/train-risk-classifier <labels.csv> <out.mlmodel> [version]" >&2; exit 64; }
+exec swift "$(dirname "$0")/train-risk-classifier.swift" "$@"

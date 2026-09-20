@@ -26,6 +26,8 @@ public struct Doctor: Sendable {
         public var systemModel: @Sendable () -> String?
         /// Nil when the given model resolves under this configuration and home, else the failure text.
         public var configuredModel: @Sendable (ModelSelection, Config.Resolved, Home) -> String?
+        /// For a `coreml` classifier: nil when its model prepares, else the failure text.
+        public var coremlClassifier: @Sendable (Config.Resolved, Home) -> String?
 
         /// Probes that ask the framework.
         public static let live = Probes(
@@ -42,15 +44,25 @@ public struct Doctor: Sendable {
                 } catch {
                     return "\(error)"
                 }
+            },
+            coremlClassifier: { config, home in
+                do {
+                    _ = try CoreMLRiskClassifier.prepare(Session.coremlModelURL(config: config, home: home))
+                    return nil
+                } catch {
+                    return "\(error)"
+                }
             })
 
         /// Creates probes.
         public init(
             systemModel: @escaping @Sendable () -> String?,
-            configuredModel: @escaping @Sendable (ModelSelection, Config.Resolved, Home) -> String?
+            configuredModel: @escaping @Sendable (ModelSelection, Config.Resolved, Home) -> String?,
+            coremlClassifier: @escaping @Sendable (Config.Resolved, Home) -> String? = { _, _ in nil }
         ) {
             self.systemModel = systemModel
             self.configuredModel = configuredModel
+            self.coremlClassifier = coremlClassifier
         }
     }
 
@@ -77,7 +89,16 @@ public struct Doctor: Sendable {
     public func run() -> [Finding] {
         var findings = [macOSVersion(), modelAvailability(), sandboxExec(), config(), homeWritable()]
         if model != .system { findings.insert(configuredModel(), at: 2) }
+        if resolvedConfig.approvalClassifier == .coreml { findings.insert(classifier(), at: 2) }
         return findings
+    }
+
+    private func classifier() -> Finding {
+        if let problem = probes.coremlClassifier(resolvedConfig, home) {
+            return Finding(name: "classifier", ok: false, detail: problem)
+        }
+        return Finding(
+            name: "classifier", ok: true, detail: "coreml model \(resolvedConfig.coremlModel ?? "?") prepares")
     }
 
     private func configuredModel() -> Finding {

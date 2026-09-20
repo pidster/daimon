@@ -73,7 +73,7 @@ private struct Boom: DaimonTool {
         defer { try? FileManager.default.removeItem(at: root) }
         let home = Home(root: root)
         let deps = Session.Dependencies(
-            makeClassifier: { _ in RuleRiskClassifier.standard }, makeSink: Session.Dependencies.live.makeSink)
+            makeClassifier: { _, _ in RuleRiskClassifier.standard }, makeSink: Session.Dependencies.live.makeSink)
         let session = try Session.begin(.init(entryPoint: .respond), home: home, dependencies: deps)
         session.end()
         let events = AuditQuery.events(in: try Data(contentsOf: home.auditFile))

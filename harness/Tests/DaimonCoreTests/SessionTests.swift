@@ -90,7 +90,7 @@ import Testing
         let session = try Session.begin(
             .init(entryPoint: .respond), home: home,
             dependencies: .init(
-                makeClassifier: { _ in RuleRiskClassifier.standard },
+                makeClassifier: { _, _ in RuleRiskClassifier.standard },
                 makeSink: { _, _ in
                     Issue.record("sink built although the audit log is disabled")
                     return MemoryAuditSink()
@@ -99,10 +99,12 @@ import Testing
     }
 
     @Test func liveDependenciesFollowTheConfigAndTestingOnesNeverUseTheModel() throws {
+        let home = try temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home.root) }
         let live = Session.Dependencies.live
-        #expect(live.makeClassifier(Config().resolved) is CompositeRiskClassifier)
-        #expect(live.makeClassifier(Config(approval: .init(useModel: false)).resolved) is RuleRiskClassifier)
-        #expect(Session.Dependencies.testing().makeClassifier(Config().resolved) is RuleRiskClassifier)
+        #expect(live.makeClassifier(Config().resolved, home) is CompositeRiskClassifier)
+        #expect(live.makeClassifier(Config(approval: .init(useModel: false)).resolved, home) is RuleRiskClassifier)
+        #expect(Session.Dependencies.testing().makeClassifier(Config().resolved, home) is RuleRiskClassifier)
     }
 
     @Test func yesReplacesTheFacesApproverWithAutoApproval() async throws {

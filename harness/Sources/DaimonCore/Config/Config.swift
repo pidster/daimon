@@ -57,8 +57,14 @@ public struct Config: Codable, Equatable, Sendable {
     public struct ApprovalConfig: Codable, Equatable, Sendable {
         /// Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`.
         public var threshold: ApprovalThreshold?
-        /// Whether the on-device model classifies alongside the rules.
+        /// Which classifier runs beside the rules: `rules`, `system-model` (default), or `coreml`.
+        public var classifier: RiskClassifierChoice?
+        /// The pre-0.2 switch: `false` means `classifier: rules`. Read only when `classifier` is absent.
         public var useModel: Bool?
+        /// For `coreml`: the `.mlmodel` or `.mlmodelc` path, absolute, `~`, or under `<home>/models/coreml`.
+        public var coremlModel: String?
+        /// For `coreml`: below this top-label probability the verdict is raised to at least `moderate`; default 0.6.
+        public var coremlMinimumConfidence: Double?
         /// Seconds to wait for an approval answer before treating silence as a denial; 0 waits forever.
         public var timeoutSeconds: Int?
         /// Days a persisted (project or always) approval lasts.
@@ -66,11 +72,15 @@ public struct Config: Codable, Equatable, Sendable {
 
         /// Creates settings; nil fields take defaults.
         public init(
-            threshold: ApprovalThreshold? = nil, useModel: Bool? = nil, timeoutSeconds: Int? = nil,
+            threshold: ApprovalThreshold? = nil, classifier: RiskClassifierChoice? = nil, useModel: Bool? = nil,
+            coremlModel: String? = nil, coremlMinimumConfidence: Double? = nil, timeoutSeconds: Int? = nil,
             persistDays: Int? = nil
         ) {
             self.threshold = threshold
+            self.classifier = classifier
             self.useModel = useModel
+            self.coremlModel = coremlModel
+            self.coremlMinimumConfidence = coremlMinimumConfidence
             self.timeoutSeconds = timeoutSeconds
             self.persistDays = persistDays
         }
@@ -149,7 +159,8 @@ public struct Config: Codable, Equatable, Sendable {
             auditLimits: FileAuditSink.Limits(
                 maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5),
             approvalThreshold: approval?.threshold ?? .default,
-            approvalUsesModel: approval?.useModel ?? true,
+            approvalClassifier: approval?.classifier ?? ((approval?.useModel ?? true) ? .default : .rules),
+            coremlModel: approval?.coremlModel, coremlMinimumConfidence: approval?.coremlMinimumConfidence ?? 0.6,
             approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600),
             approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600),
             ollama: OllamaSettings(
@@ -175,8 +186,15 @@ public struct Config: Codable, Equatable, Sendable {
         public var auditLimits: FileAuditSink.Limits
         /// From which level a human is asked.
         public var approvalThreshold: ApprovalThreshold
+        /// Which classifier runs beside the rules.
+        public var approvalClassifier: RiskClassifierChoice
+        /// For `coreml`: the model path as configured.
+        public var coremlModel: String?
+        /// For `coreml`: the confidence below which a verdict is raised to at least `moderate`.
+        public var coremlMinimumConfidence: Double
+
         /// Whether the on-device model classifies alongside the rules.
-        public var approvalUsesModel: Bool
+        public var approvalUsesModel: Bool { approvalClassifier == .systemModel }
         /// How long an approval request may go unanswered before it counts as a denial; nil waits forever.
         public var approvalTimeout: Duration?
         /// How long a persisted approval lasts.

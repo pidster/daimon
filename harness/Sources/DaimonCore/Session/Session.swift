@@ -45,14 +45,14 @@ public struct Session: Sendable {
     /// The behaviour a session constructs from its configuration, injectable so tests never
     /// touch the model or the file system.
     public struct Dependencies: Sendable {
-        /// Builds the risk classifier the configuration calls for.
-        public var makeClassifier: @Sendable (Config.Resolved) -> any RiskClassifier
+        /// Builds the risk classifier the configuration calls for; `home` locates a model under it.
+        public var makeClassifier: @Sendable (Config.Resolved, Home) -> any RiskClassifier
         /// Builds the audit sink; called only when the audit log is enabled.
         public var makeSink: @Sendable (Home, Config.Resolved) throws -> any AuditSink
 
         /// Creates dependencies.
         public init(
-            makeClassifier: @escaping @Sendable (Config.Resolved) -> any RiskClassifier,
+            makeClassifier: @escaping @Sendable (Config.Resolved, Home) -> any RiskClassifier,
             makeSink: @escaping @Sendable (Home, Config.Resolved) throws -> any AuditSink
         ) {
             self.makeClassifier = makeClassifier
@@ -62,9 +62,18 @@ public struct Session: Sendable {
         /// The real thing: the on-device classifier when `approval.useModel` is set, and the audit
         /// file under the home directory, which is created on demand.
         public static let live = Dependencies(
-            makeClassifier: { config in
-                guard config.approvalUsesModel else { return RuleRiskClassifier.standard }
-                return CompositeRiskClassifier([RuleRiskClassifier.standard, ModelRiskClassifier()])
+            makeClassifier: { config, home in
+                switch config.approvalClassifier {
+                case .rules: RuleRiskClassifier.standard
+                case .systemModel: CompositeRiskClassifier([RuleRiskClassifier.standard, ModelRiskClassifier()])
+                case .coreml:
+                    CompositeRiskClassifier([
+                        RuleRiskClassifier.standard,
+                        CoreMLRiskClassifier(
+                            url: Session.coremlModelURL(config: config, home: home),
+                            minimumConfidence: config.coremlMinimumConfidence),
+                    ])
+                }
             },
             makeSink: { home, config in
                 try home.ensure()
@@ -73,7 +82,7 @@ public struct Session: Sendable {
 
         /// Rules-only classification and the given sink, for tests: no model, no audit file.
         public static func testing(sink: any AuditSink = MemoryAuditSink()) -> Dependencies {
-            Dependencies(makeClassifier: { _ in RuleRiskClassifier.standard }, makeSink: { _, _ in sink })
+            Dependencies(makeClassifier: { _, _ in RuleRiskClassifier.standard }, makeSink: { _, _ in sink })
         }
     }
 
@@ -225,7 +234,17 @@ public struct Session: Sendable {
             request: request, home: home, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
             sessionApprovals: SessionApprovals(), notes: notes, toolNames: toolNames,
-            classifier: dependencies.makeClassifier(config))
+            classifier: dependencies.makeClassifier(config, home))
+    }
+
+    /// Where `approval.coremlModel` points: absolute or `~` as given, anything else under
+    /// `<home>/models/coreml`; nil when it is not set.
+    public static func coremlModelURL(config: Config.Resolved, home: Home) -> URL? {
+        guard let configured = config.coremlModel else { return nil }
+        if configured.hasPrefix("/") || configured.hasPrefix("~") {
+            return URL(filePath: (configured as NSString).expandingTildeInPath)
+        }
+        return home.models.appending(path: "coreml").appending(path: configured)
     }
 
     /// The whole registry for `.all`, or the names as given once each is known.

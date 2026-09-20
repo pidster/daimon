@@ -34,18 +34,23 @@ public struct RiskAssessment: Equatable, Sendable {
     public var reasons: [String]
     /// Which classifier(s) produced it, for the audit log.
     public var sources: [String]
+    /// Classifier-specific facts for the audit, such as a model's identity, version, label, and
+    /// confidence; keys are prefixed with the source (`coreml.label`).
+    public var metadata: [String: JSONValue]
 
     /// Creates an assessment.
-    public init(level: RiskLevel, reasons: [String], sources: [String]) {
+    public init(level: RiskLevel, reasons: [String], sources: [String], metadata: [String: JSONValue] = [:]) {
         self.level = level
         self.reasons = reasons
         self.sources = sources
+        self.metadata = metadata
     }
 
-    /// The more severe of two assessments, with reasons and sources merged.
+    /// The more severe of two assessments, with reasons, sources, and metadata merged.
     public func merged(with other: RiskAssessment) -> RiskAssessment {
         RiskAssessment(
-            level: max(level, other.level), reasons: reasons + other.reasons, sources: sources + other.sources)
+            level: max(level, other.level), reasons: reasons + other.reasons, sources: sources + other.sources,
+            metadata: metadata.merging(other.metadata) { $1 })
     }
 }
 

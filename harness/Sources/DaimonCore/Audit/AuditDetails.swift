@@ -150,12 +150,14 @@ extension AuditEvent {
         public static func classifierVerdict(
             command: String, pattern: String, line: String, assessment: RiskAssessment, seconds: TimeInterval
         ) -> [String: JSONValue] {
-            approvalSubject(command: command, pattern: pattern, line: line).merging([
+            var details = approvalSubject(command: command, pattern: pattern, line: line).merging([
                 "level": .string(assessment.level.rawValue),
                 "reasons": .array(assessment.reasons.map { .string($0) }),
                 "sources": .array(assessment.sources.map { .string($0) }),
                 "seconds": .double(seconds),
             ]) { $1 }
+            if !assessment.metadata.isEmpty { details["metadata"] = .object(assessment.metadata) }
+            return details
         }
 
         /// `approval.requested`.
@@ -207,7 +209,7 @@ extension AuditEvent {
         case .mcpRequest: ["tool", "arguments"]
         case .mcpResult: ["tool", "isError", "text", "seconds"]
         case .error: ["message", "context"]
-        case .classifierVerdict: ["command", "pattern", "line", "level", "reasons", "sources", "seconds"]
+        case .classifierVerdict: ["command", "pattern", "line", "level", "reasons", "sources", "seconds", "metadata"]
         case .approvalRequested: ["command", "pattern", "line", "level"]
         case .approvalDecided:
             [

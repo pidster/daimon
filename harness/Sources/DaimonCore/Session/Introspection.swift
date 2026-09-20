@@ -53,7 +53,10 @@ public struct Introspection: Sendable {
                 ]),
             ]),
             "approval": .object([
-                "threshold": .string(config.approvalThreshold.rawValue), "useModel": .bool(config.approvalUsesModel),
+                "threshold": .string(config.approvalThreshold.rawValue),
+                "classifier": .string(config.approvalClassifier.rawValue),
+                "coremlModel": config.coremlModel.map { .string($0) } ?? .null,
+                "coremlMinimumConfidence": .double(config.coremlMinimumConfidence),
                 "timeoutSeconds": config.approvalTimeout.map { .int(Int($0.components.seconds)) } ?? .int(0),
                 "persistDays": .int(Int(config.approvalLifetime.components.seconds / 86400)),
             ]),

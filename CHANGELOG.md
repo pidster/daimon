@@ -29,6 +29,16 @@ Added:
   state without a model turn.
 - `daimon config` prints the effective configuration as JSON.
 
+- `approval.classifier` chooses what judges commands beside the rules: `rules`, `system-model` (the
+  default, unchanged), or `coreml`, a Core ML text classifier you train from a `text,label` CSV with
+  `scripts/train-risk-classifier`. The model must follow a versioned contract or it is rejected; every
+  failure or low-confidence verdict is `moderate` with the reason; the audit records the model's
+  identity, version, label, and confidence. Measured on 2026-09-20: a model trained on the 45-command
+  eval set scores 45/45 on it (its own training data, so no evidence of judgement); trained on the 35
+  non-held-out commands it got 5 of the 10 held-out ones right, and two dangerous commands it called
+  `safe` were kept off `safe` only by the confidence guard. Not fit to judge alone; measure your own
+  with `DAIMON_COREML_MODEL=<path> scripts/check eval` before relying on it.
+
 Changed:
 
 - The `run_command` sandbox also allows writes under the per-user cache directory

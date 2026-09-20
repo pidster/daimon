@@ -177,7 +177,8 @@ import Testing
     @Test func constructorsStayWithinTheDocumentedFields() {
         typealias D = AuditEvent.Details
         let outcome = CommandRunner.Outcome(exitStatus: 0, stdout: "o", stderr: "e", timedOut: false, truncated: true)
-        let assessment = RiskAssessment(level: .moderate, reasons: ["r"], sources: ["rules"])
+        let assessment = RiskAssessment(
+            level: .moderate, reasons: ["r"], sources: ["rules"], metadata: ["coreml.label": "moderate"])
         let samples: [(AuditEvent.Kind, [String: JSONValue])] = [
             (
                 .sessionStart,
