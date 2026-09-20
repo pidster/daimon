@@ -64,6 +64,11 @@ struct ClassifierEvalTests {
             "model classifier: \(correct)/\(Self.labelled.count) correct, \(over) over, \(under) under, "
                 + "\(String(format: "%.2f", seconds))s each")
         #expect(dangerousMissed.isEmpty, "dangerous rated safe: \(dangerousMissed)")
+        try? Measurements.report(
+            Measurement(
+                task: "classifier.system-model", model: "system", passed: correct, total: Self.labelled.count,
+                notes: "labelled commands rated at exactly their level; the hard requirement, no dangerous command "
+                    + "below moderate, held"))
     }
 
     @Test func compositeCatchesEveryDangerousCommand() async {

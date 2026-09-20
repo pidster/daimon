@@ -95,6 +95,9 @@ backend that does not answer gets one line saying so; the others are still liste
 `private-cloud` is refused from every unsigned build; see [backends.md](backends.md), "Private Cloud
 Compute".
 
+`daimon tools --markdown` and `--json` include a `Measured:` line, or a `measurements` field, for each
+tool the eval harness has measured ([measurements.md](measurements.md)).
+
 ### `daimon config`
 
 Prints the effective configuration as JSON: every setting with its default applied, the model, the

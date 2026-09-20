@@ -6,6 +6,7 @@
 | [objective.md](objective.md) | What daimon is for and what "done" looks like |
 | [daimon.md](daimon.md) | Command reference: subcommands, flags, `~/.daimon`, `config.json`, exit codes |
 | [tools/](tools/README.md) | One page per model-facing tool: contract, result format, limits |
+| [measurements.md](measurements.md) | What the eval harness found each delegated task achieves, how it is recorded, and where it is published |
 | [mcp.md](mcp.md) | daimon as an MCP server: client setup, `respond`, `triage`, structured output, receipts, errors |
 | [design.md](design.md) | Architecture: components, data flow, extension points |
 | [fm-cli.md](fm-cli.md) | What the Apple `fm` command family does and does not offer, as observed |
@@ -14,6 +15,7 @@
 | [context-management.md](context-management.md) | The small context window: framework APIs, what daimon does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
 | [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
+| [decisions/0026-task-catalogue.md](decisions/0026-task-catalogue.md) | Eval results ship with the tool catalogue as measurements, recorded by the eval run and embedded at build time |
 | [decisions/0025-context-estimation.md](decisions/0025-context-estimation.md) | The agent condenses ahead of a known window from the usage the runtime reports, because local runtimes truncate silently |
 | [decisions/0024-edit-file.md](decisions/0024-edit-file.md) | `edit_file` writes inside the sandbox's writable set, needs approval like a command, and replaces only an exact single match |
 | [decisions/0023-condensing-tools.md](decisions/0023-condensing-tools.md) | Purpose-built MCP tools condense local content on device; `triage` runs or reads build output and returns only the failures, amending ADR 0006 |
@@ -25,7 +27,7 @@
 | [decisions/0017-three-layer-instructions.md](decisions/0017-three-layer-instructions.md) | daimon's system prompt (a resource file), the operator's extension, and the caller's instructions, rendered in order |
 | [decisions/0016-local-runtimes-through-an-executor.md](decisions/0016-local-runtimes-through-an-executor.md) | Locally installed models plug in through a daimon-supplied executor; what the spike measured; `ollama:<name>` built |
 | [release.md](release.md) | How a release is cut: tag, tarball, GitHub release, Homebrew tap formula |
-| [backlog.md](backlog.md) | Agreed work not yet started: more condensing tools, a task catalogue, sampling, deferred backends |
+| [backlog.md](backlog.md) | Agreed work not yet started: more condensing tools, sampling, deferred backends |
 | [engineering.md](engineering.md) | Standards, tooling, the pre-commit gate, and CI |
 | [backends.md](backends.md) | Model backends: Apple's, Ollama, Core AI, MLX; asset preparation, naming, declared capabilities, errors |
 | [decisions/](decisions/) | Architecture Decision Records, one per significant decision |

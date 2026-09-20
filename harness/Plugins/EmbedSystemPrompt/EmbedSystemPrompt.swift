@@ -1,36 +1,40 @@
 import Foundation
 import PackagePlugin
 
-/// Embeds `Resources/system-prompt.md` into `DaimonCore` as a Swift string constant at build time, so
-/// the prompt is a plain text file in the source tree and the product stays one binary with nothing to
-/// ship beside it. The text goes into a raw multi-line literal, so it needs no escaping; the one
-/// sequence that would end the literal early is refused.
+/// Embeds text resources into `DaimonCore` as Swift string constants at build time, so each is a plain
+/// file in the source tree and the product stays one binary with nothing to ship beside it:
+/// `Resources/system-prompt.md` as `SystemPromptText.text` and `Resources/measurements.json` as
+/// `MeasurementsText.text`. The text goes into a raw multi-line literal, so it needs no escaping; the
+/// one sequence that would end the literal early is refused.
 @main
 struct EmbedSystemPrompt: BuildToolPlugin {
-    /// The shell that turns the text file into Swift; `$1` is the input, `$2` the output.
+    /// The shell that turns a text file into Swift; `$1` is the input, `$2` the output, `$3` the type.
     static let script = """
         set -eu
-        if grep -q '\"\"\"#' "$1"; then echo "system-prompt.md must not contain \\"\\"\\"#" >&2; exit 1; fi
+        if grep -q '\"\"\"#' "$1"; then echo "$1 must not contain \\"\\"\\"#" >&2; exit 1; fi
         {
-            printf '// Generated from Resources/system-prompt.md by the EmbedSystemPrompt plugin. Do not edit.\\n'
-            printf 'enum SystemPromptText {\\n    static let text = #\"\"\"\\n'
+            printf '// Generated from %s by the EmbedSystemPrompt plugin. Do not edit.\\n' "$(basename "$1")"
+            printf 'enum %s {\\n    static let text = #\"\"\"\\n' "$3"
             cat "$1"
             printf '\"\"\"#\\n}\\n'
         } > "$2"
         """
 
+    /// The resources embedded, as file name and Swift type.
+    static let resources = [("system-prompt.md", "SystemPromptText"), ("measurements.json", "MeasurementsText")]
+
     func createBuildCommands(context: PluginContext, target: Target) throws -> [Command] {
         guard let target = target as? SourceModuleTarget else { return [] }
-        let input = target.directoryURL.appending(path: "Resources/system-prompt.md")
-        let output = context.pluginWorkDirectoryURL.appending(path: "SystemPromptText.swift")
-        return [
-            .buildCommand(
-                displayName: "Embed system-prompt.md",
+        return Self.resources.map { file, type in
+            let input = target.directoryURL.appending(path: "Resources/\(file)")
+            let output = context.pluginWorkDirectoryURL.appending(path: "\(type).swift")
+            return .buildCommand(
+                displayName: "Embed \(file)",
                 executable: URL(filePath: "/bin/sh"),
-                arguments: ["-c", Self.script, "embed-system-prompt", input.path(), output.path()],
+                arguments: ["-c", Self.script, "embed-resource", input.path(), output.path(), type],
                 inputFiles: [input],
                 outputFiles: [output]
             )
-        ]
+        }
     }
 }

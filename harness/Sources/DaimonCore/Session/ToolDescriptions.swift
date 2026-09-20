@@ -14,15 +14,20 @@ public struct ToolDescription: Codable, Equatable, Sendable {
     public var limits: String
     /// A `respond` prompt that reliably makes the model use it.
     public var examplePrompt: String
+    /// What the eval harness measured for tasks on this tool; empty when nothing has been measured.
+    public var measurements: [Measurement] = []
 }
 
 extension ToolRegistry {
-    /// Descriptions of every registered tool, in registration order.
-    public var descriptions: [ToolDescription] {
+    /// Descriptions of every registered tool, in registration order, with the embedded measurements.
+    public var descriptions: [ToolDescription] { descriptions(measurements: Measurements.embedded) }
+
+    /// Descriptions with the given measurements attached by tool name.
+    public func descriptions(measurements: [Measurement]) -> [ToolDescription] {
         all.map { tool in
             ToolDescription(
                 name: tool.name, description: tool.description, parameters: Self.schema(of: tool), limits: tool.limits,
-                examplePrompt: tool.examplePrompt)
+                examplePrompt: tool.examplePrompt, measurements: Measurements.forTool(tool.name, in: measurements))
         }
     }
 
@@ -34,8 +39,11 @@ extension ToolRegistry {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// The descriptions as Markdown, with the prompting rules a client needs.
-    public var descriptionsMarkdown: String {
+    /// The descriptions as Markdown, with the prompting rules a client needs and the embedded measurements.
+    public var descriptionsMarkdown: String { descriptionsMarkdown(measurements: Measurements.embedded) }
+
+    /// The Markdown catalogue with the given measurements attached.
+    public func descriptionsMarkdown(measurements: [Measurement]) -> String {
         var lines = [
             "# daimon tools",
             "",
@@ -45,7 +53,7 @@ extension ToolRegistry {
             "task needs.",
             "",
         ]
-        for tool in descriptions {
+        for tool in descriptions(measurements: measurements) {
             lines += ["## \(tool.name)", "", tool.description, "", "Arguments:", ""]
             if case .object(let schema) = tool.parameters, case .object(let properties)? = schema["properties"] {
                 var required: [String] = []
@@ -58,6 +66,12 @@ extension ToolRegistry {
                 }
             }
             lines += ["", "Limits: \(tool.limits)", "", "Example prompt: \(tool.examplePrompt)", ""]
+            for measured in tool.measurements {
+                lines.append(
+                    "Measured: \(measured.task) \(measured.summary) on \(measured.model), \(measured.date): \(measured.notes)"
+                )
+            }
+            if !tool.measurements.isEmpty { lines.append("") }
         }
         return lines.joined(separator: "\n")
     }

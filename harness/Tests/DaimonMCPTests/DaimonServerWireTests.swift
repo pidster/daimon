@@ -61,7 +61,7 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(
             resources.map(\.uri) == [
                 "daimon://tools", "daimon://tools.md", "daimon://config", "daimon://status", "daimon://approvals",
-                "daimon://audit",
+                "daimon://audit", "daimon://measurements",
             ])
         let json = try await pair.client.readResource(uri: "daimon://tools")
         #expect(json.first?.mimeType == "application/json")

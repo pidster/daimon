@@ -121,5 +121,10 @@ struct TriageEvalTests {
         }
         print("triage eval: recall \(hits)/\(wanted)")
         #expect(hits * 4 >= wanted * 3, "recall \(hits)/\(wanted) is below three quarters")
+        try? Measurements.report(
+            Measurement(
+                task: "triage", model: ModelSelection.default.description, passed: hits, total: wanted,
+                notes: "expected failures found across abridged swift build, swift test, cargo test, and pytest "
+                    + "output, by test name or file:line"))
     }
 }

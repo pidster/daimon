@@ -95,13 +95,16 @@ func scratchSession(entryPoint: EntryPoint = .mcp, dependencies: Session.Depende
         #expect(
             ToolCatalog.resources.map(\.uri) == [
                 "daimon://tools", "daimon://tools.md", "daimon://config", "daimon://status", "daimon://approvals",
-                "daimon://audit",
+                "daimon://audit", "daimon://measurements",
             ])
         let json = try await server.read(.init(uri: "daimon://tools"))
         #expect(json.contents.first?.text?.contains("\"name\" : \"read_file\"") == true)
         #expect(json.contents.first?.mimeType == "application/json")
         let markdown = try await server.read(.init(uri: "daimon://tools.md"))
         #expect(markdown.contents.first?.text?.hasPrefix("# daimon tools") == true)
+        let measured = try await server.read(.init(uri: "daimon://measurements"))
+        #expect(measured.contents.first?.mimeType == "application/json")
+        #expect(measured.contents.first?.text?.hasPrefix("[") == true)
         await #expect(throws: MCPError.self) { try await server.read(.init(uri: "daimon://nope")) }
     }
 

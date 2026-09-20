@@ -31,7 +31,7 @@ let package = Package(
     targets: [
         .target(
             name: "DaimonCore",
-            exclude: ["Resources/system-prompt.md"],
+            exclude: ["Resources/system-prompt.md", "Resources/measurements.json"],
             linkerSettings: [.linkedFramework("FoundationModels")],
             plugins: ["EmbedSystemPrompt"]
         ),

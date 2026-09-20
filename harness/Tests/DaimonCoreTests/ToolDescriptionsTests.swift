@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import DaimonCore
@@ -51,5 +52,19 @@ import Testing
         }
         #expect(markdown.contains("- `path` (string, required)"))
         #expect(markdown.contains("Example prompt: Use read_file"))
+        #expect(!registry.descriptionsMarkdown(measurements: []).contains("Measured:"))
+        #expect(markdown.contains("Measured:") == !Measurements.embedded.isEmpty)
+    }
+
+    @Test func markdownAndJSONCarryMeasurements() throws {
+        let registry = ToolRegistry()
+        let measured = Measurement(
+            task: "edit_file.replace", tool: "edit_file", model: "system", passed: 4, total: 5, notes: "exact")
+        let described = registry.descriptions(measurements: [measured])
+        let json = String(decoding: try JSONEncoder().encode(described), as: UTF8.self)
+        #expect(json.contains("\"task\":\"edit_file.replace\""))
+        let markdown = registry.descriptionsMarkdown(measurements: [measured])
+        #expect(markdown.contains("Measured: edit_file.replace 4/5 (80%) on system, \(measured.date): exact\n"))
+        #expect(markdown.components(separatedBy: "Measured:").count == 2)
     }
 }

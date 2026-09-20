@@ -118,7 +118,10 @@ coverage_baseline() {
 
 eval_() {
     echo "==> eval (on-device model; not part of the gate)"
-    (cd harness && DAIMON_MODEL_TESTS=1 swift test $SWIFT_SANDBOX --filter ModelEvalTests 2>&1 | grep -E 'model classifier|^  [a-z]+ -> |✔|✘|Test run')
+    record="$ROOT/harness/Sources/DaimonCore/Resources/measurements.json"
+    (cd harness && DAIMON_MODEL_TESTS=1 DAIMON_EVAL_RECORD="$record" swift test $SWIFT_SANDBOX --filter ModelEvalTests 2>&1 \
+        | grep -E 'model classifier|measured:|eval:|^  [a-z]+ -> |^[a-z-]+	|✔|✘|Test run')
+    echo "==> measurements recorded in harness/Sources/DaimonCore/Resources/measurements.json; commit them"
 }
 
 format() {

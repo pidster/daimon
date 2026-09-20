@@ -167,6 +167,11 @@ public struct DaimonServer: Sendable {
             return .init(contents: [.text(registry.descriptionsJSON, uri: params.uri, mimeType: "application/json")])
         case ToolCatalog.toolsMarkdownResourceURI:
             return .init(contents: [.text(registry.descriptionsMarkdown, uri: params.uri, mimeType: "text/markdown")])
+        case ToolCatalog.measurementsResourceURI:
+            return .init(
+                contents: [
+                    .text(Measurements.encode(Measurements.embedded), uri: params.uri, mimeType: "application/json")
+                ])
         case ToolCatalog.configResourceURI:
             return json(views.configuration)
         case ToolCatalog.statusResourceURI:

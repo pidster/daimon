@@ -135,6 +135,8 @@ public enum ToolCatalog {
     public static let approvalsResourceURI = "daimon://approvals"
     /// URI of the most recent audit events across every session.
     public static let auditResourceURI = "daimon://audit"
+    /// URI of the measurements: what the eval harness found each delegated task achieves.
+    public static let measurementsResourceURI = "daimon://measurements"
     /// Template for one session's or thread's audit events.
     public static let auditTemplate = "daimon://audit/{session}"
 
@@ -166,6 +168,12 @@ public enum ToolCatalog {
             description:
                 "The last 100 audit events across every session, as JSON Lines; the full log is in the audit file.",
             mimeType: "application/x-ndjson"),
+        Resource(
+            name: "daimon measurements", uri: measurementsResourceURI, title: "What each delegated task achieved",
+            description:
+                "Eval results per task and model (passed/total, date, what a pass is), recorded by scripts/check "
+                + "eval and shipped with this build; a caller reads them to know which delegations are reliable.",
+            mimeType: "application/json"),
     ]
 
     /// Resource templates daimon advertises.

@@ -26,8 +26,9 @@ not the differentiator. Items, in order of leverage:
   over a set of files, extract fields to a schema. A deterministic pre-pass for known output formats
   (`file:line:col: error:`, `error[E…] --> file:line`, `FAILED path::test`) would make those cases exact
   and leave the model the rest; measure it against the eval fixtures first.
-- **A measured task catalogue.** Extend the eval harness to those tools and publish success rates in
-  `daimon://tools`, so a caller knows which delegations are reliable.
+- Done 2026-09-20: a measured task catalogue. `scripts/check eval` records a `Measurement` per task
+  into an embedded resource; the tool catalogue and `daimon://measurements` publish them
+  ([ADR 0026](decisions/0026-task-catalogue.md), [measurements.md](measurements.md)).
 - **Reverse delegation through MCP sampling.** When the on-device model is stuck on a sub-step, ask the
   calling harness's model through the protocol, with data leaving the device only for that step and only
   with approval.

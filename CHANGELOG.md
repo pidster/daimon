@@ -6,6 +6,13 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 ## Unreleased
 
+Added:
+
+- Measurements: `scripts/check eval` records what each delegated task achieved (`triage`,
+  `edit_file` replace after read, schema-shaped replies, the risk classifier) into a resource embedded
+  in the binary; `daimon tools --markdown`, `daimon://tools`, and the new `daimon://measurements`
+  resource publish them so a caller knows what to trust.
+
 Changed:
 
 - Local runtimes that truncate silently no longer lose the instructions: `Agent` condenses the transcript
