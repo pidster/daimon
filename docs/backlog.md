@@ -21,9 +21,11 @@ not the differentiator. Items, in order of leverage:
 - Done 2026-09-20: structured output. `respond` and the CLI (`--schema`) take a JSON Schema and return
   JSON of that shape through guided generation ([ADR 0022](decisions/0022-structured-output.md)).
 - **Condensing tools.** Purpose-built MCP tools that keep raw content on the device and return small
-  results: summarise a file or a diff (chunked map-reduce inside daimon), triage test or build output
-  into a structured failure list, answer a question over a set of files, extract fields to a schema.
-  These encode the prompting and paging so the caller does not have to coax a small model.
+  results ([ADR 0023](decisions/0023-condensing-tools.md)). Done 2026-09-20: `triage`, build or test
+  output into a failure list. Next: summarise a file or a diff (chunked map-reduce), answer a question
+  over a set of files, extract fields to a schema. A deterministic pre-pass for known output formats
+  (`file:line:col: error:`, `error[E…] --> file:line`, `FAILED path::test`) would make those cases exact
+  and leave the model the rest; measure it against the eval fixtures first.
 - **A measured task catalogue.** Extend the eval harness to those tools and publish success rates in
   `daimon://tools`, so a caller knows which delegations are reliable.
 - **Reverse delegation through MCP sampling.** When the on-device model is stuck on a sub-step, ask the

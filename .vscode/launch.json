@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:daimon}/harness",
+            "name": "Debug daimon (harness)",
+            "target": "daimon",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug daimon (harness)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:daimon}/harness",
+            "name": "Release daimon (harness)",
+            "target": "daimon",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release daimon (harness)"
+        }
+    ]
+}

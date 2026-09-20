@@ -64,6 +64,45 @@ public enum ToolCatalog {
         annotations: .init(title: "Respond on device", readOnlyHint: false, openWorldHint: false)
     )
 
+    /// Runs or reads build/test output on this Mac and returns only the failures.
+    public static let triage = Tool(
+        name: "triage",
+        description:
+            "Run a build or test command on this Mac (or read an output file already here) and return only "
+            + "its failures as a structured list: kind, location, message. The raw output stays on this Mac; "
+            + "the on-device model reads it in chunks. Give exactly one of command or path.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Shell command line to run with /bin/sh -c under daimon's policy, sandbox, and approval, "
+                            + "such as: swift test 2>&1"),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory to run the command in. Default: daimon's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of an output file on this Mac to triage instead."),
+                ]),
+                "model": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Model to judge the chunks with; as for respond. Default: the configured one."),
+                ]),
+                "max_findings": .object([
+                    "type": .string("integer"),
+                    "description": .string("Findings to return at most (default 20); more is flagged."),
+                ]),
+            ]),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Triage build or test output", readOnlyHint: false, openWorldHint: false)
+    )
+
     /// Ends a conversation thread and frees its model session.
     public static let closeThread = Tool(
         name: "close_thread",
@@ -82,7 +121,7 @@ public enum ToolCatalog {
     )
 
     /// Every tool, in the order clients see them.
-    public static var all: [Tool] { [respond, closeThread] }
+    public static var all: [Tool] { [respond, triage, closeThread] }
 
     /// URI of the JSON resource describing the model's tools.
     public static let toolsResourceURI = "daimon://tools"
@@ -200,6 +239,62 @@ public struct RespondRequest: Equatable, Sendable {
         if let raw = arguments?["schema"] {
             guard raw.objectValue != nil else { throw MCPError.invalidParams("'schema' must be a JSON Schema object") }
             schema = JSONValue(raw)
+        }
+    }
+}
+
+/// Decoded arguments for the `triage` tool.
+public struct TriageRequest: Equatable, Sendable {
+    /// What to triage.
+    public var source: Triage.Source
+    /// Model for the judging turns; nil means the server default.
+    public var model: ModelSelection?
+    /// Findings to keep at most.
+    public var maxFindings: Int
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` unless exactly one of `command` and `path` is a non-empty string.
+    public init(arguments: [String: Value]?) throws {
+        let command = arguments?["command"]
+        let path = arguments?["path"]
+        switch (command, path) {
+        case (let command?, nil):
+            guard let line = command.stringValue, !line.isEmpty else {
+                throw MCPError.invalidParams("'command' must be a non-empty string")
+            }
+            var directory: String?
+            if let raw = arguments?["working_directory"] {
+                guard let text = raw.stringValue else {
+                    throw MCPError.invalidParams("'working_directory' must be a string")
+                }
+                directory = text
+            }
+            source = .command(line, workingDirectory: directory)
+        case (nil, let path?):
+            guard let file = path.stringValue, !file.isEmpty else {
+                throw MCPError.invalidParams("'path' must be a non-empty string")
+            }
+            source = .path(file)
+        default:
+            throw MCPError.invalidParams("give exactly one of 'command' and 'path'")
+        }
+        if let raw = arguments?["model"] {
+            guard let text = raw.stringValue else { throw MCPError.invalidParams("'model' must be a string") }
+            do {
+                model = try ModelSelection(parsing: text)
+            } catch {
+                throw MCPError.invalidParams("\(error)")
+            }
+        }
+        if let raw = arguments?["max_findings"] {
+            guard let count = raw.intValue, count > 0 else {
+                throw MCPError.invalidParams("'max_findings' must be a positive integer")
+            }
+            maxFindings = count
+        } else {
+            maxFindings = Triage.Options().maxFindings
         }
     }
 }

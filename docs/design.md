@@ -194,7 +194,11 @@ concurrently. Results carry `structuredContent.thread_id`; see
 the log never disagree. A call may give a JSON Schema; `OutputSchema` converts the accepted subset to a
 `DynamicGenerationSchema`, `Agent.respond(to:schema:)` runs guided generation after checking the model
 declares it, and the reply's JSON is parsed into `structuredContent.output`
-([ADR 0022](decisions/0022-structured-output.md)).
+([ADR 0022](decisions/0022-structured-output.md)). `triage` is the first condensing tool: `Triage`
+in `DaimonCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,
+sandbox, audit) or reads a file after the gate clears it, chunks it, judges each chunk through a
+schema-shaped turn on a conversation of its own, and merges the findings
+([ADR 0023](decisions/0023-condensing-tools.md)).
 
 ```
 MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools

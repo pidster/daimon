@@ -36,7 +36,7 @@ sensitive; it is why it is user-only.
 | Kind | Details | Written by |
 | --- | --- | --- |
 | `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`), `systemPromptExtension` and `instructions` (the operator's and the caller's layers, null when absent; daimon's own prompt is fixed per `version`), `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
-| `session.end` | `reason`: `closed` (explicit), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
+| `session.end` | `reason`: `closed` (explicit, or a `triage-<id>` session finishing), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
 | `model.resolved` | `model` (the selection), `backend` (`system`, `private-cloud`, or a scheme), `asset` (what backs a local model, null for Apple's), `capabilities` (declared names), `capabilitySource` (`framework`, `runtime`, `configuration`, `undeclared`), `tools` the conversation opened with; recorded when a conversation opens, after the capability check | `Conversation` |
 | `prompt` | `text`; `schema` (the caller's JSON Schema) when the reply had to be shaped | `Agent` |
 | `response` | `text`, `condensed`, `seconds` | `Agent` |

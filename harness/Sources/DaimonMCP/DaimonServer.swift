@@ -33,6 +33,8 @@ public struct DaimonServer: Sendable {
     private let makeThread: ThreadFactory
     /// Asks the client's user through elicitation; `--yes` sessions bypass it inside the gate.
     private let approver: ElicitationApprover
+    /// Opens the agent that judges one triage chunk; tests inject one over a scripted model.
+    private let makeTriageAgent: @Sendable (Conversation) throws -> Agent
 
     /// Creates a server over a session begun by the CLI. Threads are opened through
     /// `Session.conversation` with an elicitation approver, so every face of daimon shares one
@@ -41,6 +43,8 @@ public struct DaimonServer: Sendable {
     /// - Parameters:
     ///   - session: The session from `Session.begin`.
     ///   - makeThread: How threads are built; tests inject a fake that needs no model.
+    ///   - makeTriageAgent: How a triage chunk's agent is opened on its conversation; tests inject a
+    ///     scripted model.
     public init(
         session: Session,
         makeThread: @escaping ThreadFactory = { session, approver, id, instructions, tools, model in
@@ -49,7 +53,8 @@ public struct DaimonServer: Sendable {
             return OpenThread(
                 thread: ConversationThread(id: id, agent: try conversation.openAgent()), gate: conversation.gate,
                 audit: conversation.audit, receipts: conversation.receipts)
-        }
+        },
+        makeTriageAgent: @escaping @Sendable (Conversation) throws -> Agent = { try $0.openAgent() }
     ) {
         server = Server(
             name: Self.name, version: Self.version,
@@ -59,6 +64,7 @@ public struct DaimonServer: Sendable {
         approver = ElicitationApprover(server: server, client: client, timeout: session.config.approvalTimeout)
         threads = ThreadStore(capacity: session.config.maxThreads)
         self.makeThread = makeThread
+        self.makeTriageAgent = makeTriageAgent
     }
 
     private var config: Config.Resolved { session.config }
@@ -119,6 +125,9 @@ public struct DaimonServer: Sendable {
             case ToolCatalog.respond.name:
                 let request = try RespondRequest(arguments: params.arguments)
                 result = await respond(request)
+            case ToolCatalog.triage.name:
+                let request = try TriageRequest(arguments: params.arguments)
+                result = await triage(request)
             case ToolCatalog.closeThread.name:
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
@@ -183,7 +192,7 @@ public struct DaimonServer: Sendable {
     private static func parse(_ text: String) -> Value {
         guard let data = text.data(using: .utf8), let value = try? JSONDecoder().decode(JSONValue.self, from: data)
         else { return .string(text) }
-        return Value(value)
+        return Value(json: value)
     }
 
     /// A compact JSON rendering of MCP arguments for the audit log.
@@ -229,13 +238,38 @@ public struct DaimonServer: Sendable {
                     "text": .string(reply.text),
                     "refusals": .array(
                         refusals.map { .object(["command": .string($0.command), "reason": .string($0.reason)]) }),
-                    "receipt": Value(receipt.json),
+                    "receipt": Value(json: receipt.json),
                     "output": schema == nil ? .null : Self.parse(reply.text),
                 ]),
                 isError: false
             )
         } catch LanguageModelError.contextSizeExceeded {
             return failure("thread \(id) has exhausted the model's context window; close it and start a new one")
+        } catch {
+            return failure(String(describing: error))
+        }
+    }
+
+    /// Captures the output on a conversation of its own (so the command, the file read, and every
+    /// judging turn are audited under one session), judges it chunk by chunk, and returns the findings.
+    private func triage(_ request: TriageRequest) async -> CallTool.Result {
+        let id = "triage-" + ShortID.make()
+        do {
+            let conversation = try session.conversation(id: id, approver: approver, tools: .none, model: request.model)
+            defer { conversation.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed")) }
+            let schema = try OutputSchema(json: Triage.schemaJSON)
+            let makeAgent = makeTriageAgent
+            let triage = Triage(options: .init(maxFindings: request.maxFindings)) { prompt in
+                try await makeAgent(conversation).respond(to: prompt, schema: schema).text
+            }
+            let runner = CommandRunner(
+                options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+            let captured = try await triage.capture(request.source, runner: runner, gate: conversation.gate)
+            let report = try await triage.run(captured, from: request.source)
+            let structured: Value? = Value(json: report.json)  // the typed init, not the throwing generic one
+            return .init(
+                content: [.text(text: report.rendered, annotations: nil, _meta: nil)], structuredContent: structured,
+                isError: false)
         } catch {
             return failure(String(describing: error))
         }

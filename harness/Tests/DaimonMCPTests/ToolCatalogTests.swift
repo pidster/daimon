@@ -7,14 +7,14 @@ import Testing
 
 @Suite struct ToolCatalogTests {
     @Test func advertisesRespondAndRunCommand() {
-        #expect(ToolCatalog.all.map(\.name) == ["respond", "close_thread"])
+        #expect(ToolCatalog.all.map(\.name) == ["respond", "triage", "close_thread"])
     }
 
     @Test func everyToolHasAnObjectSchemaWithRequiredFields() {
         for tool in ToolCatalog.all {
             let schema = tool.inputSchema.objectValue
             #expect(schema?["type"]?.stringValue == "object", "\(tool.name)")
-            #expect(schema?["required"]?.arrayValue?.isEmpty == false, "\(tool.name)")
+            #expect(schema?["required"]?.arrayValue != nil, "\(tool.name)")
         }
     }
 
@@ -94,5 +94,25 @@ import Testing
         let request = try RespondRequest(arguments: ["prompt": .string("hi"), "tools": .array([])])
         #expect(request.tools == ToolSelection.none)
         #expect(ToolSelection.none.resolved(or: ["a"]).isEmpty)
+    }
+}
+
+@Suite struct TriageRequestTests {
+    @Test func decodesExactlyOneSource() throws {
+        let command = try TriageRequest(arguments: [
+            "command": .string("swift test"), "working_directory": .string("/r"), "max_findings": .int(3),
+            "model": .string("ollama:q"),
+        ])
+        #expect(command.source == .command("swift test", workingDirectory: "/r"))
+        #expect(command.maxFindings == 3 && command.model == .ollama("q"))
+        let path = try TriageRequest(arguments: ["path": .string("/log")])
+        #expect(path.source == .path("/log") && path.maxFindings == 20 && path.model == nil)
+        for bad: [String: Value] in [
+            [:], ["command": .string("a"), "path": .string("b")], ["command": .string("")], ["path": .int(1)],
+            ["command": .string("a"), "working_directory": .int(1)], ["path": .string("p"), "max_findings": .int(0)],
+            ["path": .string("p"), "model": .string("gpt")], ["path": .string("p"), "model": .int(1)],
+        ] {
+            #expect(throws: MCPError.self, "\(bad)") { try TriageRequest(arguments: bad) }
+        }
     }
 }

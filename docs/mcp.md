@@ -183,6 +183,48 @@ or start daimon with `--yes`. See [approval.md](approval.md).
 | `command` | string | yes |
 | `working_directory` | string | no |
 
+### `triage`
+
+Run a build or test command on this Mac, or read an output file already here, and get back only the
+failures. The raw output stays on the Mac: daimon captures it whole (up to 1 MiB, the tail beyond),
+cuts it into 4 KiB chunks at line ends, and judges each chunk in a fresh, tool-less model turn with a
+schema, then merges the lists, drops duplicates, and caps the result
+([ADR 0023](decisions/0023-condensing-tools.md)).
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | Shell command line, run with `/bin/sh -c` under daimon's policy, sandbox, and approval exactly as the model's `run_command` would, and audited as `command.outcome`. Pipe stderr in yourself when it matters: `swift test 2>&1`. |
+| `working_directory` | string | no | Absolute directory for the command. Default: daimon's. |
+| `path` | string | one of | Absolute path of an output file on this Mac; the read clears the gate as `read_file` does. |
+| `model` | string | no | The judging model, as for `respond`; it must declare guided generation. Default: the configured model. |
+| `max_findings` | integer | no | Findings to return at most (default 20); `more` is true when some were dropped. |
+
+Result content is a headline and one finding per line; `structuredContent`:
+
+```json
+{
+  "source": { "command": "swift test 2>&1", "workingDirectory": "/repo", "exitStatus": 1,
+              "timedOut": false, "truncated": false, "bytes": 18234 },
+  "chunks": 5, "more": false,
+  "findings": [
+    { "kind": "error", "location": "Sources/A.swift:42:13", "message": "cannot find 'fooBar' in scope" },
+    { "kind": "test-failure", "location": "CommandRunnerTests.swift:88:9", "message": "Expectation failed: …" }
+  ]
+}
+```
+
+`kind` is `error`, `test-failure`, `warning`, `crash`, or `other`; `location` is the `file:line` or test
+name as printed, or null. For a file source `exitStatus` is null. Each triage is its own audited session
+(`triage-<id>`: start, the command or read, one prompt and response per chunk, end), so
+`daimon://audit/triage-<id>` shows exactly what the model saw. Approval for the command reaches the
+client through elicitation as for `respond`.
+
+Measured with `scripts/check eval` on this Mac on 2026-09-20 with the system model: on four abridged
+fixtures (a `swift build` with two errors and a warning, a `swift test` with two failing tests, a
+`cargo test` with two compile errors, a `pytest` with one failure) every expected failure was found,
+7 of 7, with no spurious findings; the model reports a failing test by its assertion's `file:line` rather
+than its name. Output shapes not in the fixtures are not measured.
+
 ### `close_thread`
 
 Free a thread's model session.

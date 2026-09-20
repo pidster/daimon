@@ -22,10 +22,12 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         steps: [ScriptedModel.Step] = [
             .call(name: "current_date", arguments: #"{"timeZone":"Asia/Tokyo"}"#), .say("The date is {tool}"),
         ],
-        approver: any Approver = DenyingApprover(reason: "not in tests"), elicitation: Bool = false
+        approver: any Approver = DenyingApprover(reason: "not in tests"), elicitation: Bool = false,
+        triageSteps: [ScriptedModel.Step] = []
     ) async throws -> (client: Client, server: DaimonServer, sink: MemoryAuditSink) {
         let sink = MemoryAuditSink()
         let session = try scratchSession(dependencies: .testing(sink: sink))
+        let triageModel = ScriptedModel(steps: triageSteps, capabilities: [.guidedGeneration])
         let server = DaimonServer(session: session) { session, _, id, instructions, tools, model in
             let conversation = try session.conversation(
                 id: id, approver: approver, instructions: instructions, tools: tools, model: model)
@@ -36,6 +38,10 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
             return OpenThread(
                 thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit,
                 receipts: conversation.receipts)
+        } makeTriageAgent: { conversation in
+            Agent(
+                instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: triageModel),
+                audit: conversation.audit)
         }
         let transports = await InMemoryTransport.createConnectedPair()
         try await server.serve(transport: transports.server)
@@ -49,7 +55,7 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
     @Test func listsToolsAndResourcesOverTheProtocol() async throws {
         let pair = try await connected()
         let tools = try await pair.client.listTools().tools
-        #expect(tools.map(\.name) == ["respond", "close_thread"])
+        #expect(tools.map(\.name) == ["respond", "triage", "close_thread"])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
         let resources = try await pair.client.listResources().resources
         #expect(
@@ -232,6 +238,53 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
             pair.client, "respond",
             ["prompt": .string("x"), "thread_id": .string("t5"), "schema": .object(["type": .string("string")])])
         #expect(bad.isError == true)
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func triageRunsACommandJudgesChunksAndReturnsFindingsOverTheProtocol() async throws {
+        // Two chunks, each judged once; the second repeats a finding and adds another.
+        let pair = try await connected(
+            triageSteps: [
+                .say(#"{"failures":[{"kind":"error","location":"A.swift:3:5","message":"cannot find x"}]}"#),
+                .say(
+                    #"{"failures":[{"kind":"error","location":"A.swift:3:5","message":"cannot find x"},{"kind":"test-failure","location":"FooTests/bar()","message":"expected 1"}]}"#
+                ),
+            ])
+        let lines = (1...120).map { "line \($0) of output that says nothing" }.joined(separator: "\n")
+        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-wire-triage-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let log = dir.appending(path: "build.log")
+        try Data(lines.utf8).write(to: log)
+        let result = try await call(pair.client, "triage", ["path": .string(log.path)])
+        #expect(result.isError == false, "\(result)")
+        let structured = result.structuredContent?.objectValue
+        #expect(structured?["chunks"] == .int(2))
+        #expect(structured?["more"] == .bool(false))
+        let findings = structured?["findings"]?.arrayValue
+        #expect(findings?.count == 2)
+        #expect(findings?.first?.objectValue?["location"] == .string("A.swift:3:5"))
+        #expect(findings?.last?.objectValue?["kind"] == .string("test-failure"))
+        #expect(structured?["source"]?.objectValue?["path"] == .string(log.path))
+        guard case .text(let text, _, _)? = result.content.first else { Issue.record("no text"); return }
+        #expect(text.hasPrefix("2 findings; "))
+        #expect(text.contains("test-failure\tFooTests/bar()\texpected 1"))
+        // The triage has its own audited session: start, one prompt/response per chunk, end.
+        let session = pair.sink.events.filter { $0.session.hasPrefix("triage-") }
+        #expect(session.first?.kind == .sessionStart && session.last?.kind == .sessionEnd)
+        #expect(session.filter { $0.kind == .prompt }.count == 2)
+        #expect(session.first?.details["tools"] == .array([]))
+        // A command runs through the runner under the gate; `true` is harmless and prints nothing.
+        let quiet = try await call(
+            pair.client, "triage", ["command": .string("true"), "working_directory": .string(dir.path)])
+        #expect(quiet.isError == false, "\(quiet)")
+        #expect(quiet.structuredContent?.objectValue?["chunks"] == .int(0))
+        #expect(quiet.structuredContent?.objectValue?["source"]?.objectValue?["exitStatus"] == .int(0))
+        // A missing file is a tool error, and bad arguments are protocol errors.
+        let missing = try await call(pair.client, "triage", ["path": .string(dir.appending(path: "nope").path)])
+        #expect(missing.isError == true)
+        await #expect(throws: MCPError.self) { _ = try await call(pair.client, "triage", [:]) }
         await pair.client.disconnect()
         await pair.server.stop()
     }

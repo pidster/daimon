@@ -8,6 +8,10 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- `triage`, a new MCP tool: run a build or test command on this Mac (or read an output file) and get
+  back only the failures as `kind`, `location`, `message`, judged chunk by chunk by the on-device model.
+  The raw output never leaves the Mac; the command runs under the same policy, sandbox, and approval
+  as the model's own `run_command`.
 - Structured output: `respond` takes a `schema` (a JSON Schema object in an accepted subset) and
   returns JSON of that shape, parsed into `structuredContent.output`; the CLI takes `--schema <path>`.
   A model that does not declare guided generation is refused before generation.
