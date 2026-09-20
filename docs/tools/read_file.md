@@ -32,16 +32,25 @@ Paths go through the approval gate's rule classifier as if they were `cat <path>
 answer, exactly as the command would be. Ordinary files pass without a model call. Refusals come back as
 `error: read not approved: …`.
 
+The gate is the only control on reads. The read happens in daimon's own process with your permissions:
+there is no sandbox and no confinement to the launch directory, unlike `run_command`'s writes, so the
+model can read anything you can, your home directory included ([trust.md](../trust.md)). Prefer `--tool`
+to leave `read_file` out of a conversation that should not read at all.
+
 ## Limits
 
 | Limit | Default | Configure |
 | --- | --- | --- |
-| Bytes of line content per page | 4 KiB; the page ends early and the marker points at the next line | `FileReader(maxBytes:)` (not yet in `config.json`) |
+| Bytes of line content per page | 4 KiB; the page ends early and the marker points at the next line | Fixed (`FileReader(maxBytes:)` in code); not a `config.json` setting |
 | Line length | A single line longer than the budget is cut to the budget, on a character boundary | same |
 | Binary files | Rejected if the first chunk contains a NUL byte | not configurable |
 | Directories, missing files, `offset`/`limit` below 1 | Errors | |
 
 CRLF line endings are handled; the returned lines never include `\n` or `\r`.
+
+It reads forward only: there is no search, no tail, and no binary content. To find a line in a large
+file or see its end, have the model use `run_command` with `grep -n` or `tail`, then `read_file` at the
+offset it learns.
 
 ## Implementation
 

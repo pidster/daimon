@@ -6,7 +6,7 @@ here is enforced by code and covered by tests; the linked pages hold the detail.
 
 ## What runs, and where
 
-The model has three tools: `current_date`, `read_file`, and `run_command`. Only `run_command` changes
+The model has four tools: `current_date`, `read_file`, `inspect`, and `run_command`. Only `run_command` changes
 anything. It runs a shell command through `/bin/sh -c` with daimon's own privileges, inside a Seatbelt
 sandbox ([run_command](tools/run_command.md)):
 
