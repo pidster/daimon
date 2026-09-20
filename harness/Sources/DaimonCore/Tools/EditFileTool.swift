@@ -11,7 +11,8 @@ public struct EditFileTool: DaimonTool {
     /// What the model is told this tool does.
     public let description =
         "Writes a text file: mode write replaces the whole file (creating it), append adds content at the end, "
-        + "replace swaps the one exact occurrence of find with content. Read the file first for replace."
+        + "replace swaps the one exact occurrence of find with content, and nothing else changes. "
+        + "Read the file first for replace."
 
     /// Arguments the model may supply when calling the tool.
     @Generable

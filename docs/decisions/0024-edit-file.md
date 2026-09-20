@@ -39,9 +39,10 @@ gate, and Seatbelt; `read_file` runs the gate's rules only; `inspect` and `curre
   with it can write only where the sandbox would have let a command write, after the same approval.
 - The file is written in place, not atomically; a failure mid-write can leave it partial. Acceptable for
   now: the sizes are small and the audit shows the attempt.
-- Not measured with the model yet: whether the on-device model reliably supplies `find` verbatim after
-  a `read_file` page. That belongs in the eval harness with the other tool tasks (backlog, task
-  catalogue).
+- Probed once with the system model on 2026-09-20: `find` came back verbatim after a `read_file` page,
+  but `content` carried the following line too, duplicating it. The tool cannot tell intent from
+  accident; the tool description now says `content` replaces only `find`, and a proper measurement
+  belongs in the eval harness with the other tool tasks (backlog, task catalogue).
 - Tests without the model: confinement including symlinks and look-alike siblings, every failure,
   each edit and its rendering (`FileWriterTests`); the tool's gate refusal, audit event, receipt
   entry, and classifier levels (`ToolWrapperTests`, `ReceiptTests`).

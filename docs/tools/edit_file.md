@@ -59,6 +59,14 @@ Each edit that happens is recorded as `file.write` with `path`, `mode`, `created
 `bytesAfter` ([logging.md](../logging.md)); the MCP receipt lists it under `files`. The content itself
 is in the `tool.call` event's arguments.
 
+## Observed with the model
+
+Probed on this Mac on 2026-09-20 with the system model and `--yes`: asked to read a two-line file and
+replace exactly `let x = 1` with `let x = 42`, the model supplied `find` verbatim but put both lines of
+the file in `content`, so the second line was duplicated. The tool did what it was told; the prompt
+must say that `content` is only the replacement for `find`. A write outside the writable set was refused
+with the directories named and no file created. Not yet in the eval harness.
+
 ## Implementation
 
 `FileWriter` in `harness/Sources/DaimonCore/Tools/FileWriter.swift` (confinement from
