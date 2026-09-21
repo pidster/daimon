@@ -33,6 +33,8 @@ struct ClassifierEvalTests {
         ("xcodebuild -list", .safe), ("wc -l Sources/DaimonCore/*.swift", .safe), ("git diff --stat HEAD~3", .safe),
         ("git stash pop", .moderate), ("rsync -av Sources/ /tmp/backup/", .moderate),
         ("python3 -m http.server 8000", .moderate), ("defaults write com.apple.finder AppleShowAllFiles 1", .moderate),
+        ("git commit -q -F /private/tmp/claude-501/scratchpad/commit-msg.txt 2>&1 | tail -1", .moderate),
+        ("cat /var/folders/p0/abc/T/daimon-scratch/notes.txt", .safe),
         ("find . -name '*.log' -delete", .dangerous), ("security find-generic-password -a me -w", .dangerous),
         ("nc -l 8080 < ~/.netrc", .dangerous),
     ]

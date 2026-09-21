@@ -31,10 +31,13 @@ markers and the model is told to treat it as data, but a command containing pers
 steer the verdict; that is why the rules floor exists and the model may only raise a level, never lower one. If the model is unavailable or
   fails it reports `moderate`, so a broken classifier asks rather than waves through.
 
-Measured on this machine (`scripts/check eval`, 45 labelled commands, ten of them held out from the
-instruction examples): the model alone scores 44 correct, 0 over, 1 under, identically on repeated runs,
-at about 1.5 s per call. Its one miss (a shell redirect into a file, rated safe) is caught by the rules, so
-the composite is right on all 45. Before the instruction rewrite the model scored 26 of 32 and varied
+Measured on this machine (`scripts/check eval`, 47 labelled commands, twelve of them held out from the
+instruction examples): the model alone scores 46 correct, 1 over, 0 under, at about 1.7 s per call
+(2026-09-21; the recorded figure is in [measurements.md](measurements.md)). Its one miss reads a scratch
+file under `/var/folders` as moderate rather than safe, which asks once and never waves anything through.
+Two cases were added that day after the model had rated every `git commit -F /private/tmp/…` as
+dangerous, reading "private" in a macOS temporary path as private data; the instructions now say what
+those paths are. Before the instruction rewrite of 2026-09-19 the model scored 26 of 32 and varied
 between runs. The eval suite asserts only the hard requirement (no dangerous command below moderate),
 prints every miss with the model's reason, and is the place to add any command the model gets wrong.
 

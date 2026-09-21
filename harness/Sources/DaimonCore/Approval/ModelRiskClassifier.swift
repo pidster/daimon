@@ -3,8 +3,8 @@ import FoundationModels
 
 /// Asks the on-device model to judge a command, with a structured verdict.
 ///
-/// Measured on this project's labelled set (`scripts/check eval`): 44 of 45,
-/// never rating a dangerous command safe, about 1.5 s per call. Always
+/// Measured on this project's labelled set (`scripts/check eval`): 46 of 47,
+/// never rating a dangerous command safe, about 1.7 s per call. Always
 /// combine with `RuleRiskClassifier`; never let it lower a level.
 public struct ModelRiskClassifier: RiskClassifier {
     /// The structured verdict the model produces. `reason` comes first on purpose: the model
@@ -39,6 +39,9 @@ public struct ModelRiskClassifier: RiskClassifier {
         - Redirecting output into a file inside the project is moderate, not dangerous.
         - Anything that changes a file, a setting, or repository state is at least moderate, even when it is
           easy to undo; safe means nothing changed.
+        - /private/tmp, /private/var, /var/folders, and $TMPDIR are macOS's ordinary temporary directories; \
+          the word "private" in such a path does not mean private data. A commit message or a scratch file \
+          read from there is ordinary.
 
         Examples:
         - ls -la -> safe: lists files.
@@ -49,6 +52,8 @@ public struct ModelRiskClassifier: RiskClassifier {
         - mv build build.old -> moderate: renames a directory.
         - python3 -m http.server 8000 -> moderate: starts a network service.
         - git commit -am wip -> moderate: changes repository state, reversible.
+        - git commit -q -F /private/tmp/session/msg.txt -> moderate: commits with a message file from a temporary \
+          directory.
         - npm install -> moderate: installs packages and uses the network.
         - curl -s https://api.example.com/status -> moderate: reads from the network.
         - rm -rf ./build -> dangerous: recursive deletion.

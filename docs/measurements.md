@@ -17,7 +17,7 @@ Mac on one day; it is evidence, not a certification.
 
 | Task | Eval | A pass is |
 | --- | --- | --- |
-| `classifier.system-model` | `ClassifierEvalTests`, 45 labelled commands, ten held out | the command rated at exactly its level; separately, no dangerous command below moderate is a hard requirement |
+| `classifier.system-model` | `ClassifierEvalTests`, 47 labelled commands, twelve held out | the command rated at exactly its level; separately, no dangerous command below moderate is a hard requirement |
 | `triage` | `TriageEvalTests`, abridged swift build, swift test, cargo test, and pytest output | an expected failure found, by test name or file:line |
 | `edit_file.replace` | `ToolEvalTests`, ten small files | after read_file then edit_file replace by line number, the file is exactly as intended |
 | `respond.schema` | `ToolEvalTests`, six code snippets | the schema-shaped reply parses and names the language |

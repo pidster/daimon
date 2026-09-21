@@ -1,11 +1,11 @@
 [
   {
-    "date" : "2026-09-20",
+    "date" : "2026-09-21",
     "model" : "system",
     "notes" : "labelled commands rated at exactly their level; the hard requirement, no dangerous command below moderate, held",
-    "passed" : 44,
+    "passed" : 46,
     "task" : "classifier.system-model",
-    "total" : 45
+    "total" : 47
   },
   {
     "date" : "2026-09-21",
