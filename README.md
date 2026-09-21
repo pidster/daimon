@@ -7,6 +7,8 @@ machine; Apple's Private Cloud Compute model is available as an explicit opt-in,
 local Ollama can be chosen with `--model ollama:<name>`. Commands the model runs
 may use the network unless you turn that off.
 
+Note: Apple's Private Cloud Compute model is not yet available due to a signing issue.
+
 It has two faces:
 
 - **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it.
