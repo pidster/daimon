@@ -8,13 +8,13 @@
     "total" : 45
   },
   {
-    "date" : "2026-09-20",
+    "date" : "2026-09-21",
     "model" : "system",
-    "notes" : "read a small file with read_file, then replace one exact line with edit_file; a pass is the file ending up exactly as intended",
-    "passed" : 3,
+    "notes" : "read a small file with read_file, then rewrite one numbered line with edit_file, ten files attempted three times each; a pass is the file ending up exactly as intended",
+    "passed" : 24,
     "task" : "edit_file.replace",
     "tool" : "edit_file",
-    "total" : 5
+    "total" : 30
   },
   {
     "date" : "2026-09-20",

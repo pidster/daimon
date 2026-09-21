@@ -11,8 +11,8 @@ public struct EditFileTool: DaimonTool {
     /// What the model is told this tool does.
     public let description =
         "Writes a text file: mode write replaces the whole file (creating it), append adds content at the end, "
-        + "replace swaps the one exact occurrence of find with content, and nothing else changes. "
-        + "Read the file first for replace."
+        + "replace changes one line: give line (the number read_file showed) and content (that whole line, "
+        + "rewritten), or find (exact existing text, once) and content (its replacement only). Read first."
 
     /// Arguments the model may supply when calling the tool.
     @Generable
@@ -26,9 +26,16 @@ public struct EditFileTool: DaimonTool {
         /// The text to write, append, or put in place of `find`.
         @Guide(description: "The text to write or append, or the replacement text for replace.")
         public var content: String
-        /// For `replace`, the exact text to replace; must occur once.
-        @Guide(description: "For replace only: the exact existing text to replace; it must occur exactly once.")
+        /// For `replace`, the exact text to replace; must occur once. With `line`, a check on that line.
+        @Guide(
+            description:
+                "For replace: the exact existing text to replace, occurring once. With line, text the line must contain."
+        )
         public var find: String?
+        /// For `replace`, the 1-based line to rewrite, as `read_file` numbered it.
+        @Guide(
+            description: "For replace: the line number from read_file to rewrite; content is then the whole new line.")
+        public var line: Int?
     }
 
     /// Applies edits within the writable set.
@@ -45,11 +52,13 @@ public struct EditFileTool: DaimonTool {
             ?? "No write confinement (the sandbox is off)"
         return
             "\(confinement). replace loads files up to \(writer.maxBytes) bytes and needs exactly one match. "
+            + "With line, content is the whole new line and find, if given, must be on it. "
             + "Every edit passes the risk classifier and needs the user's approval at moderate and above."
     }
     /// How to ask for it.
     public let examplePrompt =
-        "Use edit_file with mode replace on /path/to/file.swift to replace exactly `let x = 1` with `let x = 2`."
+        "Use read_file to read /path/to/file.swift. Then use edit_file with mode replace on it, with line set to the "
+        + "number read_file showed for `let x = 1` and content `let x = 2`. Report the tool results verbatim."
 
     /// Creates the tool over a writer, a gate, and an audit log.
     ///
@@ -75,10 +84,13 @@ public struct EditFileTool: DaimonTool {
         case "write": edit = .write(arguments.content)
         case "append": edit = .append(arguments.content)
         case "replace":
-            guard let find = arguments.find, !find.isEmpty else {
-                return "error: replace needs find, the exact text to replace"
+            if let line = arguments.line {
+                edit = .replaceLine(line, content: arguments.content, expecting: arguments.find)
+            } else if let find = arguments.find, !find.isEmpty {
+                edit = .replace(find: find, replacement: arguments.content)
+            } else {
+                return "error: replace needs line (from read_file) or find (the exact text to replace)"
             }
-            edit = .replace(find: find, replacement: arguments.content)
         default: return "error: mode must be write, append, or replace"
         }
         do {

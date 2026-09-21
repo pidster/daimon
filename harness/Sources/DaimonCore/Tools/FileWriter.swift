@@ -3,9 +3,10 @@ import Foundation
 /// Writes text to a file inside the writable set, the same directories the sandbox lets commands
 /// write under, so `edit_file` can change no more than `run_command` could.
 ///
-/// Three edits: write the whole file (created if absent), append, or replace one exact occurrence of
-/// a piece of text. Replacement demands exactly one match so the model cannot change more than it
-/// showed it meant to. Every write is atomic: a temporary file beside the target, renamed over it.
+/// Three edits: write the whole file (created if absent), append, or replace: one exact occurrence of
+/// a piece of text, or one numbered line as `read_file` numbered it. Replacement demands exactly one
+/// match, or a line that still holds what the model expects, so it cannot change more than it showed
+/// it meant to. Every write is atomic: a temporary file beside the target, renamed over it.
 /// Nothing here creates directories or follows the model outside the set.
 public struct FileWriter: Sendable {
     /// What to do to the file.
@@ -16,13 +17,16 @@ public struct FileWriter: Sendable {
         case append(String)
         /// Replace the one occurrence of `find` with `replacement`.
         case replace(find: String, replacement: String)
+        /// Replace the whole 1-based `line` with `content`; when `expecting` is given the line must
+        /// contain it, so a stale number changes nothing.
+        case replaceLine(Int, content: String, expecting: String?)
 
         /// The spelling the model uses and the audit records.
         public var mode: String {
             switch self {
             case .write: "write"
             case .append: "append"
-            case .replace: "replace"
+            case .replace, .replaceLine: "replace"
             }
         }
     }
@@ -68,6 +72,12 @@ public struct FileWriter: Sendable {
         case notFound(find: String)
         /// The text to replace occurs more than once.
         case ambiguous(find: String, count: Int)
+        /// The line number is past the end of the file.
+        case noSuchLine(Int, lines: Int)
+        /// The numbered line does not contain the text the model expected there.
+        case lineMismatch(Int, expected: String, actual: String)
+        /// A line edit was given more than one line of content.
+        case notOneLine(Int)
         /// The approval gate refused the edit.
         case notApproved(String)
 
@@ -84,6 +94,10 @@ public struct FileWriter: Sendable {
             case .notFound(let find): "text to replace not found: \(Self.excerpt(find))"
             case .ambiguous(let find, let count):
                 "text to replace occurs \(count) times, include more surrounding text: \(Self.excerpt(find))"
+            case .noSuchLine(let line, let lines): "no line \(line): the file has \(lines) lines"
+            case .lineMismatch(let line, let expected, let actual):
+                "line \(line) does not contain \(Self.excerpt(expected)); it is: \(Self.excerpt(actual))"
+            case .notOneLine(let line): "content for line \(line) must be one line; nothing changed"
             case .notApproved(let reason): "edit not approved: \(reason)"
             }
         }
@@ -189,6 +203,25 @@ public struct FileWriter: Sendable {
             guard ranges.count == 1 else { throw Failure.ambiguous(find: find, count: ranges.count) }
             line = text[..<range.lowerBound].count(where: { $0 == "\n" }) + 1
             after = Data(text.replacingCharacters(in: range, with: replacement).utf8)
+        case .replaceLine(let number, let content, let expecting):
+            guard before.count <= maxBytes else {
+                throw Failure.tooLarge(path: path, bytes: before.count, limit: maxBytes)
+            }
+            guard !before.contains(0) else { throw Failure.binary(path) }
+            let text = String(decoding: before, as: UTF8.self)
+            var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let count = text.hasSuffix("\n") ? lines.count - 1 : lines.count
+            guard number >= 1, number <= count else { throw Failure.noSuchLine(number, lines: count) }
+            if let expecting, !lines[number - 1].contains(expecting) {
+                throw Failure.lineMismatch(number, expected: expecting, actual: lines[number - 1])
+            }
+            // A line has no newline of its own: one trailing newline is dropped, any other is refused,
+            // so a model that pastes the page marker or a neighbour cannot corrupt the file.
+            let single = content.hasSuffix("\n") ? String(content.dropLast()) : content
+            guard !single.contains("\n") else { throw Failure.notOneLine(number) }
+            lines[number - 1] = single
+            line = number
+            after = Data(lines.joined(separator: "\n").utf8)
         }
         try Self.writeAtomically(after, to: url, replacing: exists)
         return Result(

@@ -15,6 +15,9 @@ Added:
 
 Changed:
 
+- `edit_file` replace takes `line`, the number `read_file` showed, with `content` as the whole new line
+  and `find` as an optional check on that line; a drifted number changes nothing. The by-`find` form
+  measured 3 of 5, because the model retyped the neighbouring line into `content`.
 - Local runtimes that truncate silently no longer lose the instructions: `Agent` condenses the transcript
   ahead of the window when the usage the last reply reported, plus the new prompt, would pass 85% of it,
   audited as `context.condensation` with reason `budget`. Ollama is asked for an explicit window on every

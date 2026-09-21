@@ -1,6 +1,6 @@
 # ADR 0024: `edit_file` writes inside the sandbox's writable set, approved like a command
 
-Date: 2026-09-20. Status: accepted.
+Date: 2026-09-20. Status: accepted. Amended 2026-09-21: `replace` also takes a line number.
 
 ## Context
 
@@ -29,7 +29,12 @@ gate, and Seatbelt; `read_file` runs the gate's rules only; `inspect` and `curre
 - **Edits.** `write` (whole file, creating it), `append`, and `replace` of one exact occurrence of
   `find`. A `find` that matches zero or several times changes nothing and the error says which, so the
   model cannot change more than it showed it meant to. `replace` loads at most 1 MiB and refuses binary
-  files. No line-number edits: numbers drift and small models miscount; the exact text is the anchor.
+  files. The first version had no line-number edits, on the argument that numbers drift and small
+  models miscount. Amended 2026-09-21: the eval showed the opposite failure, the model retyping the
+  anchor and its neighbour into `content` (3 of 5). `replace` now also takes `line`, the number
+  `read_file` just showed, with `content` the whole new line and `find`, when given, a check that the
+  line still holds it; a drifted number then changes nothing. The model copies a number instead of
+  retyping text.
 - **Audit.** A landed edit is recorded as `file.write` (path, mode, created, sizes); the content is
   already in the `tool.call` arguments. Receipts list writes under `files`.
 
@@ -40,10 +45,8 @@ gate, and Seatbelt; `read_file` runs the gate's rules only; `inspect` and `curre
 - Writes are atomic (a temporary file beside the target, renamed over it, mode preserved), so a
   crash or a full disk leaves the original; the cost is one extra file operation. Amended the same
   day: the first version wrote in place.
-- Probed once with the system model on 2026-09-20: `find` came back verbatim after a `read_file` page,
-  but `content` carried the following line too, duplicating it. The tool cannot tell intent from
-  accident; the tool description now says `content` replaces only `find`, and a proper measurement
-  belongs in the eval harness with the other tool tasks (backlog, task catalogue).
+- Measured in the eval harness (`edit_file.replace`, ADR 0026): 3 of 5 by `find` on 2026-09-20; the
+  line form is measured on ten cases and the number recorded in `measurements.json`.
 - Tests without the model: confinement including symlinks and look-alike siblings, every failure,
   each edit and its rendering (`FileWriterTests`); the tool's gate refusal, audit event, receipt
   entry, and classifier levels (`ToolWrapperTests`, `ReceiptTests`).

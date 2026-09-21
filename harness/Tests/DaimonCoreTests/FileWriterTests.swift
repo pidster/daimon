@@ -46,6 +46,48 @@ import Testing
         }
     }
 
+    @Test func replacesANumberedLineAndChecksWhatIsThere() throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let writer = FileWriter(roots: [CommandPolicy.canonical(dir.path)])
+        let file = dir.appending(path: "n.txt").path
+        try Data("one\ntwo\nthree\n".utf8).write(to: URL(fileURLWithPath: file))
+        let result = try writer.apply(.replaceLine(2, content: "TWO", expecting: "two"), to: file)
+        #expect(result.line == 2 && result.mode == "replace" && result.bytesAfter == 14)
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "one\nTWO\nthree\n")
+        // Without a check the number alone decides; the trailing newline survives; the last line counts.
+        _ = try writer.apply(.replaceLine(3, content: "3", expecting: nil), to: file)
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "one\nTWO\n3\n")
+        #expect(throws: FileWriter.Failure.noSuchLine(4, lines: 3)) {
+            try writer.apply(.replaceLine(4, content: "x", expecting: nil), to: file)
+        }
+        #expect(throws: FileWriter.Failure.noSuchLine(0, lines: 3)) {
+            try writer.apply(.replaceLine(0, content: "x", expecting: nil), to: file)
+        }
+        #expect(throws: FileWriter.Failure.lineMismatch(1, expected: "uno", actual: "one")) {
+            try writer.apply(.replaceLine(1, content: "x", expecting: "uno"), to: file)
+        }
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "one\nTWO\n3\n")
+        // A file without a trailing newline keeps that shape.
+        try Data("a\nb".utf8).write(to: URL(fileURLWithPath: file))
+        _ = try writer.apply(.replaceLine(2, content: "B", expecting: "b"), to: file)
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "a\nB")
+        // One trailing newline is dropped; a second line inside the content is refused.
+        _ = try writer.apply(.replaceLine(1, content: "A\n", expecting: nil), to: file)
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "A\nB")
+        #expect(throws: FileWriter.Failure.notOneLine(1)) {
+            try writer.apply(.replaceLine(1, content: "A\nB\n", expecting: nil), to: file)
+        }
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == "A\nB")
+        #expect(FileWriter.Failure.notOneLine(2).description == "content for line 2 must be one line; nothing changed")
+        #expect(FileWriter.Failure.noSuchLine(9, lines: 2).description == "no line 9: the file has 2 lines")
+        #expect(FileWriter.Failure.lineMismatch(1, expected: "x", actual: "y").description.contains("it is: y"))
+        try Data([0x61, 0x00]).write(to: URL(fileURLWithPath: file))
+        #expect(throws: FileWriter.Failure.binary(file)) {
+            try writer.apply(.replaceLine(1, content: "x", expecting: nil), to: file)
+        }
+    }
+
     @Test func refusesOutsideTheWritableSetAndUnusablePaths() throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(at: dir) }

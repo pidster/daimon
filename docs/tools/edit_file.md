@@ -9,9 +9,18 @@ Writes a text file: the whole file, an addition at the end, or one exact replace
 | Name | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `path` | string | yes | Path of the file. Its directory must exist; `edit_file` never creates directories. |
-| `mode` | string | yes | `write` replaces the whole file, creating it if absent. `append` adds to the end, creating it if absent. `replace` swaps one exact occurrence of `find` for `content`. |
-| `content` | string | yes | The text to write or append, or the replacement text. |
-| `find` | string | for `replace` | The exact existing text to replace. It must occur exactly once; otherwise nothing changes and the error says how many times it occurs. |
+| `mode` | string | yes | `write` replaces the whole file, creating it if absent. `append` adds to the end, creating it if absent. `replace` changes one line, by number or by exact text. |
+| `content` | string | yes | The text to write or append; for `replace` with `line`, the whole new line; for `replace` with `find` alone, the replacement for `find` only. |
+| `line` | integer | for `replace` | The 1-based line to rewrite, as `read_file` numbered it. Past the end, nothing changes. Preferred: the model copies a number it just read instead of retyping the text. |
+| `find` | string | for `replace` | Without `line`: the exact existing text to replace, which must occur exactly once. With `line`: text that line must contain, so a stale number changes nothing. |
+
+Read the file first, then replace by `line`:
+
+```
+Use read_file to read /repo/Package.swift. Then use edit_file with mode replace on /repo/Package.swift,
+with line set to the number read_file showed for `let version = "0.1.0"` and content `let version = "0.2.0"`.
+Report the tool results verbatim.
+```
 
 ## Result
 
@@ -49,6 +58,7 @@ program. Where nobody can answer the edit is refused and the file is untouched.
 | Limit | Value |
 | --- | --- |
 | `replace` file size | 1 MiB; larger files are refused (`FileWriter(maxBytes:)`, fixed in code) |
+| Line edits | One line per call: `content` is that line, one trailing newline is dropped, and any other newline (a pasted neighbour or the `[end of file]` marker) is refused with nothing changed; a line that is not there or does not contain `find` is an error |
 | Binary files | Refused for `replace` (a NUL byte); `write` and `append` do not read the file |
 | Directories, missing parent directory, unknown `mode`, `replace` without `find` | Errors |
 | Atomicity | Every write goes to a temporary file beside the target (same directory, the existing mode copied) and is renamed over it, so a reader never sees a partial file and a failure leaves the original untouched |
@@ -59,13 +69,13 @@ Each edit that happens is recorded as `file.write` with `path`, `mode`, `created
 `bytesAfter` ([logging.md](../logging.md)); the MCP receipt lists it under `files`. The content itself
 is in the `tool.call` event's arguments.
 
-## Observed with the model
+## Measured with the model
 
-Probed on this Mac on 2026-09-20 with the system model and `--yes`: asked to read a two-line file and
-replace exactly `let x = 1` with `let x = 42`, the model supplied `find` verbatim but put both lines of
-the file in `content`, so the second line was duplicated. The tool did what it was told; the prompt
-must say that `content` is only the replacement for `find`. A write outside the writable set was refused
-with the directories named and no file created. Not yet in the eval harness.
+The eval (`ToolEvalTests`, ten small files) reads a file and rewrites one numbered line; the recorded
+result is in [measurements.md](../measurements.md) and on `daimon tools --markdown`. The `line`
+argument exists because the first version, replace by `find` only, measured 3 of 5 on 2026-09-20: the
+model copied `find` correctly and then put the neighbouring line into `content` too. A write outside
+the writable set is refused with the directories named and no file created.
 
 ## Implementation
 
