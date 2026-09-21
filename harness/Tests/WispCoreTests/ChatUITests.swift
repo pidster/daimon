@@ -1,0 +1,188 @@
+import Foundation
+import Synchronization
+import Testing
+import WispTestSupport
+
+@testable import WispCore
+
+@Suite struct ChatUITests {
+    @Test func styleIsOffWhenPipedOrAskedAndWrapsOtherwise() {
+        #expect(Style.plain.bold("x") == "x")
+        #expect(Style.detect(isTerminal: false, environment: [:]) == .plain)
+        #expect(Style.detect(isTerminal: true, environment: ["NO_COLOR": ""]) == .plain)
+        #expect(Style.detect(isTerminal: true, environment: ["TERM": "dumb"]) == .plain)
+        let on = Style.detect(isTerminal: true, environment: [:])
+        #expect(on.enabled)
+        #expect(on.bold("x") == "\u{1B}[1mx\u{1B}[0m" && on.dim("x") == "\u{1B}[2mx\u{1B}[0m")
+        #expect(on.level(.dangerous) == "\u{1B}[31mdangerous\u{1B}[0m" && on.level(.safe).contains("32m"))
+        #expect(on.level(.moderate).contains("33m") && on.cyan("›").hasPrefix("\u{1B}[36m"))
+        #expect(Style.stripped(on.magenta(on.bold("ab"))) == "ab")
+    }
+
+    @Test func statusLineRendersWhatIsKnown() {
+        let full = ChatStatus(
+            model: "ollama:q", directory: "~/src/x", branch: "main", dirty: false, approval: "--yes", contextUsed: 0.137
+        )
+        #expect(full.rendered(style: .plain) == "ollama:q · ~/src/x · main · clean · --yes · context 14% used")
+        let bare = ChatStatus(model: "system", directory: "/tmp", approval: "never asks")
+        #expect(bare.rendered(style: .plain) == "system · /tmp · never asks")
+        let styled = full.rendered(style: Style(enabled: true))
+        #expect(Style.stripped(styled) == full.rendered(style: .plain))
+        #expect(styled.contains("\u{1B}[36mollama:q") && styled.contains("\u{1B}[34mcontext"))
+        #expect(ChatStatus.abbreviated("/Users/me/src", home: "/Users/me") == "~/src")
+        #expect(ChatStatus.abbreviated("/Users/me", home: "/Users/me") == "~")
+        #expect(ChatStatus.abbreviated("/Users/meg/src", home: "/Users/me") == "/Users/meg/src")
+        #expect(ChatStatus.approvalMode(threshold: .level(.moderate), autoApprove: false) == "approve at moderate")
+        #expect(ChatStatus.approvalMode(threshold: .never, autoApprove: false) == "never asks")
+        #expect(ChatStatus.approvalMode(threshold: .never, autoApprove: true) == "--yes")
+    }
+
+    @Test func gitStateReadsThisRepositoryAndNothingElsewhere() throws {
+        let here = FileManager.default.currentDirectoryPath
+        let state = GitState.read(in: here)
+        #expect(state.branch != nil && state.dirty != nil, "\(state)")
+        #expect(GitState.repositoryRoot(of: here + "/Sources") == GitState.repositoryRoot(of: here))
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-nogit-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        #expect(GitState.read(in: dir.path) == (nil, nil))
+        // A detached HEAD shows a short hash; a branch its name.
+        let fake = dir.appending(path: ".git")
+        try FileManager.default.createDirectory(at: fake, withIntermediateDirectories: true)
+        try Data("ref: refs/heads/feature/x\n".utf8).write(to: fake.appending(path: "HEAD"))
+        #expect(GitState.read(in: dir.path).branch == "feature/x")
+        try Data("0123456789abcdef\n".utf8).write(to: fake.appending(path: "HEAD"))
+        #expect(GitState.read(in: dir.path).branch == "01234567")
+    }
+
+    @Test func eventsRenderAsOneDimLineEach() {
+        func event(_ kind: AuditEvent.Kind, call: String? = "c", _ details: [String: JSONValue]) -> AuditEvent {
+            AuditEvent(session: "s", kind: kind, turn: 1, call: call, details: details)
+        }
+        let style = Style.plain
+        #expect(
+            ChatEvents.render(
+                event(
+                    .toolCall,
+                    ["tool": "run_command", "arguments": #"{"command":"git status","workingDirectory":"/r"}"#]),
+                style: style)
+                == "⚙ run_command git status")
+        #expect(
+            ChatEvents.render(
+                event(.toolCall, ["tool": "read_file", "arguments": #"{"path":"/r/README.md","offset":101}"#]),
+                style: style)
+                == "⚙ read_file /r/README.md from line 101")
+        #expect(
+            ChatEvents.render(
+                event(
+                    .toolCall, ["tool": "edit_file", "arguments": #"{"path":"a.txt","mode":"append","content":"x"}"#]),
+                style: style)
+                == "⚙ edit_file append a.txt")
+        #expect(
+            ChatEvents.render(event(.toolCall, ["tool": "other", "arguments": "{\"k\":1}"]), style: style)
+                == "⚙ other {\"k\":1}")
+        #expect(
+            ChatEvents.render(
+                event(.toolResult, ["tool": "read_file", "output": "1\tline\n2\tmore", "bytes": 14, "seconds": 0.04]),
+                style: style)
+                == "  ↳ 14 bytes in 0.0 s: 1\tline")
+        #expect(
+            ChatEvents.render(event(.commandOutcome, ["command": "x", "exitStatus": 0]), style: style) == "  ↳ exit 0")
+        #expect(
+            ChatEvents.render(
+                event(.commandOutcome, ["command": "x", "exitStatus": 1, "timedOut": true, "truncated": true]),
+                style: style)
+                == "  ↳ exit 1 (timed out, output truncated)")
+        #expect(
+            ChatEvents.render(event(.fileWrite, ["path": "a", "mode": "write", "bytesAfter": 9]), style: style)
+                == "  ↳ write a, now 9 bytes")
+        #expect(ChatEvents.render(event(.error, ["message": "boom"]), style: style) == "  ↳ error: boom")
+        #expect(ChatEvents.render(event(.error, call: nil, ["message": "turn failed"]), style: style) == nil)
+        #expect(
+            ChatEvents.render(
+                event(.condensation, ["reason": "budget", "turnsBefore": 4, "turnsAfter": 1]), style: style)
+                == "(context condensed, budget: 4 → 1 turns)")
+        #expect(ChatEvents.render(event(.prompt, ["text": "hi"]), style: style) == nil)
+        #expect(ChatEvents.shortened(String(repeating: "x", count: 120)).count == 101)
+        #expect(ChatEvents.firstSentence(of: "Does a thing. Then more.") == "Does a thing.")
+        #expect(ChatEvents.firstSentence(of: "No period") == "No period")
+        let styled = ChatEvents.render(
+            event(.commandOutcome, ["command": "x", "exitStatus": 2]), style: Style(enabled: true))
+        #expect(styled?.contains("\u{1B}[31mexit 2") == true)
+    }
+
+    @Test func aCommandsResultLineIsLeftToItsOutcome() {
+        let result = AuditEvent(
+            session: "s", kind: .toolResult, turn: 1, call: "c",
+            details: ["tool": "run_command", "output": "exit status: 0", "bytes": 14])
+        #expect(ChatEvents.render(result, style: .plain) == nil)
+    }
+
+    @Test func tapForwardsEventsAndKeepsTheLastToolOutput() {
+        let tap = ChatEvents.Tap()
+        let seen = Mutex<[AuditEvent.Kind]>([])
+        tap.write(AuditEvent(session: "s", kind: .prompt))  // before a handler: nothing breaks
+        tap.onEvent { event in seen.withLock { $0.append(event.kind) } }
+        tap.write(
+            AuditEvent(session: "s", kind: .toolResult, call: "c", details: ["tool": "t", "output": "full output"]))
+        #expect(seen.withLock { $0 } == [.toolResult])
+        #expect(tap.lastToolOutput == "full output")
+    }
+
+    @Test func liveToolEventsReachTheChatNotesThroughTheConversation() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "wisp-chat-events-\(UUID().uuidString)")
+        let home = Home(root: root)
+        try home.ensure()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = try Session.begin(.init(entryPoint: .chat), home: home, dependencies: .testing())
+        let tap = ChatEvents.Tap()
+        let notes = Mutex<[String]>([])
+        // The real conversation set-up with the tap observing; the model is scripted through a custom
+        // agent over the same tools and audit, as the wire tests do.
+        let conversation = try Conversation.setUp(
+            session: session, audit: session.audit, approver: DenyingApprover(reason: "x"),
+            prompting: session.prompting,
+            toolNames: ["current_date"], model: .system, observer: tap)
+        let agent = Agent(
+            instructions: "x", tools: conversation.tools,
+            model: ResolvedModel(selection: .system, custom: ScriptedModel()), audit: conversation.audit)
+        tap.onEvent { event in
+            if let line = ChatEvents.render(event, style: .plain) { notes.withLock { $0.append(line) } }
+        }
+        _ = try await agent.respond(to: "date?")
+        let lines = notes.withLock { $0 }
+        #expect(lines.first == "⚙ current_date Asia/Tokyo")
+        #expect(lines.count == 2 && lines[1].hasPrefix("  ↳ ") && lines[1].contains("bytes"))
+        #expect(tap.lastToolOutput?.contains("Asia/Tokyo") == true)
+    }
+
+    @Test func approvalDialogIsCompactAndStyled() {
+        let request = ApprovalRequest(
+            command: "git push origin main",
+            line: "git add -A && git push origin main", pattern: "git push *",
+            workingDirectory: FileManager.default.homeDirectoryForCurrentUser.path + "/src/x",
+            assessment: RiskAssessment(
+                level: .dangerous, reasons: ["changes repository state", String(repeating: "r", count: 130)],
+                sources: ["rules"]))
+        let text = TerminalApprover.render(request, style: .plain)
+        #expect(
+            text
+                == """
+
+                ⚠ approve [dangerous] git push origin main
+                  part of: git add -A && git push origin main
+                  in ~/src/x
+                  - changes repository state
+                  - \(String(repeating: "r", count: 110))…
+                  remembered as: git push *
+                  [y]once  [s]ession  [p]roject 30d  [a]lways 30d  [n]o › \u{20}
+                """.replacingOccurrences(of: "› \u{20}", with: "› "))
+        let same = ApprovalRequest(
+            command: "ls", line: "ls", pattern: "ls *", workingDirectory: "/tmp",
+            assessment: RiskAssessment(level: .moderate, reasons: [], sources: []))
+        #expect(!TerminalApprover.render(same, style: .plain).contains("part of"))
+        let styled = TerminalApprover.render(request, style: Style(enabled: true))
+        #expect(styled.contains("\u{1B}[31mdangerous") && Style.stripped(styled) == text)
+        #expect(TerminalApprover(style: Style(enabled: true)).style.enabled)
+    }
+}

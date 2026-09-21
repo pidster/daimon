@@ -12,6 +12,10 @@ public enum ChatInput: Equatable, Sendable {
     case new
     /// Report how many tokens the transcript occupies.
     case tokens
+    /// Show wisp's own state (`config`, `status`, `approvals`, `audit`), as the model's `inspect` tool would.
+    case inspect(String)
+    /// Show the last tool result in full.
+    case last
     /// A message for the model.
     case message(String)
     /// A slash command that does not exist.
@@ -24,6 +28,10 @@ public enum ChatInput: Equatable, Sendable {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         if ["exit", "quit", "q"].contains(trimmed.lowercased()) {
             self = .quit
+            return
+        }
+        if ["help", "?"].contains(trimmed.lowercased()) {
+            self = .help
             return
         }
         guard trimmed.hasPrefix("/") else {
@@ -40,6 +48,8 @@ public enum ChatInput: Equatable, Sendable {
         case "save": self = .save(argument)
         case "new": self = .new
         case "tokens": self = .tokens
+        case "inspect", "status": self = .inspect(argument ?? (command == "status" ? "status" : "status"))
+        case "last": self = .last
         default: self = .unknown(command)
         }
     }
@@ -49,6 +59,8 @@ public enum ChatInput: Equatable, Sendable {
         /help          show this list
         /tools         list the tools the model can call
         /tokens        show how much of the context window the conversation uses
+        /inspect [what] show wisp's own config, status (default), approvals, or audit
+        /last          show the last tool result in full
         /save [name]   save the transcript to ~/.wisp/transcripts
         /new           start a fresh conversation with the same instructions and tools
         /quit          exit (also /exit, a bare exit or quit, Ctrl-D)

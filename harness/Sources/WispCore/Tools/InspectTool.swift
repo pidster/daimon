@@ -45,6 +45,11 @@ public struct InspectTool: WispTool {
         self.introspection = introspection
     }
 
+    /// `call` for a bare `what`, for the chat's `/inspect`.
+    public func show(_ what: String) async -> String {
+        await call(arguments: .init(what: what, last: nil, kind: nil, session: nil))
+    }
+
     /// Renders the requested view, bounded.
     ///
     /// - Parameter arguments: Which view and, for audit, the filters.

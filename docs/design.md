@@ -222,7 +222,11 @@ MCP client ──stdio──▶ WispServer ──respond(thread_id)──▶ Thr
 `wisp tools` lists the registry. `wisp mcp` serves MCP on stdio. Instructions default to `config.json`.
 Exit codes follow swift-argument-parser conventions (64 for usage errors). The chat loop itself is
 `ChatLoop` in `WispCore`, with its input and output injected, so the executable only wires the
-terminal to it and `ChatLoopTests` runs the whole loop over a scripted model.
+terminal to it and `ChatLoopTests` runs the whole loop over a scripted model. Chat shows tool activity
+live through `ChatEvents.Tap`, an `AuditSink` the conversation is opened with (`Session.openAgent(observer:)`
+tees it beside the log and the receipt collector), so the lines the user sees are rendered from the
+audited events; `ChatStatus` draws the status line above each prompt; `Style` applies colour only on a
+terminal.
 
 ## Error handling
 

@@ -66,21 +66,33 @@ public struct DenyingApprover: Approver {
 
 /// Asks on the terminal: prints the command and reasons to stderr, reads one line from stdin.
 public struct TerminalApprover: Approver {
+    /// Styling for the dialog.
+    public let style: Style
+
     /// Creates the approver.
-    public init() {}
+    public init(style: Style = .plain) { self.style = style }
+
+    /// The dialog for `request`: the level and command, the whole line when it differs, each reason
+    /// shortened to a line, the pattern it is remembered under, and the one-line key.
+    public static func render(_ request: ApprovalRequest, style: Style) -> String {
+        var lines = [
+            "",
+            style.yellow("⚠ approve") + " [" + style.level(request.assessment.level) + "] "
+                + style.bold(request.command),
+        ]
+        if request.line != request.command { lines.append(style.dim("  part of: \(request.line)")) }
+        lines.append(style.dim("  in \(ChatStatus.abbreviated(request.workingDirectory))"))
+        for reason in request.assessment.reasons {
+            lines.append(style.dim("  - " + (reason.count > 110 ? String(reason.prefix(110)) + "…" : reason)))
+        }
+        lines.append(style.dim("  remembered as: \(request.pattern)"))
+        lines.append("  [y]once  [s]ession  [p]roject 30d  [a]lways 30d  [n]o " + style.cyan("›") + " ")
+        return lines.joined(separator: "\n")
+    }
 
     /// Prompts and parses the answer; end of input denies.
     public func decide(_ request: ApprovalRequest) async -> ApprovalDecision {
-        let context = request.line == request.command ? "" : "\n  part of: \(request.line)"
-        let text = """
-
-            approval needed (\(request.assessment.level.rawValue)): \(request.command)\(context)
-              in \(request.workingDirectory)
-              \(request.assessment.reasons.map { "- \($0)" }.joined(separator: "\n  "))
-              remembered as: \(request.pattern)
-            run it? [y]es (this turn) / [s]ession / [p]roject (30 days, this directory) / [a]lways (30 days) / [n]o:\u{20}
-            """
-        FileHandle.standardError.write(Data(text.utf8))
+        FileHandle.standardError.write(Data(Self.render(request, style: style).utf8))
         guard let line = readLine() else { return .denied("no answer (end of input)") }
         return Self.parse(line)
     }

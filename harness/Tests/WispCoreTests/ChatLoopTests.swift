@@ -10,6 +10,7 @@ import WispTestSupport
     final class Capture: Sendable {
         let stdout = Mutex<[String]>([])
         let notes = Mutex<[String]>([])
+        let prompts = Mutex<[String?]>([])
         let lines: Mutex<[String]>
 
         init(lines: [String]) { self.lines = Mutex(lines) }
@@ -18,13 +19,20 @@ import WispTestSupport
             .init(
                 readLine: { self.lines.withLock { $0.isEmpty ? nil : $0.removeFirst() } },
                 print: { text in self.stdout.withLock { $0.append(text + "\n") } },
-                write: { text in if text != "> " { self.stdout.withLock { $0.append(text) } } },
-                note: { text in self.notes.withLock { $0.append(text) } })
+                write: { text in self.stdout.withLock { $0.append(text) } },
+                note: { text in self.notes.withLock { $0.append(text) } },
+                prompt: { status in self.prompts.withLock { $0.append(status) } })
         }
 
         var output: String { stdout.withLock { $0.joined() } }
         var noted: [String] { notes.withLock { $0 } }
+        var shownStatus: [String?] { prompts.withLock { $0 } }
     }
+
+    /// A context with a fixed git answer and an inspect view that echoes its argument.
+    static let context = ChatLoop.Context(
+        directory: "/repo", approval: "approve at moderate", git: { _ in ("main", true) },
+        inspect: { what in "inspected \(what)" }, banner: "wisp test")
 
     private func scratch() throws -> URL {
         let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-chat-\(UUID().uuidString)")
@@ -43,18 +51,26 @@ import WispTestSupport
             audit: AuditLog(session: "chat", sink: sink))
         let capture = Capture(lines: [
             "/help", "/tools", "/tokens", "", "hello", "/save", "/save first", "/bogus", "/new", "again", "/save",
-            "quit", "never read",
+            "/inspect approvals", "/status", "/last", "help", "quit", "never read",
         ])
-        var loop = ChatLoop(agent: agent, store: store, saveName: nil, io: capture.io)
+        var loop = ChatLoop(agent: agent, store: store, saveName: nil, context: Self.context, io: capture.io)
         try await loop.run()
         let out = capture.output
         #expect(out.contains(ChatInput.helpText))
-        #expect(out.contains("current_date\t"))
+        #expect(out.contains("current_date  Returns the current local date and time.\n"))
+        #expect(out.contains("inspected approvals\n") && out.contains("inspected status\n"))
+        #expect(out.contains("no tool has run yet\n"))
+        #expect(out.components(separatedBy: ChatInput.helpText).count == 3)  // /help and bare help
         #expect(out.contains("unknown tokens in 0 turns; condensed 0 times\n"))
         #expect(out.contains("hi there\n"))
         #expect(out.contains("second\n"))
         let notes = capture.noted
-        #expect(notes.first == "wisp chat. /help for commands, /quit or Ctrl-D to exit.")
+        #expect(notes.first == "wisp test")
+        #expect(notes[1] == "/help for commands, /quit or Ctrl-D to exit.")
+        // The status line is drawn before every prompt, from the context and the agent.
+        let status = capture.shownStatus
+        #expect(status.count == 16)
+        #expect(status.first == "system · /repo · main · changes · approve at moderate")
         #expect(notes.contains("usage: /save <name>"))
         #expect(notes.contains("saved 'first'"))
         #expect(notes.contains("unknown command /bogus; /help lists commands"))
@@ -77,27 +93,31 @@ import WispTestSupport
             model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("done")], overflowOnce: true)),
             contextPolicy: .failFast)
         let capture = Capture(lines: ["boom", "fine"])
-        var loop = ChatLoop(agent: agent, store: store, saveName: "session", io: capture.io)
+        var loop = ChatLoop(agent: agent, store: store, saveName: "session", context: Self.context, io: capture.io)
         try await loop.run()
         #expect(capture.noted.contains { $0.hasPrefix("error: ") }, "\(capture.noted)")
         #expect(capture.output.hasSuffix("done\n"), "\(capture.output)")
         #expect(capture.noted.last == "saved 'session'")
         #expect(try store.list() == ["session"])
-        // A condensed turn is announced.
+        // A condensed turn is announced, through the tap the agent's audit log feeds.
+        let tap = ChatEvents.Tap()
         let condensing = Agent(
             instructions: "x", tools: [],
-            model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("after")], overflowOnce: true)))
+            model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("after")], overflowOnce: true)),
+            audit: AuditLog(session: "c", sink: tap))
         let second = Capture(lines: ["go", "/quit"])
-        var again = ChatLoop(agent: condensing, store: store, saveName: nil, io: second.io)
+        var again = ChatLoop(
+            agent: condensing, store: store, saveName: nil, tap: tap, context: Self.context, io: second.io)
         try await again.run()
-        #expect(second.noted.contains("(context was full; older turns were dropped to continue)"))
+        #expect(second.noted.contains { $0.hasPrefix("(context condensed, overflow: ") })
         // A save that cannot happen is a note inside the loop and an error on exit.
         let unwritable = TranscriptStore(directory: dir.appending(path: "missing"))
         let third = Capture(lines: ["/save x", "/quit"])
-        var broken = ChatLoop(agent: condensing, store: unwritable, saveName: nil, io: third.io)
+        var broken = ChatLoop(agent: condensing, store: unwritable, saveName: nil, context: Self.context, io: third.io)
         try await broken.run()
         #expect(third.noted.contains { $0.hasPrefix("error: ") })
-        var exiting = ChatLoop(agent: condensing, store: unwritable, saveName: "x", io: Capture(lines: []).io)
+        var exiting = ChatLoop(
+            agent: condensing, store: unwritable, saveName: "x", context: Self.context, io: Capture(lines: []).io)
         await #expect(throws: (any Error).self) { try await exiting.run() }
     }
 }

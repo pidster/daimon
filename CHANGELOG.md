@@ -4,6 +4,15 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Changed:
+
+- `wisp chat` shows its work: a status line above every prompt (model, directory, git branch and state,
+  approval mode, context used), the model's tool calls and results live as one dim line each, a compact
+  approval dialog with a one-line key, colour on a terminal (off when piped or with `NO_COLOR`), and
+  new commands `/inspect`, `/status`, `/last`, plus `--yes`. Replies alone go to stdout, as before.
+
 ## 0.4.0
 
 Renamed: daimon is now **wisp**. The binary is `wisp`, the home directory `~/.wisp` (`WISP_HOME`), the

@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import FoundationModels
+import Synchronization
 import WispCore
 import WispCoreAI
 import WispMCP
@@ -209,6 +210,9 @@ struct Chat: AsyncParsableCommand {
 
     @OptionGroup var options: SessionOptions
 
+    @Flag(name: [.short, .customLong("yes")], help: "Approve risky commands without asking.")
+    var yes = false
+
     @Option(name: [.short, .long], help: "Resume a saved transcript by name.")
     var resume: String?
 
@@ -224,39 +228,74 @@ struct Chat: AsyncParsableCommand {
             for name in try store.list() { print(name) }
             return
         }
-        let session = try Wisp.begin(try options.request(entryPoint: .chat, resume: resume))
+        let session = try Wisp.begin(try options.request(entryPoint: .chat, autoApprove: yes, resume: resume))
         defer { session.end() }
         try Wisp.home.ensure()
+        let style = Style.detect(isTerminal: isatty(FileHandle.standardOutput.fileDescriptor) != 0)
+        let tap = ChatEvents.Tap()
         var agent: Agent
         if let resume {
             let transcript = try Wisp.usage { try store.load(resume) }
-            agent = try session.openAgent(approver: TerminalApprover(), transcript: transcript)
+            agent = try session.openAgent(
+                approver: TerminalApprover(style: style), transcript: transcript, observer: tap)
             Self.note("resumed '\(resume)' (\(agent.transcript.turnCount) turns)")
         } else {
-            agent = try session.openAgent(approver: TerminalApprover())
+            agent = try session.openAgent(approver: TerminalApprover(style: style), observer: tap)
         }
-        Self.note("audit log: \(Wisp.home.auditFile.path) session \(session.audit.session)")
+        let directory = FileManager.default.currentDirectoryPath
+        let views = session.introspection
+        let banner =
+            "wisp \(WispVersion.current) · \(agent.model.selection) · \(agent.tools.count) tools · "
+            + "audit \(ChatStatus.abbreviated(Wisp.home.auditFile.path)) session \(session.audit.session)"
         var loop = ChatLoop(
-            agent: agent, store: store, saveName: save ?? resume,
+            agent: agent, store: store, saveName: save ?? resume, tap: tap,
+            context: .init(
+                directory: directory,
+                approval: ChatStatus.approvalMode(threshold: session.config.approvalThreshold, autoApprove: yes),
+                git: GitState.read(in:),
+                inspect: { what in await InspectTool(introspection: views).show(what) },
+                banner: banner),
+            style: style,
             io: .init(
                 readLine: { readLine() },
-                print: { print($0) },
-                write: {
-                    if $0 == "> " {
-                        FileHandle.standardError.write(Data($0.utf8))
-                    } else {
-                        print($0, terminator: "")
-                        fflush(stdout)
-                    }
+                print: { text in
+                    Self.midLine.withLock { $0 = false }
+                    print(text)
                 },
-                note: Self.note))
+                write: { text in
+                    Self.midLine.withLock { $0 = !text.hasSuffix("\n") }
+                    print(text, terminator: "")
+                    fflush(stdout)
+                },
+                note: Self.note,
+                prompt: { status in
+                    Self.freshLine()
+                    var text = ""
+                    if let status { text += status + "\n" }
+                    text += style.cyan("›") + " "
+                    FileHandle.standardError.write(Data(text.utf8))
+                }))
         try await loop.run()
+    }
+
+    /// Whether the last stdout write left the cursor mid-line, so a note can start on a fresh one.
+    private static let midLine = Mutex(false)
+
+    /// Ends a streamed line before anything else is written.
+    private static func freshLine() {
+        fflush(stdout)
+        if Self.midLine.withLock({
+            let was = $0; $0 = false; return was
+        }) {
+            FileHandle.standardError.write(Data("\n".utf8))
+        }
     }
 
     /// Writes a status line to stderr so stdout stays clean for replies.
     private static func note(_ text: String) {
+        Self.freshLine()
         FileHandle.standardError.write(Data((text + "\n").utf8))
-        Diagnostics.chat.info(text)
+        Diagnostics.chat.info(Style.stripped(text))
     }
 }
 

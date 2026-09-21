@@ -263,12 +263,16 @@ public struct Session: Sendable {
     /// - Parameters:
     ///   - approver: How the face asks a human; replaced by `AutoApprover` when the request said `--yes`.
     ///   - transcript: A saved conversation to resume, or nil to start fresh.
+    ///   - observer: A sink that also sees every event of this conversation as it is recorded; chat
+    ///     shows tool activity through it.
     /// - Returns: The agent over the session's tools, recording to the session's audit log.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
-    public func openAgent(approver: any Approver, transcript: Transcript? = nil) throws -> Agent {
+    public func openAgent(
+        approver: any Approver, transcript: Transcript? = nil, observer: (any AuditSink)? = nil
+    ) throws -> Agent {
         let conversation = try Conversation.setUp(
             session: self, audit: audit, approver: approver, prompting: prompting, toolNames: toolNames,
-            model: config.model)
+            model: config.model, observer: observer)
         return try conversation.openAgent(transcript: transcript)
     }
 
@@ -333,10 +337,11 @@ public struct Conversation: Sendable {
     /// - Throws: `Session.Failure.unknownTools` for names not in the registry.
     static func setUp(
         session: Session, audit: AuditLog, approver: any Approver, prompting: Prompting, toolNames: [String],
-        model: ModelSelection
+        model: ModelSelection, observer: (any AuditSink)? = nil
     ) throws -> Conversation {
         let receipts = ReceiptCollector()
-        let audit = audit.alsoRecording(to: receipts)
+        var audit = audit.alsoRecording(to: receipts)
+        if let observer { audit = audit.alsoRecording(to: observer) }
         let gate = ApprovalGate(
             classifier: session.classifier, approver: session.request.autoApprove ? AutoApprover() : approver,
             threshold: session.config.approvalThreshold, audit: audit, store: session.store,

@@ -32,6 +32,22 @@ wisp --no-tools --schema verdict.json "Which language is this: fn main() {}"
 
 Interactive session. Lines starting with `/` are commands; anything else goes to the model. Replies stream.
 
+What a session shows, and where it goes:
+
+- A banner with the version, model, tool count, and audit session, then a status line above every
+  prompt: model, directory, git branch and whether tracked files have changes, the approval mode
+  (`approve at moderate`, `never asks`, `--yes`), and `context N% used` when the model's window and the
+  transcript's size are both known. Each part is omitted when unknown; `GitState` reads the branch from
+  `.git/HEAD` and the state from `git status --porcelain` with a two-second cap.
+- The model's tool activity as it happens, one dim line per call and result, from the same events the
+  audit log records: `⚙ run_command git status`, then `↳ exit 0`; `⚙ read_file README.md`, then
+  `↳ 2048 bytes in 0.0 s: 1\t# wisp`. `/last` prints the last tool result whole.
+- Replies on stdout; everything else (banner, status, prompt, tool lines, notes, approval dialogs) on
+  stderr, so `wisp chat > transcript.txt` captures only the replies.
+- Colour and weight when stdout is a terminal: the prompt and model in cyan, notes and tool lines dim,
+  approvals yellow with the level coloured, errors red. Off when piped, when `NO_COLOR` is set, or when
+  `TERM` is `dumb`.
+
 | Flag | Meaning |
 | --- | --- |
 | `-i, --instructions <text>` | As for `respond`. |
@@ -41,20 +57,26 @@ Interactive session. Lines starting with `/` are commands; anything else goes to
 | `--list` | Print the names of saved transcripts and exit. |
 | `--unsafe` | Disable the `run_command` policy and sandbox. |
 | `-m, --model <model>` | As for `respond`. |
+| `-y, --yes` | Approve risky commands without asking; the status line says `--yes`. |
 
 | Command | Effect |
 | --- | --- |
 | `/help` | List commands. |
 | `/tools` | List the tools the model can call. |
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
+| `/inspect [what]`, `/status` | wisp's own `config`, `status` (default), `approvals`, or `audit`, as the model's `inspect` tool shows them. |
+| `/last` | The last tool result in full; the live line shows only its first line. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, `/q`, a bare `exit`, `quit`, or `q`, Ctrl-D | Exit, saving if a name is set. |
-| `/help`, `/?` | List commands. |
+| `/help`, `/?`, a bare `help` | List commands. |
 
-When the model wants to run a risky command, chat prints it with the reasons and asks on stderr:
-`y` approves it for the rest of this turn, `s` for the session, `p` for this project (30 days, this
-directory), `a` always (30 days, any directory), `n` refuses.
+When the model wants to run a risky command, chat asks on stderr with a compact dialog: the level and
+command, the whole line when the command is one part of it, the directory, each reason on a line
+(shortened to 110 characters), the pattern the answer is remembered under, and one key line:
+`[y]once [s]ession [p]roject 30d [a]lways 30d [n]o`. `y` approves it for the rest of this turn, `s`
+for the session, `p` for this project (30 days, this directory), `a` always (30 days, anywhere); `n`, an
+empty answer, or end of input refuses it ([approval.md](approval.md)).
 
 Status lines and the `> ` prompt go to stderr, replies to stdout, so `wisp chat 2>/dev/null` prints only
 what the model said. A *turn* is one message from you and everything the model does to answer it.
