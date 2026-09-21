@@ -3,3 +3,4 @@
 target/
 *.xcodeproj
 .DS_Store
+*.profraw
