@@ -19,6 +19,7 @@ Mac on one day; it is evidence, not a certification.
 | --- | --- | --- |
 | `classifier.system-model` | `ClassifierEvalTests`, 47 labelled commands, twelve held out | the command rated at exactly its level; separately, no dangerous command below moderate is a hard requirement |
 | `triage` | `TriageEvalTests`, abridged swift build, swift test, cargo test, and pytest output | an expected failure found, by test name or file:line |
+| `summarise_diff` | `DiffSummaryEvalTests`, five small diffs | the expected flag (secret, deleted or disabled test) on the expected file, or no flag for an ordinary change, from the rules and the model together; every file must also get a summary line. The model alone scored 2 of 5 on 2026-09-21, which is why the rules exist |
 | `edit_file.replace` | `ToolEvalTests`, ten small files | after read_file then edit_file replace by line number, the file is exactly as intended |
 | `respond.schema` | `ToolEvalTests`, six code snippets | the schema-shaped reply parses and names the language |
 

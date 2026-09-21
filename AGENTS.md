@@ -76,7 +76,7 @@ the single set-up path for every face; `respond` and `chat` open the session's o
 `DaimonMCP` opens one per `thread_id` through `Session.conversation` (threads held by
 `ThreadStore`/`ConversationThread` actors), so all of them share one config, approval store, and
 session-approval set. `DaimonMCP` exposes `respond`, `triage` (build or test output condensed to a failure list on device,
-ADR 0023), and `close_thread`; daimon's own tools are reachable only through `respond`. Details: `docs/design.md`.
+ADR 0023), `summarise_diff` (a diff condensed to per-file lines and review flags), and `close_thread`; daimon's own tools are reachable only through `respond`. Details: `docs/design.md`.
 
 ## Rules
 

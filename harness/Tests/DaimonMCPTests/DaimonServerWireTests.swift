@@ -55,7 +55,7 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
     @Test func listsToolsAndResourcesOverTheProtocol() async throws {
         let pair = try await connected()
         let tools = try await pair.client.listTools().tools
-        #expect(tools.map(\.name) == ["respond", "triage", "close_thread"])
+        #expect(tools.map(\.name) == ["respond", "triage", "summarise_diff", "close_thread"])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
         let resources = try await pair.client.listResources().resources
         #expect(
@@ -285,6 +285,46 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         let missing = try await call(pair.client, "triage", ["path": .string(dir.appending(path: "nope").path)])
         #expect(missing.isError == true)
         await #expect(throws: MCPError.self) { _ = try await call(pair.client, "triage", [:]) }
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func summariseDiffReadsADiffJudgesItAndReturnsFilesAndFlagsOverTheProtocol() async throws {
+        let pair = try await connected(
+            triageSteps: [
+                .say(
+                    #"{"headline":"Adds a token","files":[{"path":"Sources/New.swift","summary":"new file"}],"flags":[{"kind":"secret","path":"Sources/New.swift","note":"token literal"}]}"#
+                )
+            ])
+        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-wire-diff-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let diff = dir.appending(path: "change.diff")
+        try Data(
+            """
+            diff --git a/Sources/New.swift b/Sources/New.swift
+            new file mode 100644
+            --- /dev/null
+            +++ b/Sources/New.swift
+            @@ -0,0 +1,1 @@
+            +let token = "abc"
+            """.utf8
+        ).write(to: diff)
+        let result = try await call(pair.client, "summarise_diff", ["path": .string(diff.path)])
+        #expect(result.isError == false, "\(result)")
+        let structured = result.structuredContent?.objectValue
+        #expect(structured?["chunks"] == .int(1))
+        #expect(structured?["headline"] == .string("Adds a token"))
+        #expect(structured?["added"] == .int(1) && structured?["removed"] == .int(0))
+        let file = structured?["files"]?.arrayValue?.first?.objectValue
+        #expect(file?["path"] == .string("Sources/New.swift") && file?["change"] == .string("added"))
+        #expect(file?["summary"] == .string("new file"))
+        #expect(structured?["flags"]?.arrayValue?.first?.objectValue?["kind"] == .string("secret"))
+        guard case .text(let text, _, _)? = result.content.first else { Issue.record("no text"); return }
+        #expect(text.hasPrefix("1 file, +1 -0\nAdds a token\nFLAG secret"))
+        let session = pair.sink.events.filter { $0.session.hasPrefix("summarise-") }
+        #expect(session.first?.kind == .sessionStart && session.last?.kind == .sessionEnd)
+        await #expect(throws: MCPError.self) { _ = try await call(pair.client, "summarise_diff", [:]) }
         await pair.client.disconnect()
         await pair.server.stop()
     }

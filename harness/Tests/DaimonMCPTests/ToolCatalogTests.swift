@@ -7,7 +7,7 @@ import Testing
 
 @Suite struct ToolCatalogTests {
     @Test func advertisesRespondAndRunCommand() {
-        #expect(ToolCatalog.all.map(\.name) == ["respond", "triage", "close_thread"])
+        #expect(ToolCatalog.all.map(\.name) == ["respond", "triage", "summarise_diff", "close_thread"])
     }
 
     @Test func everyToolHasAnObjectSchemaWithRequiredFields() {
@@ -94,6 +94,18 @@ import Testing
         let request = try RespondRequest(arguments: ["prompt": .string("hi"), "tools": .array([])])
         #expect(request.tools == ToolSelection.none)
         #expect(ToolSelection.none.resolved(or: ["a"]).isEmpty)
+    }
+}
+
+@Suite struct SummariseDiffRequestTests {
+    @Test func decodesLikeTriageWithItsOwnCap() throws {
+        let request = try SummariseDiffRequest(arguments: ["command": .string("git diff"), "max_files": .int(5)])
+        #expect(request.source == .command("git diff", workingDirectory: nil) && request.maxFiles == 5)
+        #expect(try SummariseDiffRequest(arguments: ["path": .string("/d")]).maxFiles == 40)
+        #expect(throws: MCPError.self) {
+            try SummariseDiffRequest(arguments: ["path": .string("/d"), "max_files": .int(0)])
+        }
+        #expect(throws: MCPError.self) { try SummariseDiffRequest(arguments: [:]) }
     }
 }
 

@@ -33,7 +33,7 @@ public struct Triage: Sendable {
         case path(String)
 
         /// What to call the output in prompts and results.
-        var label: String {
+        public var label: String {
             switch self {
             case .command(let line, _): "the command `\(line)`"
             case .path(let path): "the file \(path)"
@@ -282,10 +282,25 @@ public struct Triage: Sendable {
     /// - Returns: The capture.
     /// - Throws: `CommandRunner.Failure`, `ApprovalGate.Failure`, or a file error.
     public func capture(_ source: Source, runner: CommandRunner, gate: ApprovalGate?) async throws -> Captured {
+        try await Self.capture(source, runner: runner, gate: gate, maxOutputBytes: options.maxOutputBytes)
+    }
+
+    /// The capture every condensing tool shares; see the instance method.
+    ///
+    /// - Parameters:
+    ///   - source: What to capture.
+    ///   - runner: Runs commands.
+    ///   - gate: Clears file reads; nil skips the check.
+    ///   - maxOutputBytes: Bytes kept; only the tail beyond.
+    /// - Returns: The capture.
+    /// - Throws: `CommandRunner.Failure`, `ApprovalGate.Failure`, or a file error.
+    public static func capture(
+        _ source: Source, runner: CommandRunner, gate: ApprovalGate?, maxOutputBytes: Int
+    ) async throws -> Captured {
         switch source {
         case .command(let line, let directory):
             var runner = runner
-            runner.options.maxOutputBytes = options.maxOutputBytes
+            runner.options.maxOutputBytes = maxOutputBytes
             let outcome = try await runner.run(line, in: directory)
             var text = outcome.stdout
             if !outcome.stderr.isEmpty {
@@ -297,8 +312,8 @@ public struct Triage: Sendable {
         case .path(let path):
             try await gate?.clear(readingFile: path, workingDirectory: FileManager.default.currentDirectoryPath)
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
-            let truncated = data.count > options.maxOutputBytes
-            let kept = truncated ? data.suffix(options.maxOutputBytes) : data[...]
+            let truncated = data.count > maxOutputBytes
+            let kept = truncated ? data.suffix(maxOutputBytes) : data[...]
             return Captured(text: String(decoding: kept, as: UTF8.self), truncated: truncated)
         }
     }

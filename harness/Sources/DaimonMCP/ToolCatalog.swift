@@ -103,6 +103,46 @@ public enum ToolCatalog {
         annotations: .init(title: "Triage build or test output", readOnlyHint: false, openWorldHint: false)
     )
 
+    /// Summarises a diff on this Mac: files, one line each, and review flags.
+    public static let summariseDiff = Tool(
+        name: "summarise_diff",
+        description:
+            "Run a command that prints a unified diff on this Mac (such as git diff), or read a diff file already "
+            + "here, and return a per-file summary: path, change kind, lines added and removed, one line on what "
+            + "changed, plus flags for deleted tests, secrets, binary or generated content. The diff stays on this "
+            + "Mac; the on-device model reads it in chunks. Give exactly one of command or path.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Shell command line that prints a unified diff, run with /bin/sh -c under daimon's policy, "
+                            + "sandbox, and approval, such as: git diff HEAD~3"),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory to run the command in. Default: daimon's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of a diff file on this Mac to summarise instead."),
+                ]),
+                "model": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Model to judge the chunks with; as for respond. Default: the configured one."),
+                ]),
+                "max_files": .object([
+                    "type": .string("integer"),
+                    "description": .string("Files to list at most (default 40); the rest are counted in more."),
+                ]),
+            ]),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Summarise a diff", readOnlyHint: false, openWorldHint: false)
+    )
+
     /// Ends a conversation thread and frees its model session.
     public static let closeThread = Tool(
         name: "close_thread",
@@ -121,7 +161,7 @@ public enum ToolCatalog {
     )
 
     /// Every tool, in the order clients see them.
-    public static var all: [Tool] { [respond, triage, closeThread] }
+    public static var all: [Tool] { [respond, triage, summariseDiff, closeThread] }
 
     /// URI of the JSON resource describing the model's tools.
     public static let toolsResourceURI = "daimon://tools"
@@ -251,16 +291,14 @@ public struct RespondRequest: Equatable, Sendable {
     }
 }
 
-/// Decoded arguments for the `triage` tool.
-public struct TriageRequest: Equatable, Sendable {
-    /// What to triage.
+/// The arguments every condensing tool shares: one source, an optional model.
+public struct CondensingRequest: Equatable, Sendable {
+    /// What to condense.
     public var source: Triage.Source
     /// Model for the judging turns; nil means the server default.
     public var model: ModelSelection?
-    /// Findings to keep at most.
-    public var maxFindings: Int
 
-    /// Decodes and validates MCP call arguments.
+    /// Decodes `command`/`working_directory` or `path`, and `model`.
     ///
     /// - Parameter arguments: The raw `tools/call` arguments.
     /// - Throws: `MCPError.invalidParams` unless exactly one of `command` and `path` is a non-empty string.
@@ -296,14 +334,59 @@ public struct TriageRequest: Equatable, Sendable {
                 throw MCPError.invalidParams("\(error)")
             }
         }
-        if let raw = arguments?["max_findings"] {
-            guard let count = raw.intValue, count > 0 else {
-                throw MCPError.invalidParams("'max_findings' must be a positive integer")
-            }
-            maxFindings = count
-        } else {
-            maxFindings = Triage.Options().maxFindings
+    }
+
+    /// A positive integer argument, or `fallback` when absent.
+    ///
+    /// - Throws: `MCPError.invalidParams` when present and not a positive integer.
+    static func count(_ arguments: [String: Value]?, _ name: String, fallback: Int) throws -> Int {
+        guard let raw = arguments?[name] else { return fallback }
+        guard let count = raw.intValue, count > 0 else {
+            throw MCPError.invalidParams("'\(name)' must be a positive integer")
         }
+        return count
+    }
+}
+
+/// Decoded arguments for the `triage` tool.
+public struct TriageRequest: Equatable, Sendable {
+    /// What to triage.
+    public var source: Triage.Source
+    /// Model for the judging turns; nil means the server default.
+    public var model: ModelSelection?
+    /// Findings to keep at most.
+    public var maxFindings: Int
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad `max_findings`.
+    public init(arguments: [String: Value]?) throws {
+        let shared = try CondensingRequest(arguments: arguments)
+        source = shared.source
+        model = shared.model
+        maxFindings = try CondensingRequest.count(arguments, "max_findings", fallback: Triage.Options().maxFindings)
+    }
+}
+
+/// Decoded arguments for the `summarise_diff` tool.
+public struct SummariseDiffRequest: Equatable, Sendable {
+    /// What to summarise.
+    public var source: Triage.Source
+    /// Model for the judging turns; nil means the server default.
+    public var model: ModelSelection?
+    /// Files to list at most.
+    public var maxFiles: Int
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad `max_files`.
+    public init(arguments: [String: Value]?) throws {
+        let shared = try CondensingRequest(arguments: arguments)
+        source = shared.source
+        model = shared.model
+        maxFiles = try CondensingRequest.count(arguments, "max_files", fallback: DiffSummary.Options().maxFiles)
     }
 }
 

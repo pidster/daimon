@@ -33,7 +33,7 @@ public struct DaimonServer: Sendable {
     private let makeThread: ThreadFactory
     /// Asks the client's user through elicitation; `--yes` sessions bypass it inside the gate.
     private let approver: ElicitationApprover
-    /// Opens the agent that judges one triage chunk; tests inject one over a scripted model.
+    /// Opens the agent that judges one chunk for a condensing tool; tests inject one over a scripted model.
     private let makeTriageAgent: @Sendable (Conversation) throws -> Agent
 
     /// Creates a server over a session begun by the CLI. Threads are opened through
@@ -128,6 +128,9 @@ public struct DaimonServer: Sendable {
             case ToolCatalog.triage.name:
                 let request = try TriageRequest(arguments: params.arguments)
                 result = await triage(request)
+            case ToolCatalog.summariseDiff.name:
+                let request = try SummariseDiffRequest(arguments: params.arguments)
+                result = await summariseDiff(request)
             case ToolCatalog.closeThread.name:
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
@@ -272,6 +275,30 @@ public struct DaimonServer: Sendable {
             let captured = try await triage.capture(request.source, runner: runner, gate: conversation.gate)
             let report = try await triage.run(captured, from: request.source)
             let structured: Value? = Value(json: report.json)  // the typed init, not the throwing generic one
+            return .init(
+                content: [.text(text: report.rendered, annotations: nil, _meta: nil)], structuredContent: structured,
+                isError: false)
+        } catch {
+            return failure(String(describing: error))
+        }
+    }
+
+    /// Captures the diff on a conversation of its own, judges it chunk by chunk, and returns the summary.
+    private func summariseDiff(_ request: SummariseDiffRequest) async -> CallTool.Result {
+        let id = "summarise-" + ShortID.make()
+        do {
+            let conversation = try session.conversation(id: id, approver: approver, tools: .none, model: request.model)
+            defer { conversation.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed")) }
+            let schema = try OutputSchema(json: DiffSummary.schemaJSON)
+            let makeAgent = makeTriageAgent
+            let summary = DiffSummary(options: .init(maxFiles: request.maxFiles)) { prompt in
+                try await makeAgent(conversation).respond(to: prompt, schema: schema).text
+            }
+            let runner = CommandRunner(
+                options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+            let captured = try await summary.capture(request.source, runner: runner, gate: conversation.gate)
+            let report = try await summary.run(captured, from: request.source)
+            let structured: Value? = Value(json: report.json)
             return .init(
                 content: [.text(text: report.rendered, annotations: nil, _meta: nil)], structuredContent: structured,
                 isError: false)

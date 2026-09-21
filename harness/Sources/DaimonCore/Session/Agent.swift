@@ -29,6 +29,10 @@ public final class Agent {
     public private(set) var contextSize: Int?
     /// Bytes of prompt per token assumed when estimating a new prompt's cost.
     static let bytesPerToken = 4
+    /// Output tokens a schema-shaped reply may take. A small model can loop inside a string the schema
+    /// cannot bound; the cap turns a runaway into a prompt error instead of a full window (probed
+    /// 2026-09-21: one chunk ran 8193 tokens and six minutes before this).
+    public var maximumSchemaTokens = 1024
     /// Where turns, responses, condensations, and errors are recorded.
     public let audit: AuditLog?
     /// The conversation's turn counter, advanced once per prompt; the approval gate reads it.
@@ -223,7 +227,9 @@ public final class Agent {
     nonisolated(nonsending) public func respond(to prompt: String, schema: OutputSchema) async throws -> Reply {
         try model.checkGuidedGeneration()
         return try await turn(prompt, schema: schema.source) {
-            try await session.respond(to: prompt, schema: schema.schema).content.jsonString
+            try await session.respond(
+                to: prompt, schema: schema.schema, options: .init(maximumResponseTokens: maximumSchemaTokens)
+            ).content.jsonString
         }
     }
 

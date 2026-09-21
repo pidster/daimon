@@ -202,7 +202,8 @@ concurrently. Results carry `structuredContent.thread_id`; see
 the log never disagree. A call may give a JSON Schema; `OutputSchema` converts the accepted subset to a
 `DynamicGenerationSchema`, `Agent.respond(to:schema:)` runs guided generation after checking the model
 declares it, and the reply's JSON is parsed into `structuredContent.output`
-([ADR 0022](decisions/0022-structured-output.md)). `triage` is the first condensing tool: `Triage`
+([ADR 0022](decisions/0022-structured-output.md)). `triage` and `summarise_diff` are the condensing tools so far; `DiffSummary` chunks a diff at file
+boundaries and joins the model's summaries and flags onto the file list the diff itself gives. `triage` was the first: `Triage`
 in `DaimonCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,
 sandbox, audit) or reads a file after the gate clears it, chunks it, judges each chunk through a
 schema-shaped turn on a conversation of its own, and merges the findings

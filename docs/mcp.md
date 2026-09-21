@@ -144,7 +144,10 @@ guided generation (`system`, `private-cloud`, Ollama models that report `complet
 whose engine supports it); otherwise the call is refused before generation with a hint. The schema is
 per call: the next call on the thread is prose again unless it gives one too.
 
-The accepted subset is what a small model can fill and the framework can constrain:
+Shaped replies are capped at 1024 output tokens (`Agent.maximumSchemaTokens`): a small model can loop
+inside a string the schema cannot bound, and the cap turns that into a failed call instead of a full
+window (probed 2026-09-21: one chunk ran to 8193 tokens and six minutes before the cap). The accepted
+subset is what a small model can fill and the framework can constrain:
 
 | Construct | Accepted |
 | --- | --- |
@@ -227,6 +230,50 @@ fixtures (a `swift build` with two errors and a warning, a `swift test` with two
 `cargo test` with two compile errors, a `pytest` with one failure) every expected failure was found,
 7 of 7, with no spurious findings; the model reports a failing test by its assertion's `file:line` rather
 than its name. Output shapes not in the fixtures are not measured.
+
+### `summarise_diff`
+
+Run a command that prints a unified diff (such as `git diff HEAD~3`), or read a diff file already on
+this Mac, and get back a per-file summary with review flags. The diff stays on the Mac: daimon captures
+it whole (up to 1 MiB), cuts it into 4 KiB chunks at file, then hunk, then line boundaries, judges each
+chunk in a fresh tool-less turn with a schema, and joins the answers onto the file list the diff itself
+gives ([ADR 0023](decisions/0023-condensing-tools.md)). Paths, change kinds, and line counts are read
+from the diff headers and hunks, never from the model, and so are the flags the text proves: a deleted
+test file, a test disabled on an added line (`.disabled(`, `XCTSkip`, `@pytest.mark.skip`, `#[ignore]`
+and the like), a credential literal on an added line (known key prefixes, a private key block, or a
+secret-named assignment of a long string), and binary content. The model adds the headline, one line
+per file, and any flag the rules miss; anything it says about a file the diff does not contain is
+dropped. Rules never remove a flag.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | A command line that prints a unified diff, run under daimon's policy, sandbox, and approval as `run_command` would. |
+| `working_directory` | string | no | Absolute directory for the command. Default: daimon's. |
+| `path` | string | one of | Absolute path of a diff file on this Mac; the read clears the gate as `read_file` does. |
+| `model` | string | no | The judging model, as for `respond`; it must declare guided generation. |
+| `max_files` | integer | no | Files to list at most (default 40); the rest are counted in `more`. |
+
+Result content is a headline block and one line per flag and per file; `structuredContent`:
+
+```json
+{
+  "source": { "command": "git diff HEAD~1", "workingDirectory": "/repo", "exitStatus": 0, "truncated": false, "bytes": 2210 },
+  "chunks": 1, "more": 0, "added": 14, "removed": 3,
+  "headline": "Adds atomic writes to edit_file and tests them",
+  "files": [
+    { "path": "Sources/Tools/FileWriter.swift", "change": "modified", "added": 12, "removed": 1,
+      "summary": "writes to a temporary file and renames it over the target" },
+    { "path": "Tests/FileWriterTests.swift", "change": "modified", "added": 2, "removed": 2, "summary": "checks the mode survives" }
+  ],
+  "flags": [{ "kind": "deleted-test", "path": "Tests/OldTests.swift", "note": "the timeout test was removed" }]
+}
+```
+
+`change` is `added`, `modified`, `deleted`, or `renamed`; `summary` is null for a file the model said
+nothing about. Flag kinds: `deleted-test` (a test removed or disabled), `secret`, `binary`, `generated`,
+`large`; a flag the model leaves pathless lands on the chunk's only file when it had one. Each summary is its own audited session (`summarise-<id>`), so
+`daimon://audit/summarise-<id>` shows what the model saw. The measured result is in
+[measurements.md](measurements.md).
 
 ### `close_thread`
 

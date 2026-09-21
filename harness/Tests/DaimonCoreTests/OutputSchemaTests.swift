@@ -83,6 +83,7 @@ import Testing
         _ = try await Agent(instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: model))
             .respond(to: "n", schema: schema)
         #expect(model.script.requests.withLock { $0.first?.schema != nil })
+        #expect(model.script.requests.withLock { $0.first?.generationOptions.maximumResponseTokens } == 1024)
         // A model that does not declare guided generation is refused before the turn.
         let textOnly = Agent(
             instructions: "x", tools: [],

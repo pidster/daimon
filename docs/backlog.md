@@ -22,8 +22,8 @@ not the differentiator. Items, in order of leverage:
   JSON of that shape through guided generation ([ADR 0022](decisions/0022-structured-output.md)).
 - **Condensing tools.** Purpose-built MCP tools that keep raw content on the device and return small
   results ([ADR 0023](decisions/0023-condensing-tools.md)). Done 2026-09-20: `triage`, build or test
-  output into a failure list. Next: summarise a file or a diff (chunked map-reduce), answer a question
-  over a set of files, extract fields to a schema. A deterministic pre-pass for known output formats
+  output into a failure list. Done 2026-09-21: `summarise_diff`, a diff into per-file lines and review
+  flags. Next: summarise a file, answer a question over a set of files, extract fields to a schema. A deterministic pre-pass for known output formats
   (`file:line:col: error:`, `error[E…] --> file:line`, `FAILED path::test`) would make those cases exact
   and leave the model the rest; measure it against the eval fixtures first.
 - Done 2026-09-20: a measured task catalogue. `scripts/check eval` records a `Measurement` per task

@@ -8,6 +8,10 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- `summarise_diff`, a new MCP tool: run a command that prints a diff (or read a diff file) and get back
+  a headline, one line per file with its change kind and line counts, and flags for secrets, deleted or
+  disabled tests, and binary or generated content. Paths and counts come from the diff itself; the diff
+  never leaves the Mac.
 - Measurements: `scripts/check eval` records what each delegated task achieved (`triage`,
   `edit_file` replace after read, schema-shaped replies, the risk classifier) into a resource embedded
   in the binary; `daimon tools --markdown`, `daimon://tools`, and the new `daimon://measurements`
