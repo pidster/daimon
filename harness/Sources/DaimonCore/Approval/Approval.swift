@@ -162,6 +162,14 @@ public actor ApprovalGate {
         return turn
     }
 
+    /// The persisted approval covering `segment`: under its pattern, or under the pre-verb pattern
+    /// (`git *`) an older approvals file may hold.
+    private func standingApproval(for segment: SimpleCommand, in directory: String) async -> ApprovalStore.Entry? {
+        if let entry = await store?.find(pattern: segment.pattern, directory: directory) { return entry }
+        guard let legacy = segment.legacyPattern else { return nil }
+        return await store?.find(pattern: legacy, directory: directory)
+    }
+
     /// Session approvals are keyed on the pattern (`head *`) in the exact directory.
     private static func key(_ pattern: String, _ workingDirectory: String) -> String {
         "\(workingDirectory)\u{0}\(pattern)"
@@ -297,9 +305,7 @@ public actor ApprovalGate {
             decided("cached-turn")
             return
         }
-        if assessment.level < .dangerous,
-            let standing = await store?.find(pattern: segment.pattern, directory: workingDirectory)
-        {
+        if assessment.level < .dangerous, let standing = await standingApproval(for: segment, in: workingDirectory) {
             decided("cached-\(standing.scope.rawValue)", approvalID: standing.id)
             return
         }

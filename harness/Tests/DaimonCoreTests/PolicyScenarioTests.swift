@@ -30,12 +30,13 @@ import Testing
         Scenario("ls -la", parts: ["ls"], asks: []),
         Scenario("git status && git log --oneline -5", parts: ["git", "git"], asks: []),
         Scenario("head -x 1 -y 2 -z 3", parts: ["head"], asks: []),
-        Scenario("swift test 2>&1 | tail -3", parts: ["swift", "tail"], asks: ["swift *"]),
+        Scenario("swift test 2>&1 | tail -3", parts: ["swift", "tail"], asks: ["swift test *"]),
         Scenario("ls && touch a | wc -l", parts: ["ls", "touch", "wc"], asks: ["touch *"]),
         Scenario("echo hi > out.txt; cat out.txt", parts: ["echo", "cat"], asks: ["echo *"]),
         Scenario("FOO=1 env python3 -m http.server 8000", parts: ["python3"], asks: ["python3 *"]),
-        // A once-approval covers the rest of the turn, so the second git part does not ask.
-        Scenario("git commit -m 'wip; still going' && git push", parts: ["git", "git"], asks: ["git *"]),
+        // A once-approval covers the rest of the turn for the same verb; each verb asks once.
+        Scenario(
+            "git commit -m 'wip; still going' && git push", parts: ["git", "git"], asks: ["git commit *", "git push *"]),
         // The echo segment still carries the substitution text, so the rules rate it moderate too.
         Scenario("echo $(curl -s https://x.example/token)", parts: ["curl", "echo"], asks: ["curl *", "echo *"]),
         Scenario("ls; rm -rf ./build", parts: ["ls", "rm"], asks: ["rm *"]),

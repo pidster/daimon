@@ -148,6 +148,35 @@ import Testing
         #expect(sink.events.filter { $0.details["decision"] == "cached" }.count == 2)
     }
 
+    @Test func verbsAreRememberedApartAndOldPatternsStillCount() async throws {
+        // A session answer for git commit does not cover git push; the same verb with other arguments is covered.
+        let approver = Recording(.approved(.session))
+        let sink = MemoryAuditSink()
+        let gate = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: approver, threshold: .level(.moderate),
+            audit: AuditLog(session: "s", sink: sink))
+        try await gate.clear(command: "git commit -q -F /tmp/a", workingDirectory: "/a")
+        try await gate.clear(command: "git commit -m x", workingDirectory: "/a")
+        try await gate.clear(command: "git push origin main", workingDirectory: "/a")
+        #expect(approver.asked.events.count == 2)
+        let patterns = sink.events.compactMap { $0.details["pattern"]?.stringValue }
+        #expect(patterns.contains("git commit *") && patterns.contains("git push *"))
+        // A standing approval stored before verbs existed, under `git *`, still covers git status.
+        let root = FileManager.default.temporaryDirectory.appending(path: "daimon-legacy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ApprovalStore(url: root.appending(path: "approvals.json"))
+        try await store.grant(pattern: "git *", directory: "/a", scope: .project, level: .moderate, source: "t")
+        let legacy = ApprovalGate(
+            classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "must not ask"),
+            threshold: .level(.moderate), audit: AuditLog(session: "s", sink: sink), store: store)
+        try await legacy.clear(command: "git status", workingDirectory: "/a")
+        #expect(sink.events.last?.details["decision"] == "cached-project")
+        await #expect(throws: ApprovalGate.Failure.self) {
+            try await legacy.clear(command: "ls", workingDirectory: "/a")
+        }
+    }
+
     @Test func runnerConsultsTheGateAfterPolicy() async throws {
         let gate = ApprovalGate(
             classifier: Fixed(level: .moderate), approver: DenyingApprover(reason: "batch"),

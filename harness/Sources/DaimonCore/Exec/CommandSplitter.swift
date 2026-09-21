@@ -7,13 +7,20 @@ public struct SimpleCommand: Equatable, Sendable {
     /// The program that actually runs, after unwrapping prefixes such as `sudo`, `env`, `time`, or
     /// `VAR=value`, and without its directory.
     public var executable: String
-    /// The approval key: the executable followed by ` *`, so any arguments share one approval.
-    public var pattern: String { "\(executable) *" }
+    /// The verb, for a program in `Multiplexers` (`commit` in `git commit -q`); nil otherwise.
+    public var subcommand: String?
+    /// The approval key: the executable, its verb when it has one, and ` *`, so arguments never
+    /// matter to remembering but `git commit *` and `git push *` are remembered apart.
+    public var pattern: String { "\(executable)\(subcommand.map { " " + $0 } ?? "") *" }
+    /// The pattern before verbs were part of it (`git *`); a standing approval stored under it is
+    /// still honoured so an existing approvals file keeps working.
+    public var legacyPattern: String? { subcommand == nil ? nil : "\(executable) *" }
 
     /// Creates a simple command.
-    public init(text: String, executable: String) {
+    public init(text: String, executable: String, subcommand: String? = nil) {
         self.text = text
         self.executable = executable
+        self.subcommand = subcommand
     }
 }
 
@@ -44,8 +51,9 @@ public enum CommandSplitter {
             for nested in substitutions(in: trimmed) {
                 commands += split(nested)
             }
-            if let executable = executable(of: trimmed) {
-                commands.append(SimpleCommand(text: trimmed, executable: executable))
+            if let essential = essential(of: trimmed) {
+                commands.append(
+                    SimpleCommand(text: trimmed, executable: essential.executable, subcommand: essential.subcommand))
             }
         }
         return commands
@@ -160,7 +168,31 @@ public enum CommandSplitter {
     }
 
     /// The program a segment runs, or nil for a bare subshell or assignment-only segment.
-    static func executable(of segment: String) -> String? {
+    static func executable(of segment: String) -> String? { essential(of: segment)?.executable }
+
+    /// The program and, for a multiplexer, its verb: the first word after the program that is not an
+    /// option, an option's value, or a toolchain selector such as `+nightly`. `git -C dir status`
+    /// gives `status`; `git --version` gives no verb.
+    static func essential(of segment: String) -> (executable: String, subcommand: String?)? {
+        guard let (name, rest) = program(of: segment) else { return nil }
+        guard Multiplexers.programs.contains(name) else { return (name, nil) }
+        var words = rest
+        while let word = words.first {
+            words.removeFirst()
+            if word.hasPrefix("-") {
+                if valueOptions.contains(word), !words.isEmpty { words.removeFirst() }
+                continue
+            }
+            if word.hasPrefix("+") { continue }
+            let isVerb =
+                word.first?.isLetter == true && word.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+            return (name, isVerb ? word : nil)
+        }
+        return (name, nil)
+    }
+
+    /// The program name and the words after it, with wrappers and assignments unwrapped.
+    private static func program(of segment: String) -> (String, [String])? {
         var words = words(of: segment)
         while let first = words.first {
             if first.hasPrefix("(") || first.hasPrefix("$(") || first.hasPrefix("`") { return nil }
@@ -181,7 +213,8 @@ public enum CommandSplitter {
                 }
                 continue
             }
-            return name
+            words.removeFirst()
+            return (name, words)
         }
         return nil
     }

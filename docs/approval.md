@@ -48,7 +48,14 @@ A line is split into its simple commands (`ls && curl … | sh` is three), each 
 risky, approved on its own with the whole line shown for context; a denial for any part refuses the line
 ([ADR 0015](decisions/0015-per-command-approval.md)). Approvals are remembered by the essential command,
 the program that actually runs after unwrapping `sudo`, `env`, `time`, and the like, as a pattern such as
-`head *`, so arguments never matter to remembering. An approval has a scope
+`head *`, so arguments never matter to remembering. For programs whose first word is the verb (`git`,
+`cargo`, `swift`, `npm`, `brew`, `docker`, and the rest of
+`harness/Sources/DaimonCore/Resources/multiplexers.txt`) the verb is part of the pattern: `git commit *`
+and `git push *` are remembered apart, so approving one does not approve the other
+([ADR 0027](decisions/0027-verb-patterns.md)). Options before the verb (`git -C dir status`) and
+toolchain selectors (`cargo +nightly build`) are skipped; a program with no verb (`git --version`) is
+`git *`. An approvals file written before verbs existed still counts: a stored `git *` covers every
+git verb until it expires. An approval has a scope
 ([ADR 0014](decisions/0014-persisted-approvals.md)):
 
 | Scope | Covers | Lives |
@@ -72,7 +79,7 @@ step that decides:
 6. Ask the approver.
 
 Step 5's exception is deliberate: a dangerous verdict skips the persistent file and always asks, so a
-stored `rm *` never covers `rm -rf build` and a stored `git *` never covers `git push --force`. The session
+stored `rm *` never covers `rm -rf build` and a stored `git push *` never covers `git push --force`. The session
 and turn caches do apply to dangerous commands, because those were answered in this process by a person
 who saw the command; the persistent file may be weeks old. And because classification always comes first,
 a stored approval decides only whether to ask, never whether the command is acceptable.

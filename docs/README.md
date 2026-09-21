@@ -15,6 +15,7 @@
 | [context-management.md](context-management.md) | The small context window: framework APIs, what daimon does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
 | [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
+| [decisions/0027-verb-patterns.md](decisions/0027-verb-patterns.md) | Approval patterns include the verb for programs like git and cargo, from an embedded list; old patterns still count |
 | [decisions/0026-task-catalogue.md](decisions/0026-task-catalogue.md) | Eval results ship with the tool catalogue as measurements, recorded by the eval run and embedded at build time |
 | [decisions/0025-context-estimation.md](decisions/0025-context-estimation.md) | The agent condenses ahead of a known window from the usage the runtime reports, because local runtimes truncate silently |
 | [decisions/0024-edit-file.md](decisions/0024-edit-file.md) | `edit_file` writes inside the sandbox's writable set, needs approval like a command, and replaces only an exact single match |

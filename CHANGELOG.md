@@ -15,6 +15,10 @@ Added:
 
 Changed:
 
+- Approvals for programs whose first word is the verb (`git`, `cargo`, `swift`, `npm`, `brew`, `docker`
+  and others listed in `multiplexers.txt`) are remembered by verb: `git commit *` and `git push *` are
+  separate, so a session answer for one no longer covers the other. A standing approval stored under
+  the old `git *` still counts until it expires.
 - `edit_file` replace takes `line`, the number `read_file` showed, with `content` as the whole new line
   and `find` as an optional check on that line; a drifted number changes nothing. The by-`find` form
   measured 3 of 5, because the model retyped the neighbouring line into `content`.
