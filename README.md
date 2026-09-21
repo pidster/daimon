@@ -19,6 +19,8 @@ sandbox that confines what it can write, is classified for risk, and needs your 
 Everything that happens is written to an audit log you can read back, and anything it remembers can be
 listed and revoked. [trust.md](docs/trust.md) states exactly what it can and cannot do to your Mac.
 
+Note: Apple's Private Cloud Compute model is not yet available due to a signing issue.
+
 ## Quick start
 
 Requirements: an Apple silicon Mac on macOS 27 or later with Apple Intelligence enabled, and Homebrew.
