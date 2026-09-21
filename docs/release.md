@@ -9,8 +9,8 @@ wisp ships as one arm64 binary through a Homebrew tap. This page is the procedur
 - A GitHub release for that tag with `wisp-X.Y.Z-arm64.tar.gz` (the stripped release binary and the
   LICENSE) and `wisp-X.Y.Z-arm64.tar.gz.sha256`, whose notes are the `## X.Y.Z` section of
   `CHANGELOG.md` followed by the install line.
-- A formula update in `pidster/homebrew-wisp` (`Formula/wisp.rb`) pointing at that tarball with its
-  checksum. Users run `brew install pidster/wisp/wisp`, which installs to Homebrew's prefix
+- A formula update in `pidster/homebrew-tap` (`Formula/wisp.rb`) pointing at that tarball with its
+  checksum. Users run `brew install pidster/tap/wisp`, which installs to Homebrew's prefix
   (`/opt/homebrew/bin/wisp`), already on `PATH`.
 
 The binary is unsigned for now; Homebrew does not quarantine what it downloads, so Gatekeeper does not
@@ -30,9 +30,9 @@ every local step and prints the remote ones instead of executing them.
    (`docs/backends.md`); MLX is a self-build option until that packaging is decided.
 3. Package: tarball with `wisp` and `LICENSE`; SHA-256 file.
 4. Publish: `git tag -a vX.Y.Z`, push the tag, `gh release create` with both assets and generated notes.
-5. Tap: clone or update `pidster/homebrew-wisp`, write `Formula/wisp.rb` from the template with the new
+5. Tap: clone or update `pidster/homebrew-tap`, write `Formula/wisp.rb` from the template with the new
    URL and checksum, commit, push.
-6. Verify from a clean shell: `brew update && brew install pidster/wisp/wisp && wisp doctor`.
+6. Verify from a clean shell: `brew update && brew install pidster/tap/wisp && wisp doctor`.
 
 Until a macOS 27 CI runner exists this runs on a developer's Mac with Xcode 27.
 

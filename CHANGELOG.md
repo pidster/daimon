@@ -8,9 +8,9 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Renamed: daimon is now **wisp**. The binary is `wisp`, the home directory `~/.wisp` (`WISP_HOME`), the
 environment variables `WISP_*`, the unified-logging subsystem `com.pidster.wisp`, the MCP server `wisp`
-with `wisp://` resources, and the Homebrew tap `pidster/homebrew-wisp` (`brew install pidster/wisp/wisp`).
+with `wisp://` resources, and a new formula in the Homebrew tap (`brew install pidster/tap/wisp`).
 Nothing carries over automatically: move `~/.daimon` to `~/.wisp` yourself if you want your approvals and
-transcripts, and `brew uninstall daimon`. The old tap keeps the daimon releases.
+transcripts, and `brew uninstall daimon`. The `daimon` formula stays in the tap.
 
 Added:
 

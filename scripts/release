@@ -14,7 +14,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 TAG="v$VERSION"
 TARBALL="wisp-$VERSION-arm64.tar.gz"
-TAP_REPO="pidster/homebrew-wisp"
+TAP_REPO="pidster/homebrew-tap"
 OUT="$ROOT/harness/.build/release-artifacts"
 
 remote() {
@@ -55,7 +55,7 @@ cp LICENSE "$OUT/stage/LICENSE"
 echo "==> package"
 {
     printf '%s\n\n' "$NOTES"
-    printf 'Install or upgrade with Homebrew: `brew install pidster/wisp/wisp`. Downloading the tarball directly leaves it quarantined; use Homebrew.\n'
+    printf 'Install or upgrade with Homebrew: `brew install pidster/tap/wisp`. Downloading the tarball directly leaves it quarantined; use Homebrew.\n'
 } > "$OUT/notes.md"
 (cd "$OUT/stage" && tar -czf "../$TARBALL" wisp LICENSE)
 (cd "$OUT" && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
@@ -96,4 +96,4 @@ TAP_DIR="$OUT/tap"
 remote sh -c "rm -rf '$TAP_DIR' && gh repo clone $TAP_REPO '$TAP_DIR' && mkdir -p '$TAP_DIR/Formula' && cp '$FORMULA' '$TAP_DIR/Formula/wisp.rb' && cd '$TAP_DIR' && git add Formula/wisp.rb && git commit -m 'wisp $VERSION' && git push"
 
 echo "==> done"
-echo "verify: brew update && brew install pidster/wisp/wisp && wisp doctor"
+echo "verify: brew update && brew install pidster/tap/wisp && wisp doctor"

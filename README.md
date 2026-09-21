@@ -24,7 +24,7 @@ listed and revoked. [trust.md](docs/trust.md) states exactly what it can and can
 Requirements: an Apple silicon Mac on macOS 27 or later with Apple Intelligence enabled, and Homebrew.
 
 ```bash
-brew install pidster/wisp/wisp
+brew install pidster/tap/wisp
 wisp doctor                     # checks the model, sandbox, config, and home directory
 wisp "What is the date in Tokyo?"
 wisp chat                       # interactive; ask it to run your tests; type /help for commands

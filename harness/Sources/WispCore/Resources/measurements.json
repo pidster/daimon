@@ -11,16 +11,16 @@
     "date" : "2026-09-21",
     "model" : "system",
     "notes" : "read a small file with read_file, then rewrite one numbered line with edit_file, ten files attempted three times each; a pass is the file ending up exactly as intended",
-    "passed" : 24,
+    "passed" : 25,
     "task" : "edit_file.replace",
     "tool" : "edit_file",
     "total" : 30
   },
   {
-    "date" : "2026-09-20",
+    "date" : "2026-09-21",
     "model" : "system",
     "notes" : "classify a code snippet into an enum through a schema; a pass parses and names the language",
-    "passed" : 5,
+    "passed" : 6,
     "task" : "respond.schema",
     "total" : 6
   },
@@ -33,7 +33,7 @@
     "total" : 5
   },
   {
-    "date" : "2026-09-20",
+    "date" : "2026-09-21",
     "model" : "system",
     "notes" : "expected failures found across abridged swift build, swift test, cargo test, and pytest output, by test name or file:line",
     "passed" : 7,
