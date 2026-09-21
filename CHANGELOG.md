@@ -6,6 +6,12 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 ## Unreleased
 
+Fixed:
+
+- An unanswered MCP approval now comes back at `approval.timeoutSeconds` as promised. The wait was
+  decided at the deadline but not returned until the client eventually answered the dialog, which on
+  2026-09-21 took 11 to 56 minutes for three refusals.
+
 Changed:
 
 - `wisp chat` shows its work: a status line above every prompt (model, directory, git branch and state,

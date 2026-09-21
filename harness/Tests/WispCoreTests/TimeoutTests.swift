@@ -17,6 +17,17 @@ import Testing
         }
     }
 
+    @Test func givesUpOnTimeEvenWhenTheOperationIgnoresCancellation() async {
+        // A continuation nobody resumes cannot be cancelled; the old task-group wait sat on it forever.
+        let started = ContinuousClock.now
+        await #expect(throws: Timeout.Failure.elapsed(.milliseconds(100))) {
+            try await Timeout.run(.milliseconds(100)) {
+                await withCheckedContinuation { (_: CheckedContinuation<Int, Never>) in }
+            }
+        }
+        #expect(ContinuousClock.now - started < .seconds(2))
+    }
+
     @Test func propagatesOperationErrors() async {
         struct Boom: Error {}
         await #expect(throws: Boom.self) { try await Timeout.run(.seconds(5)) { throw Boom() } }
