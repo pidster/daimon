@@ -1,10 +1,10 @@
-# ADR 0016: Locally installed models plug in through a daimon-supplied executor
+# ADR 0016: Locally installed models plug in through a wisp-supplied executor
 
 Date: 2026-09-19. Status: accepted. Amends [ADR 0013](0013-model-selection.md).
 
 ## Context
 
-The intent is to run daimon on any model installed on this Mac, not only Apple's. ADR 0013 left custom
+The intent is to run wisp on any model installed on this Mac, not only Apple's. ADR 0013 left custom
 backends "out of scope until a spike shows what the executor protocol allows". This is that spike,
 done on 2026-09-19 against the macOS 27.0 SDK and this machine (M4 Max, 48 GiB, Ollama 0.33.3).
 
@@ -18,11 +18,11 @@ What the framework offers, read from `FoundationModels.swiftinterface`:
   (the transcript, the enabled tool definitions with JSON schemas, an optional output schema, generation
   and context options) into events on a `LanguageModelExecutorGenerationChannel`: `response` text
   appended or replaced, `toolCalls` with argument fragments, `reasoning`, and `updateUsage` token counts.
-- The framework keeps everything above the executor: the tool loop (it invokes daimon's `Tool`s from a
+- The framework keeps everything above the executor: the tool loop (it invokes wisp's `Tool`s from a
   `toolCalls` event, appends the `toolOutput`, and calls the executor again), streaming snapshots, the
   transcript, guided generation parsing, and capability gating.
 
-Measured with two executors in `DaimonCoreTests` (`ExecutorSpikeTests`, `OllamaSpikeTests`):
+Measured with two executors in `WispCoreTests` (`ExecutorSpikeTests`, `OllamaSpikeTests`):
 
 | Probe | Result |
 | --- | --- |
@@ -39,10 +39,10 @@ Ollama's `/api/tags` is a real "what is installed" list.
 
 ## Decision
 
-- A third `ModelSelection` will name a locally served model, backed by a daimon-owned `LanguageModel`
+- A third `ModelSelection` will name a locally served model, backed by a wisp-owned `LanguageModel`
   whose executor speaks to the runtime. Ollama is the first runtime: no build dependency, an HTTP API
   with streaming, tool calling, and JSON-schema output, and an installed-models list. Selection spelling
-  and config shape are decided when it is built, but discovery of "what is installed" is daimon's (the
+  and config shape are decided when it is built, but discovery of "what is installed" is wisp's (the
   runtime's list), never the framework's.
 - `ResolvedModel(selection:custom:)` and `Agent.init(instructions:tools:model: ResolvedModel)` are the
   seam, added by this spike. Everything above them (`Agent`, `Session`, the MCP server, audit, approval)
@@ -57,13 +57,13 @@ Ollama's `/api/tags` is a real "what is installed" list.
 
 - Tests can drive `Agent` and the tool loop without any model through a scripted executor, so "tests
   never need the model" now extends to the agent layer; `ExecutorSpikeTests` is the first such test.
-- `OllamaLiveTests` is gated by `DAIMON_OLLAMA_TESTS=1` and `DAIMON_OLLAMA_MODEL`, like the model eval;
+- `OllamaLiveTests` is gated by `WISP_OLLAMA_TESTS=1` and `WISP_OLLAMA_MODEL`, like the model eval;
   `OllamaModelTests` covers the mapping, bodies, chunks, and the unreachable case without a server.
 - Token counting is not in the protocol; a custom model reports usage through `updateUsage` per turn,
   and `contextTokens()` stays nil. Ollama does not signal context overflow (it truncates to `num_ctx`),
   so `ContextPolicy`'s recovery never triggers on it; a later change may estimate from the usage it
   reports.
 - Built the same day: `ModelSelection.ollama(name)` spelled `ollama:<name>`; `config.json`'s `ollama`
-  section (`baseURL`, `timeoutSeconds`); `daimon models`, which lists Apple's two and the server's
+  section (`baseURL`, `timeoutSeconds`); `wisp models`, which lists Apple's two and the server's
   `/api/tags`; the doctor's configured-model check resolves through the same path. `resolve` for an
   Ollama model blocks on one `/api/tags` call with a five-second limit.

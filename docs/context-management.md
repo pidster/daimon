@@ -2,7 +2,7 @@
 
 The on-device model's window is small. `LanguageModelError.contextSizeExceeded` reports both the limit and
 the offending count; on this machine a session died at 4,096 tokens. This page records what the framework
-offers, what daimon does, and what it deliberately does not do yet.
+offers, what wisp does, and what it deliberately does not do yet.
 
 ## What the framework offers (macOS 27 SDK)
 
@@ -17,7 +17,7 @@ offers, what daimon does, and what it deliberately does not do yet.
 There is no automatic summarisation or sliding window in the framework. Whatever fits must be arranged by
 the caller.
 
-## What daimon does
+## What wisp does
 
 `Agent` has a `ContextPolicy`:
 
@@ -40,11 +40,11 @@ that cannot count, the token usage the runtime reported for the last request; `c
 Ollama and other local runtimes do not throw `contextSizeExceeded`; they drop the front of the prompt
 silently, and the instructions go first. The reactive path never fires. So `Agent` also condenses ahead
 of the window ([ADR 0025](decisions/0025-context-estimation.md)): a runtime reports the tokens a
-request used, daimon's executors keep the last request's figure on the model (`UsageReporting`;
+request used, wisp's executors keep the last request's figure on the model (`UsageReporting`;
 `LanguageModelSession.usage` accumulates across requests, so it cannot serve), and before each prompt
 the agent adds a rough cost for the new prompt (four bytes per token) to that figure. If that reaches `contextBudget` (85%) of a known window, the transcript is condensed to the
 policy's turns first and the condensation is audited with reason `budget`. The window is known when the
-model states it (`SystemLanguageModel.contextSize`; Ollama's configured `contextLength`, which daimon
+model states it (`SystemLanguageModel.contextSize`; Ollama's configured `contextLength`, which wisp
 sends as `num_ctx` so the server's default cannot differ from what it condenses against) or once an
 overflow error has reported it. Nothing happens for a window nobody knows.
 

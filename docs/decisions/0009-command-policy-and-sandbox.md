@@ -12,7 +12,7 @@ profiled, SwiftPM works inside it with `--disable-sandbox`, and Cargo works unmo
 
 ## Decision
 
-`CommandPolicy` in `DaimonCore`, configured by `commandPolicy` in `config.json`, applied by `CommandRunner`
+`CommandPolicy` in `WispCore`, configured by `commandPolicy` in `config.json`, applied by `CommandRunner`
 on every run:
 
 - **Patterns.** `deny` regexes reject a command; if `allow` is non-empty the command must also match one.
@@ -32,7 +32,7 @@ on every run:
 ## Consequences
 
 - Seatbelt refuses a nested profile that differs from the outer one. `swift build` needs
-  `--disable-sandbox` under daimon's sandbox, and daimon running inside a sandbox (as it does when it runs
+  `--disable-sandbox` under wisp's sandbox, and wisp running inside a sandbox (as it does when it runs
   its own tests through MCP) runs commands under the outer sandbox instead. Amended 2026-09-19 after
   review: nesting is decided once per process by a probe command, never from a user command's output, and
   a command is never launched twice; the writable root is the launch directory, never a per-command

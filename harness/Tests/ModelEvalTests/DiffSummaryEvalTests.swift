@@ -1,13 +1,13 @@
 import Foundation
 import Testing
 
-@testable import DaimonCore
+@testable import WispCore
 
 /// How well the configured model summarises diffs. Needs the model (`scripts/check eval`). Each
 /// fixture is a small diff with the flags a reviewer would raise; a pass is a flag of the expected kind
 /// on the expected file, or, for a fixture with nothing to flag, no flags at all. Summaries are checked
 /// for presence, not content.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["DAIMON_MODEL_TESTS"] != nil))
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["WISP_MODEL_TESTS"] != nil))
 struct DiffSummaryEvalTests {
     struct Fixture {
         let name: String
@@ -82,7 +82,7 @@ struct DiffSummaryEvalTests {
                 --- a/README.md
                 +++ b/README.md
                 @@ -1,2 +1,3 @@
-                 # daimon
+                 # wisp
                 +An on-device, tool-using AI microharness for macOS.
                 """, expected: []),
     ]

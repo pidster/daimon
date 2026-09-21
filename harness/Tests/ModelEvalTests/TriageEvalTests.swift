@@ -1,13 +1,13 @@
 import Foundation
 import Testing
 
-@testable import DaimonCore
+@testable import WispCore
 
 /// How well the configured model triages real build and test output. Needs the model, so it runs
-/// only with `DAIMON_MODEL_TESTS=1` (`scripts/check eval`); reports recall per fixture and asserts a
+/// only with `WISP_MODEL_TESTS=1` (`scripts/check eval`); reports recall per fixture and asserts a
 /// floor so a regression fails the run. Fixtures are captured output, abridged; the expected
 /// locations are what a reader would list.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["DAIMON_MODEL_TESTS"] != nil))
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["WISP_MODEL_TESTS"] != nil))
 struct TriageEvalTests {
     struct Fixture {
         let name: String
@@ -23,14 +23,14 @@ struct TriageEvalTests {
             output: """
                 Building for debugging...
                 [1/12] Write sources
-                [5/12] Compiling DaimonCore Agent.swift
-                /Users/me/src/harness/Sources/DaimonCore/Session/Agent.swift:42:13: error: cannot find 'fooBar' in scope
+                [5/12] Compiling WispCore Agent.swift
+                /Users/me/src/harness/Sources/WispCore/Session/Agent.swift:42:13: error: cannot find 'fooBar' in scope
                         let x = fooBar()
                                 ^~~~~~
-                /Users/me/src/harness/Sources/DaimonCore/Session/Agent.swift:58:9: warning: variable 'unused' was never used; consider replacing with '_' or removing it
+                /Users/me/src/harness/Sources/WispCore/Session/Agent.swift:58:9: warning: variable 'unused' was never used; consider replacing with '_' or removing it
                         let unused = 1
                             ^
-                /Users/me/src/harness/Sources/DaimonCore/Tools/ReadFileTool.swift:17:1: error: missing return in instance method expected to return 'String'
+                /Users/me/src/harness/Sources/WispCore/Tools/ReadFileTool.swift:17:1: error: missing return in instance method expected to return 'String'
                 }
                 ^
                 error: fatalError

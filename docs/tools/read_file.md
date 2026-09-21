@@ -16,7 +16,7 @@ streamed, so reading the first page of a multi-gigabyte log costs only the bytes
 Numbered lines, then a marker.
 
 ```
-1	# daimon
+1	# wisp
 2
 3	An on-device, tool-using AI microharness ...
 [more: call again with offset 4]
@@ -32,7 +32,7 @@ Paths go through the approval gate's rule classifier as if they were `cat <path>
 answer, exactly as the command would be. Ordinary files pass without a model call. Refusals come back as
 `error: read not approved: …`.
 
-The gate is the only control on reads. The read happens in daimon's own process with your permissions:
+The gate is the only control on reads. The read happens in wisp's own process with your permissions:
 there is no sandbox and no confinement to the launch directory, unlike `run_command`'s writes, so the
 model can read anything you can, your home directory included ([trust.md](../trust.md)). Prefer `--tool`
 to leave `read_file` out of a conversation that should not read at all.
@@ -54,5 +54,5 @@ offset it learns.
 
 ## Implementation
 
-`FileReader` and `LineScanner` in `harness/Sources/DaimonCore/Tools/FileReader.swift`, tested in `FileReaderTests`
+`FileReader` and `LineScanner` in `harness/Sources/WispCore/Tools/FileReader.swift`, tested in `FileReaderTests`
 including chunk-boundary and early-stop cases; `ReadFileTool` is the model-facing wrapper.

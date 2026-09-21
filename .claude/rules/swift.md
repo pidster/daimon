@@ -25,8 +25,8 @@ paths:
 - Shared mutable state uses `Mutex` from `Synchronization`. `Mutex` is non-copyable: hold it in a
   `final class … : Sendable` with a `let` (see `OutputBuffer`, `ClientCapabilityFlags`), never as a struct
   stored property or a closure capture.
-- `public` only for what `DaimonMCP` or `daimon` calls, an extension-point protocol, or a type a public
-  signature exposes; everything else internal (tests use `@testable import`). Folders in `DaimonCore`
+- `public` only for what `WispMCP` or `wisp` calls, an extension-point protocol, or a type a public
+  signature exposes; everything else internal (tests use `@testable import`). Folders in `WispCore`
   group by concern (`Session/`, `Exec/`, `Approval/`, `Audit/`, `Tools/`, `Config/`, `CLI/`, `Support/`);
   put a new file where its neighbours are.
 - Do not wrap session work in `Task.detached` or an `AsyncThrowingStream` closure; streaming is a delta
@@ -50,7 +50,7 @@ paths:
 ## Errors
 
 - Typed `enum … : Error, CustomStringConvertible, Equatable`, one per subsystem (`CommandRunner.Failure`,
-  `FileReader.Failure`, `Session.Failure`). No `fatalError` or `print` in `DaimonCore` or `DaimonMCP`; the
+  `FileReader.Failure`, `Session.Failure`). No `fatalError` or `print` in `WispCore` or `WispMCP`; the
   CLI target is the only place that renders to stderr, and never to stdout while serving MCP.
 
 ## Tests
@@ -59,7 +59,7 @@ paths:
   `"\(value)"`, not a `String` variable.
 - Tests never need the model. Put logic in pure functions or generic types (`ThreadStore<Thread>`,
   `Transcript.condensed`, `CommandRunner.tail`) and test those. `ModelEvalTests` is the one exception and
-  runs only under `DAIMON_MODEL_TESTS=1` (`scripts/check eval`).
+  runs only under `WISP_MODEL_TESTS=1` (`scripts/check eval`).
 - Tests drive the real Seatbelt sandbox: write only under the working directory and
   `FileManager.default.temporaryDirectory`; a "blocked" path must be outside both (the home directory).
 - A computed property that builds a `Transcript` mints new entry ids each access; bind it to a `let`

@@ -22,5 +22,5 @@ None needed; the result is a single line.
 
 ## Implementation
 
-`harness/Sources/DaimonCore/Tools/CurrentDateTool.swift`. Formatting is a pure static function, tested in
+`harness/Sources/WispCore/Tools/CurrentDateTool.swift`. Formatting is a pure static function, tested in
 `CurrentDateToolTests`.

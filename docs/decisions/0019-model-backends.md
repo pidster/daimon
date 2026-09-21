@@ -4,20 +4,20 @@ Date: 2026-09-20. Status: accepted. Extends [ADR 0016](0016-local-runtimes-throu
 
 ## Context
 
-ADR 0016 added Ollama as a third model through a daimon-supplied executor, with the selection spelled
+ADR 0016 added Ollama as a third model through a wisp-supplied executor, with the selection spelled
 `ollama:<name>` and the runtime's settings read from `config.json`. Two more local runtimes are wanted
 (MLX Swift and Core AI), each with its own dependencies, asset formats, and idea of what a model can do,
 and more are candidates (see the backlog). Hard-wiring each into `ModelSelection` would put every
-runtime's SDK into `DaimonCore`, which the tests and the sandboxed pre-commit hook build, and would
+runtime's SDK into `WispCore`, which the tests and the sandboxed pre-commit hook build, and would
 leave capability claims implicit: the Ollama executor declared tool calling for every model, including
 an embedding model that cannot chat.
 
 ## Decision
 
 - `ModelBackend` is a protocol: a scheme, `resolve(name, config)` into a `ResolvedModel`, `installed`
-  for `daimon models`, and `settings` for `daimon config`. `ModelBackends` is the registry, keyed by
-  scheme. Ollama is built into `DaimonCore`; the executable registers the others at launch, so
-  `DaimonCore` never links a runtime it does not need and a build can omit one.
+  for `wisp models`, and `settings` for `wisp config`. `ModelBackends` is the registry, keyed by
+  scheme. Ollama is built into `WispCore`; the executable registers the others at launch, so
+  `WispCore` never links a runtime it does not need and a build can omit one.
 - `ModelSelection.local(backend:name:)` is spelled `<backend>:<name>`. Parsing accepts any scheme;
   resolving a scheme this binary lacks fails with `unknownBackend` naming the registered ones, so a
   config file can name a backend an older or slimmer build does not have and get a clear error.
@@ -32,7 +32,7 @@ an embedding model that cannot chat.
 - A new audit event, `model.resolved`, records at conversation open which model actually served,
   its backend, its asset, its declared capabilities and their source, and the tools it was opened with.
 - A backend never downloads. Acquisition is the operator's job; a missing asset is an `unavailable`
-  failure that says where daimon looked.
+  failure that says where wisp looked.
 
 ## Consequences
 

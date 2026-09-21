@@ -3,7 +3,7 @@ import CreateML
 import Foundation
 import TabularData
 
-// Trains an MLTextClassifier from a `text,label` CSV and writes it with daimon's contract metadata.
+// Trains an MLTextClassifier from a `text,label` CSV and writes it with wisp's contract metadata.
 // Invoked by scripts/train-risk-classifier; see that file for usage.
 let arguments = CommandLine.arguments.dropFirst()
 guard arguments.count >= 2 else {
@@ -24,11 +24,11 @@ guard seen.isSubset(of: labels) else {
 let classifier = try MLTextClassifier(
     trainingData: frame, textColumn: "text", labelColumn: "label", parameters: .init(validation: .none))
 let metadata = MLModelMetadata(
-    author: "daimon", shortDescription: "daimon command risk classifier, contract 1", version: version,
-    additional: ["daimon.classifier.contract": "1", "daimon.classifier.labels": labels.joined(separator: ",")])
+    author: "wisp", shortDescription: "wisp command risk classifier, contract 1", version: version,
+    additional: ["wisp.classifier.contract": "1", "wisp.classifier.labels": labels.joined(separator: ",")])
 try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
 try classifier.write(to: output, metadata: metadata)
 let rows = frame.rows.count
 let trainingError = classifier.trainingMetrics.classificationError
 print("trained on \(rows) rows; training error \(String(format: "%.3f", trainingError)); wrote \(output.path) (version \(version))")
-print("evaluate before relying on it: DAIMON_MODEL_TESTS=1 DAIMON_COREML_MODEL=\(output.path) scripts/check eval")
+print("evaluate before relying on it: WISP_MODEL_TESTS=1 WISP_COREML_MODEL=\(output.path) scripts/check eval")

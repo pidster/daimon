@@ -31,7 +31,7 @@ understood; a signed app identity or entitlement is the leading hypothesis, serv
 ## Consequences
 
 - `Agent`'s `contextTokens()` returns nil on models that cannot count; `chat` prints "unknown".
-- `daimon doctor` checks the configured model in addition to the system model.
+- `wisp doctor` checks the configured model in addition to the system model.
 - `--model private-cloud` works when Apple's service accepts the request and otherwise fails with the
   framework's error, which the audit log records. Understanding the intermittent `1046` failure is open
   work, likely tied to the signing decision.

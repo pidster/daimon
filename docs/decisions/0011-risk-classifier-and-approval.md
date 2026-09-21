@@ -25,7 +25,7 @@ catches every dangerous command in a labelled set but under-rates some moderate 
   minutes proved too short for real dialogs) and the gate refuses, auditing `timed-out`. The MCP dialog is
   fieldless (Accept once or Decline) because a form picker made Claude Code's dialog unresponsive; session
   approval over MCP and approval for clients without elicitation are open questions.
-- A model evaluation suite runs only with `DAIMON_MODEL_TESTS=1` (`scripts/check eval`); it asserts that
+- A model evaluation suite runs only with `WISP_MODEL_TESTS=1` (`scripts/check eval`); it asserts that
   no dangerous command is rated below moderate and reports accuracy.
 
 ## Consequences

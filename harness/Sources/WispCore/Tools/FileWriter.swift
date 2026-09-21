@@ -1,0 +1,231 @@
+import Foundation
+
+/// Writes text to a file inside the writable set, the same directories the sandbox lets commands
+/// write under, so `edit_file` can change no more than `run_command` could.
+///
+/// Three edits: write the whole file (created if absent), append, or replace: one exact occurrence of
+/// a piece of text, or one numbered line as `read_file` numbered it. Replacement demands exactly one
+/// match, or a line that still holds what the model expects, so it cannot change more than it showed
+/// it meant to. Every write is atomic: a temporary file beside the target, renamed over it.
+/// Nothing here creates directories or follows the model outside the set.
+public struct FileWriter: Sendable {
+    /// What to do to the file.
+    public enum Edit: Equatable, Sendable {
+        /// Replace the whole file with `content`, creating it if absent.
+        case write(String)
+        /// Add `content` to the end, creating the file if absent.
+        case append(String)
+        /// Replace the one occurrence of `find` with `replacement`.
+        case replace(find: String, replacement: String)
+        /// Replace the whole 1-based `line` with `content`; when `expecting` is given the line must
+        /// contain it, so a stale number changes nothing.
+        case replaceLine(Int, content: String, expecting: String?)
+
+        /// The spelling the model uses and the audit records.
+        public var mode: String {
+            switch self {
+            case .write: "write"
+            case .append: "append"
+            case .replace, .replaceLine: "replace"
+            }
+        }
+    }
+
+    /// What an edit did.
+    public struct Result: Equatable, Sendable {
+        /// The path as given.
+        public var path: String
+        /// The edit's mode.
+        public var mode: String
+        /// Whether the file did not exist before.
+        public var created: Bool
+        /// Size before the edit; 0 when created.
+        public var bytesBefore: Int
+        /// Size after the edit.
+        public var bytesAfter: Int
+        /// For a replacement, the 1-based line where it started.
+        public var line: Int?
+
+        /// Model-facing rendering.
+        public var rendered: String {
+            switch mode {
+            case "replace": "replaced at line \(line ?? 0) of \(path); now \(bytesAfter) bytes"
+            case "append": "appended to \(path); now \(bytesAfter) bytes"
+            default: "\(created ? "created" : "wrote") \(path); now \(bytesAfter) bytes"
+            }
+        }
+    }
+
+    /// Why an edit was not made.
+    public enum Failure: Error, CustomStringConvertible, Equatable {
+        /// The path is outside every writable directory.
+        case outsideWritableSet(path: String, roots: [String])
+        /// The parent directory does not exist.
+        case noParent(String)
+        /// The path is a directory.
+        case isDirectory(String)
+        /// The file contains NUL bytes.
+        case binary(String)
+        /// The file is larger than the writer will load for a replacement.
+        case tooLarge(path: String, bytes: Int, limit: Int)
+        /// The text to replace was not found.
+        case notFound(find: String)
+        /// The text to replace occurs more than once.
+        case ambiguous(find: String, count: Int)
+        /// The line number is past the end of the file.
+        case noSuchLine(Int, lines: Int)
+        /// The numbered line does not contain the text the model expected there.
+        case lineMismatch(Int, expected: String, actual: String)
+        /// A line edit was given more than one line of content.
+        case notOneLine(Int)
+        /// The approval gate refused the edit.
+        case notApproved(String)
+
+        /// Human-readable explanation.
+        public var description: String {
+            switch self {
+            case .outsideWritableSet(let path, let roots):
+                "cannot write \(path): outside the writable directories (\(roots.joined(separator: ", ")))"
+            case .noParent(let path): "cannot write \(path): its directory does not exist"
+            case .isDirectory(let path): "path is a directory: \(path)"
+            case .binary(let path): "file appears to be binary: \(path)"
+            case .tooLarge(let path, let bytes, let limit):
+                "file too large to edit in place: \(path) is \(bytes) bytes, limit \(limit)"
+            case .notFound(let find): "text to replace not found: \(Self.excerpt(find))"
+            case .ambiguous(let find, let count):
+                "text to replace occurs \(count) times, include more surrounding text: \(Self.excerpt(find))"
+            case .noSuchLine(let line, let lines): "no line \(line): the file has \(lines) lines"
+            case .lineMismatch(let line, let expected, let actual):
+                "line \(line) does not contain \(Self.excerpt(expected)); it is: \(Self.excerpt(actual))"
+            case .notOneLine(let line): "content for line \(line) must be one line; nothing changed"
+            case .notApproved(let reason): "edit not approved: \(reason)"
+            }
+        }
+
+        /// The first line of `text`, shortened.
+        private static func excerpt(_ text: String) -> String {
+            let first = text.split(separator: "\n", omittingEmptySubsequences: false).first.map(String.init) ?? ""
+            return first.count > 60 ? String(first.prefix(60)) + "…" : first
+        }
+    }
+
+    /// Canonical directories writes may land under; nil means anywhere (the sandbox is off).
+    public let roots: [String]?
+    /// Largest file loaded for a replacement.
+    public let maxBytes: Int
+
+    /// Creates a writer confined to `roots`.
+    ///
+    /// - Parameters:
+    ///   - roots: Canonical directories, as `CommandPolicy.writableRoots` gives them; nil confines nothing.
+    ///   - maxBytes: Largest file a replacement will load (default 1 MiB).
+    public init(roots: [String]?, maxBytes: Int = 1 << 20) {
+        self.roots = roots
+        self.maxBytes = maxBytes
+    }
+
+    /// A writer confined exactly as `options` confines commands: the same roots the Seatbelt profile
+    /// is built from, or nothing when the sandbox is off.
+    public init(options: CommandRunner.Options) {
+        guard options.policy.sandbox.enabled else {
+            self.init(roots: nil)
+            return
+        }
+        self.init(
+            roots: options.policy.writableRoots(
+                writableRoot: options.writableRoot, temporaryDirectory: FileManager.default.temporaryDirectory.path,
+                userCacheDirectory: CommandRunner.userCacheDirectory,
+                home: FileManager.default.homeDirectoryForCurrentUser.path))
+    }
+
+    /// Whether `path` (canonicalised) lies under one of the roots.
+    public func permits(_ path: String) -> Bool {
+        guard let roots else { return true }
+        let canonical = CommandPolicy.canonical(path)
+        return roots.contains { root in
+            canonical == root || canonical.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+        }
+    }
+
+    /// Writes `data` to a temporary file beside `url`, gives it the existing file's mode, and renames
+    /// it over the target, so a reader never sees a partial file and a failure leaves the original.
+    ///
+    /// - Throws: A file-system error; the temporary file is removed on failure.
+    static func writeAtomically(_ data: Data, to url: URL, replacing exists: Bool) throws {
+        let directory = url.deletingLastPathComponent()
+        let temporary = directory.appending(path: ".\(url.lastPathComponent).wisp-\(ShortID.make())")
+        do {
+            try data.write(to: temporary)
+            if exists, let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] {
+                try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: temporary.path)
+            }
+            guard rename(temporary.path, url.path) == 0 else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+    }
+
+    /// Applies `edit` to the file at `path`.
+    ///
+    /// - Parameters:
+    ///   - edit: What to do.
+    ///   - path: The file; created by `write` and `append` when absent, its directory must exist.
+    /// - Returns: What happened.
+    /// - Throws: `Failure`, or a file-system error from the write.
+    public func apply(_ edit: Edit, to path: String) throws -> Result {
+        guard permits(path) else { throw Failure.outsideWritableSet(path: path, roots: roots ?? []) }
+        let url = URL(fileURLWithPath: path)
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+        if exists, isDirectory.boolValue { throw Failure.isDirectory(path) }
+        guard FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        else { throw Failure.noParent(path) }
+        let before = exists ? try Data(contentsOf: url) : Data()
+        var line: Int?
+        let after: Data
+        switch edit {
+        case .write(let content):
+            after = Data(content.utf8)
+        case .append(let content):
+            after = before + Data(content.utf8)
+        case .replace(let find, let replacement):
+            guard before.count <= maxBytes else {
+                throw Failure.tooLarge(path: path, bytes: before.count, limit: maxBytes)
+            }
+            guard !before.contains(0) else { throw Failure.binary(path) }
+            let text = String(decoding: before, as: UTF8.self)
+            let ranges = text.ranges(of: find)
+            guard let range = ranges.first, !find.isEmpty else { throw Failure.notFound(find: find) }
+            guard ranges.count == 1 else { throw Failure.ambiguous(find: find, count: ranges.count) }
+            line = text[..<range.lowerBound].count(where: { $0 == "\n" }) + 1
+            after = Data(text.replacingCharacters(in: range, with: replacement).utf8)
+        case .replaceLine(let number, let content, let expecting):
+            guard before.count <= maxBytes else {
+                throw Failure.tooLarge(path: path, bytes: before.count, limit: maxBytes)
+            }
+            guard !before.contains(0) else { throw Failure.binary(path) }
+            let text = String(decoding: before, as: UTF8.self)
+            var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            let count = text.hasSuffix("\n") ? lines.count - 1 : lines.count
+            guard number >= 1, number <= count else { throw Failure.noSuchLine(number, lines: count) }
+            if let expecting, !lines[number - 1].contains(expecting) {
+                throw Failure.lineMismatch(number, expected: expecting, actual: lines[number - 1])
+            }
+            // A line has no newline of its own: one trailing newline is dropped, any other is refused,
+            // so a model that pastes the page marker or a neighbour cannot corrupt the file.
+            let single = content.hasSuffix("\n") ? String(content.dropLast()) : content
+            guard !single.contains("\n") else { throw Failure.notOneLine(number) }
+            lines[number - 1] = single
+            line = number
+            after = Data(lines.joined(separator: "\n").utf8)
+        }
+        try Self.writeAtomically(after, to: url, replacing: exists)
+        return Result(
+            path: path, mode: edit.mode, created: !exists, bytesBefore: before.count, bytesAfter: after.count,
+            line: line)
+    }
+}

@@ -17,5 +17,5 @@ paths:
   typed errors (`thiserror` is fine) and `anyhow` only at `main`.
 - Edition 2024, `rustfmt.toml` at 100 columns, `cargo fmt --all` before committing.
 - Tests live beside the code (`#[cfg(test)]`) and must not need the model or the network. Cargo works
-  inside daimon's sandbox unchanged.
+  inside wisp's sandbox unchanged.
 - Document the tool under `docs/tools/<name>.md` (contract, result format, limits) in the same commit.

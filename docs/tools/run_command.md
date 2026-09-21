@@ -9,7 +9,7 @@ machine.
 | Name | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `command` | string | yes | A POSIX shell command line, executed with `/bin/sh -c`. |
-| `workingDirectory` | string | no | Absolute path to run in. Default: daimon's current directory. A missing directory is an error. |
+| `workingDirectory` | string | no | Absolute path to run in. Default: wisp's current directory. A missing directory is an error. |
 
 ## Result
 
@@ -44,7 +44,7 @@ configured under `commandPolicy` in `config.json`:
 | `allow` | `[]` | Regexes; when non-empty the command must match one. Deny wins. |
 | `sandbox.enabled` | `true` | Run under `sandbox-exec`. |
 | `sandbox.allowNetwork` | `true` | Set `false` to deny all networking inside the sandbox. |
-| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the directory daimon was launched in, `$TMPDIR`, the per-user cache directory (`getconf DARWIN_USER_CACHE_DIR`, where Clang keeps its module cache), and `/private/tmp`. A command's own `workingDirectory` never widens this. `~` expands. |
+| `sandbox.writablePaths` | `~/Library/Caches`, `~/.cargo/registry`, `~/.cargo/git` | Writable in addition to the directory wisp was launched in, `$TMPDIR`, the per-user cache directory (`getconf DARWIN_USER_CACHE_DIR`, where Clang keeps its module cache), and `/private/tmp`. A command's own `workingDirectory` never widens this. `~` expands. |
 
 Inside the sandbox everything is readable and executable, but writes outside the writable set fail with
 `Operation not permitted`. A denied pattern comes back to the model as `error: command denied by policy: …`
@@ -69,7 +69,7 @@ human is asked for that part, with the line shown for context, and approvals are
 
 ### Symlinks
 
-Seatbelt matches real paths, so daimon resolves every profile path with `realpath(3)` before generating the
+Seatbelt matches real paths, so wisp resolves every profile path with `realpath(3)` before generating the
 profile (`/tmp` and `/var` are symlinks into `/private`; a not-yet-existing path resolves its longest existing
 prefix). At run time the kernel resolves the target of each write, not the name used. Verified on macOS 27:
 
@@ -89,10 +89,10 @@ volume, so it can only alias files the command could already reach.
 Seatbelt lets a process re-apply an identical profile but refuses a different one
 (`sandbox_apply: Operation not permitted`). Two consequences, both verified on macOS 27:
 
-- Tools that apply their own sandbox cannot run inside daimon's. Run SwiftPM as
+- Tools that apply their own sandbox cannot run inside wisp's. Run SwiftPM as
   `swift build --disable-sandbox` and `swift test --disable-sandbox`; Cargo needs nothing.
-- When daimon itself runs inside a sandbox (for example daimon running its own tests through its MCP
-  server), its `sandbox-exec` would be refused. daimon decides this **once per process** with a probe
+- When wisp itself runs inside a sandbox (for example wisp running its own tests through its MCP
+  server), its `sandbox-exec` would be refused. wisp decides this **once per process** with a probe
   command of its own (`CommandRunner.isNestedSandbox`), records `nested: true` on each `policy.decision`,
   and runs commands plainly because the outer sandbox is already confining them. The decision never
   depends on a command's output and a command is never launched twice: an earlier version keyed on the
@@ -102,7 +102,7 @@ Seatbelt lets a process re-apply an identical profile but refuses a different on
 
 ### Writable root and working directory
 
-The sandbox's writable set is rooted at the directory daimon was launched in (`Options.writableRoot`),
+The sandbox's writable set is rooted at the directory wisp was launched in (`Options.writableRoot`),
 plus the temporary directory, the per-user cache directory, `/private/tmp`, and configured paths. A
 `workingDirectory` chosen by the
 model changes where the command runs, never what it may write: a command run in `/Users/me` with the
@@ -122,5 +122,5 @@ the model.
 
 ## Implementation
 
-`CommandRunner` in `harness/Sources/DaimonCore/Exec/CommandRunner.swift` does the work and is tested by running
+`CommandRunner` in `harness/Sources/WispCore/Exec/CommandRunner.swift` does the work and is tested by running
 real commands in `CommandRunnerTests`; `RunCommandTool` is the thin model-facing wrapper.

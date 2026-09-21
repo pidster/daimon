@@ -1,4 +1,4 @@
-# ADR 0017: What the model is told has three layers, and the first is daimon's own
+# ADR 0017: What the model is told has three layers, and the first is wisp's own
 
 Date: 2026-09-20. Status: accepted.
 
@@ -6,7 +6,7 @@ Date: 2026-09-20. Status: accepted.
 
 Until now "instructions" was one string: the MCP `instructions` argument or `--instructions` if given,
 else `config.json`'s `instructions`, else a built-in sentence. An override replaced everything, so a
-caller could, by accident or design, remove daimon's framing of who the model is and how to treat tool
+caller could, by accident or design, remove wisp's framing of who the model is and how to treat tool
 results. There was also no place for the operator of a Mac to add standing guidance that applies to every
 caller. The three things have different owners and lifetimes and were being spelled as one.
 
@@ -18,7 +18,7 @@ are:
 
 | Layer | Owner | Set where | Lifetime |
 | --- | --- | --- | --- |
-| 1. daimon system prompt | daimon | `harness/Sources/DaimonCore/Resources/system-prompt.md` | fixed per release; cannot be removed or replaced |
+| 1. wisp system prompt | wisp | `harness/Sources/WispCore/Resources/system-prompt.md` | fixed per release; cannot be removed or replaced |
 | 2. system prompt extension | this Mac's operator | `config.json` `systemPromptExtension` | every session and thread on this install |
 | 3. conversation instructions | the caller | `--instructions`, MCP `instructions` | one session or one thread |
 
@@ -40,6 +40,6 @@ are:
 - Callers can no longer switch off the tool-use and reporting rules; a caller that needs a different
   model persona must say so in layer 3 and lives within layer 1.
 - The audit record for a session now says whose text was in force at each layer.
-- Changing daimon's own prompt is a text edit plus a release; the plugin re-embeds it on the next build.
-- The eval harness and the MCP prompting guidance in `daimon://tools.md` should stay consistent with
+- Changing wisp's own prompt is a text edit plus a release; the plugin re-embeds it on the next build.
+- The eval harness and the MCP prompting guidance in `wisp://tools.md` should stay consistent with
   layer 1; both describe "one tool per prompt, verbatim reporting".

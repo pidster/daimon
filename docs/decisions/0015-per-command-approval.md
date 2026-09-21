@@ -30,5 +30,5 @@ made approvals nearly useless for real work: `head -n 5 a` and `head -n 10 b` as
 - A pipeline of three risky parts raises three dialogs the first time and none afterwards for the same
   programs. That is the intended trade: approvals follow programs, not argument spellings.
 - The model classifier runs once per part, about 1.5 s each; long pipelines are slower to gate.
-- `~/.daimon/approvals.json` entries carry `pattern` rather than a command line.
+- `~/.wisp/approvals.json` entries carry `pattern` rather than a command line.
 - Audit events for classification and approval carry `command` (the part), `pattern`, and `line`.

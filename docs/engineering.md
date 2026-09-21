@@ -1,6 +1,6 @@
 # Engineering standards
 
-daimon is held to the highest standard of coding and software-engineering practice. This page lists what that
+wisp is held to the highest standard of coding and software-engineering practice. This page lists what that
 means in practice and how it is enforced. Everything here is mechanical where it can be; judgement calls are
 recorded as [decisions](decisions/).
 
@@ -14,7 +14,7 @@ recorded as [decisions](decisions/).
 | `scripts/check build` | `swift build -Xswiftc -warnings-as-errors`; `cargo build` with `RUSTFLAGS=-D warnings` |
 | `scripts/check test` | `swift test`; then the `CommandRunner` suites again inside an outer Seatbelt sandbox to exercise the nested-sandbox fallback; `cargo test --workspace` |
 | `scripts/check format` | Auto-fix formatting with swift-format and rustfmt |
-| `scripts/check eval` | Runs the on-device model evaluation (`ModelEvalTests`, gated by `DAIMON_MODEL_TESTS=1`); reports classifier accuracy and every miss, asserts no dangerous command rated safe (not in the gate) |
+| `scripts/check eval` | Runs the on-device model evaluation (`ModelEvalTests`, gated by `WISP_MODEL_TESTS=1`); reports classifier accuracy and every miss, asserts no dangerous command rated safe (not in the gate) |
 | `scripts/check coverage` | `swift test --enable-code-coverage` plus an `llvm-cov` per-file line report for the harness sources (not in the gate) |
 | `scripts/check hygiene` | Staged-file checks: conflict markers, trailing whitespace, files over 1 MiB, commit author uses a GitHub noreply address |
 | `scripts/check all` | Everything above, in that order |
@@ -25,7 +25,7 @@ and `test`; on a warm build cache this takes a few seconds. Bypass with `git com
 work-in-progress commits on a branch that will be squashed.
 
 `scripts/check format` fixes most lint findings automatically. Rust checks are skipped until the workspace has
-its first crate. When the gate itself runs inside a Seatbelt sandbox (daimon running its own hook through
+its first crate. When the gate itself runs inside a Seatbelt sandbox (wisp running its own hook through
 `run_command`), the script detects it, passes `--disable-sandbox` to SwiftPM, and skips the nested-sandbox
 test step.
 
@@ -40,7 +40,7 @@ A change is done only when all of the following are true. "Works on my machine" 
    comment: public API (enforced by lint), and internal or private members whose purpose is not obvious from
    the name. Say what and why, not how.
 3. **Documented for users.** `docs/` reflects the change: a new or changed tool updates its page under
-   `docs/tools/` and the index; a CLI flag or subcommand updates `docs/daimon.md`; an MCP change updates
+   `docs/tools/` and the index; a CLI flag or subcommand updates `docs/wisp.md`; an MCP change updates
    `docs/mcp.md`; an architectural change updates `docs/design.md`; a non-obvious or hard-to-reverse choice
    gets an ADR. If nothing in `docs/` needs to change, say so in the commit message.
 4. **Recorded.** `AGENTS.md` (and `CLAUDE.md` for Claude Code-only points) is updated when the change alters how an agent should work in this repository
@@ -65,7 +65,7 @@ because refactors legitimately need none.
   functions and test those; the live model is exercised by running the binary. Tests use swift-testing
   (`@Suite`, `@Test`, `#expect`). Check `scripts/check coverage` when adding a module; `Agent` and the tool
   `call` wrappers are the accepted gaps because they need the model.
-- **Layering**: logic in `DaimonCore`; the executable target holds only argument parsing and I/O. Rust tool
+- **Layering**: logic in `WispCore`; the executable target holds only argument parsing and I/O. Rust tool
   binaries know nothing about agents; the harness owns the model-facing schema.
 - **Commits** are small and single-purpose. The subject says what, the body says why.
 - **Decisions** that are non-obvious or hard to reverse get an ADR in `docs/decisions/`.

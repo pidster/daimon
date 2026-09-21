@@ -1,7 +1,7 @@
 # The `fm` command family, as observed
 
 `/usr/bin/fm` is the "Apple Foundation Models CLI" shipped with macOS 27. These notes record what it offers so
-that daimon can borrow its ergonomics and avoid duplicating what it already does. Observed 2026-09-17.
+that wisp can borrow its ergonomics and avoid duplicating what it already does. Observed 2026-09-17.
 
 ## Subcommands
 
@@ -24,7 +24,7 @@ Only one model exists: `system`.
   prose about wanting to call the tool and never returned `tool_calls`. The server also streams SSE chunks even
   when `stream` is omitted.
 
-These two facts are why daimon links the framework directly instead of wrapping `fm`; see
+These two facts are why wisp links the framework directly instead of wrapping `fm`; see
 [ADR 0001](decisions/0001-swift-and-foundationmodels.md).
 
 ## Ergonomics worth mirroring

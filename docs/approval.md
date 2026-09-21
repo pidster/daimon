@@ -53,7 +53,7 @@ risky, approved on its own with the whole line shown for context; a denial for a
 the program that actually runs after unwrapping `sudo`, `env`, `time`, and the like, as a pattern such as
 `head *`, so arguments never matter to remembering. For programs whose first word is the verb (`git`,
 `cargo`, `swift`, `npm`, `brew`, `docker`, and the rest of
-`harness/Sources/DaimonCore/Resources/multiplexers.txt`) the verb is part of the pattern: `git commit *`
+`harness/Sources/WispCore/Resources/multiplexers.txt`) the verb is part of the pattern: `git commit *`
 and `git push *` are remembered apart, so approving one does not approve the other
 ([ADR 0027](decisions/0027-verb-patterns.md)). Options before the verb (`git -C dir status`) and
 toolchain selectors (`cargo +nightly build`) are skipped; a program with no verb (`git --version`) is
@@ -65,8 +65,8 @@ git verb until it expires. An approval has a scope
 | --- | --- | --- |
 | `once` | this pattern in this directory | the rest of the current turn: the prompt's whole tool loop, however many calls it makes |
 | `session` | this pattern in this directory | until the process exits |
-| `project` | this pattern in this directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
-| `always` | this pattern in any directory | `approval.persistDays` (30), in `~/.daimon/approvals.json` |
+| `project` | this pattern in this directory | `approval.persistDays` (30), in `~/.wisp/approvals.json` |
+| `always` | this pattern in any directory | `approval.persistDays` (30), in `~/.wisp/approvals.json` |
 
 ### The order of checks
 
@@ -91,7 +91,7 @@ A dangerous verdict is never persisted: `project` or `always` is downgraded to `
 says so. Remembered approvals only decide whether to ask; deny patterns, the sandbox, and the classifier
 run on every part every time, so `rm *` never covers `rm -rf build`, and each use is audited with the
 approval id.
-`daimon approvals` lists them, `daimon approvals revoke <id>` and `clear` remove them. Decisions: approve with a scope (see below), deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
+`wisp approvals` lists them, `wisp approvals revoke <id>` and `clear` remove them. Decisions: approve with a scope (see below), deny with a reason, or unanswered. **An unanswered request is a denial**: no answer is not
 an answer, so the MCP approver that hears nothing within `approval.timeoutSeconds` (default 600, ten
 minutes) reports `unanswered`, the gate refuses the command and audits the decision as `timed-out`. Set it
 to `0` to wait indefinitely. The terminal prompt in `chat` has no timeout: a person is at the keyboard,
@@ -107,9 +107,9 @@ not an audit log is attached, and the refusals `respond` reports are those of th
 
 | Entry point | Approver | Behaviour |
 | --- | --- | --- |
-| `daimon respond` | denying, unless `--yes` | Non-interactive: risky commands are refused with a message naming the three ways forward. `--yes` approves everything. |
-| `daimon chat` | terminal | Prints the command, level, and reasons on stderr; reads `y` (this turn), `s` (session), `p` (project), `a` (always), or `n`. |
-| `daimon mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol. Accept runs it with the scope picked (this turn by default, or session, project, always); Decline or silence for `approval.timeoutSeconds` refuses. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start daimon with `--yes`, or lower the threshold. |
+| `wisp respond` | denying, unless `--yes` | Non-interactive: risky commands are refused with a message naming the three ways forward. `--yes` approves everything. |
+| `wisp chat` | terminal | Prints the command, level, and reasons on stderr; reads `y` (this turn), `s` (session), `p` (project), `a` (always), or `n`. |
+| `wisp mcp` | MCP elicitation, unless `--yes` | For commands the model runs inside `respond`: asks the client's user through the protocol. Accept runs it with the scope picked (this turn by default, or session, project, always); Decline or silence for `approval.timeoutSeconds` refuses. If the client did not advertise elicitation, denies with a message telling the calling harness to run the command itself, start wisp with `--yes`, or lower the threshold. |
 
 ## Configuration
 
@@ -138,8 +138,8 @@ The rules, the threshold, and the human stay authoritative: the higher of the tw
 nothing the classifier does can lower a level or grant an approval.
 
 The model must follow contract version 1: input `text`, a string; output `label`, one of `safe`,
-`moderate`, `dangerous`; creator metadata `daimon.classifier.contract` = `1` and
-`daimon.classifier.labels` = `safe,moderate,dangerous`. daimon gives it the command line trimmed with
+`moderate`, `dangerous`; creator metadata `wisp.classifier.contract` = `1` and
+`wisp.classifier.labels` = `safe,moderate,dangerous`. wisp gives it the command line trimmed with
 runs of whitespace collapsed to one space, case kept. A model declaring anything else is rejected when
 it loads. Its metadata version string is its identity in the audit.
 
@@ -147,13 +147,13 @@ Every failure is a `moderate` verdict with the reason: no path configured, a mis
 Core ML cannot load, a contract mismatch, an inference error, no prediction, an unknown label, or a
 top-label probability below `coremlMinimumConfidence`. Confidence is recorded only when the model gives
 label probabilities (Create ML text classifiers do); it is uncalibrated, and the threshold guards
-against guessing rather than measuring accuracy. `daimon doctor` checks the configured model prepares.
+against guessing rather than measuring accuracy. `wisp doctor` checks the configured model prepares.
 
 Train one from a `text,label` CSV, then measure it before relying on it:
 
 ```
-scripts/train-risk-classifier docs/examples/risk-labels.csv ~/.daimon/models/coreml/risk.mlmodel
-DAIMON_MODEL_TESTS=1 DAIMON_COREML_MODEL=~/.daimon/models/coreml/risk.mlmodel scripts/check eval
+scripts/train-risk-classifier docs/examples/risk-labels.csv ~/.wisp/models/coreml/risk.mlmodel
+WISP_MODEL_TESTS=1 WISP_COREML_MODEL=~/.wisp/models/coreml/risk.mlmodel scripts/check eval
 ```
 
 `docs/examples/risk-labels.csv` is the 45-command eval set: enough to prove the pipeline, not to trust

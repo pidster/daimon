@@ -14,7 +14,7 @@ paths:
 - ADR format: title, `Date: … Status: accepted.`, then `## Context`, `## Decision`, `## Consequences`.
   Number sequentially; record measurements that informed the decision, not just the conclusion.
 - Which page a change touches: a tool → `docs/tools/<name>.md` and the table in `docs/tools/README.md`;
-  a CLI flag, subcommand, config field, or environment variable → `docs/daimon.md`; an MCP tool or
+  a CLI flag, subcommand, config field, or environment variable → `docs/wisp.md`; an MCP tool or
   behaviour → `docs/mcp.md`; an audit event kind → `docs/logging.md`; a component or data flow →
   `docs/design.md`; a non-obvious or hard-to-reverse choice → a new ADR.
 - Write for the reader named in the page: user pages give contracts, limits, and examples; design pages

@@ -7,9 +7,9 @@
         "mcp-server"
       ]
     },
-    "daimon": {
+    "wisp": {
       "type": "stdio",
-      "command": "scripts/daimon-mcp",
+      "command": "scripts/wisp-mcp",
       "args": []
     }
   }

@@ -1,8 +1,8 @@
 # inspect
 
-Shows daimon's own state to the model: the effective configuration, this conversation's status, the
-standing command approvals, or recent audit events. Read-only. The same views back the MCP `daimon://`
-resources and `daimon config`; see [ADR 0018](../decisions/0018-introspection.md).
+Shows wisp's own state to the model: the effective configuration, this conversation's status, the
+standing command approvals, or recent audit events. Read-only. The same views back the MCP `wisp://`
+resources and `wisp config`; see [ADR 0018](../decisions/0018-introspection.md).
 
 ## Arguments
 
@@ -16,12 +16,12 @@ resources and `daimon config`; see [ADR 0018](../decisions/0018-introspection.md
 ## Result
 
 - `config`: pretty JSON, every setting with its default applied, the model, the `run_command` policy, and
-  the paths under `~/.daimon` (the same as `daimon config`).
+  the paths under `~/.wisp` (the same as `wisp config`).
 - `status`: pretty JSON with `session`, `entryPoint`, `turn`, `model`, `tools`, `sessionApprovals` (how
   many patterns are approved for this session), `auditFile`, `version`.
 - `approvals`: pretty JSON array of standing approvals: `id`, `pattern`, `workingDirectory` (null for
   `always`), `scope`, `level`, `grantedAt`, `expiresAt`, `source`.
-- `audit`: one summary line per event, oldest first, the same lines `daimon logs` prints. `no matching
+- `audit`: one summary line per event, oldest first, the same lines `wisp logs` prints. `no matching
   audit events` when nothing matches.
 
 An unknown `what` or `kind` is returned as `error: …` text naming the accepted values.
@@ -36,12 +36,12 @@ trace in it.
 ## Example
 
 ```
-daimon "Use inspect with what: audit, last: 5, kind: command.outcome and tell me which commands ran and their exit status."
+wisp "Use inspect with what: audit, last: 5, kind: command.outcome and tell me which commands ran and their exit status."
 ```
 
 ## Implementation
 
-`InspectTool` in `harness/Sources/DaimonCore/Tools/InspectTool.swift` renders `Introspection`
+`InspectTool` in `harness/Sources/WispCore/Tools/InspectTool.swift` renders `Introspection`
 (`Session/Introspection.swift`), which a `Conversation` builds with the session's home, config, store,
 and a status closure. Tested in `IntrospectionTests` and, through the MCP server with a scripted model,
-in `DaimonServerWireTests`.
+in `WispServerWireTests`.

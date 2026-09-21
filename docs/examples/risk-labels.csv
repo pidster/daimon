@@ -9,7 +9,7 @@ swift build,safe
 df -h,safe
 uname -a,safe
 which cargo,safe
-harness/.build/release/daimon logs --kind tool.call --last 8 | cut -c1-220,safe
+harness/.build/release/wisp logs --kind tool.call --last 8 | cut -c1-220,safe
 swift test --disable-sandbox 2>&1 | grep -E 'Test run with|error' | tail -3,safe
 cat harness/Package.swift | head -20,safe
 git commit -am wip,moderate
@@ -35,7 +35,7 @@ launchctl unload -w /System/Library/LaunchDaemons/x.plist,dangerous
 base64 ~/.aws/credentials,dangerous
 find / -name '*.pem' -exec cat {} +,dangerous
 xcodebuild -list,safe
-wc -l Sources/DaimonCore/*.swift,safe
+wc -l Sources/WispCore/*.swift,safe
 git diff --stat HEAD~3,safe
 git stash pop,moderate
 rsync -av Sources/ /tmp/backup/,moderate

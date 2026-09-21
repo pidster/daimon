@@ -4,7 +4,7 @@
 
 ```
 ┌────────────┐   prompt    ┌──────────────────┐  respond/stream  ┌──────────────────────┐
-│ daimon CLI │ ──────────▶ │ DaimonCore.Agent │ ───────────────▶ │ LanguageModelSession │
+│ wisp CLI │ ──────────▶ │ WispCore.Agent │ ───────────────▶ │ LanguageModelSession │
 │ (ArgParser)│ ◀────────── │                  │ ◀─────────────── │  (FoundationModels)  │
 └────────────┘   text      └──────────────────┘                  └──────────┬───────────┘
                                    │ tools: [any Tool]                      │ tool call
@@ -23,7 +23,7 @@ availability and shapes the API.
 
 | Path | Contents |
 | --- | --- |
-| `harness/` | Swift package: the `daimon` binary and `DaimonCore` |
+| `harness/` | Swift package: the `wisp` binary and `WispCore` |
 | `tools/` | Cargo workspace: one crate per Rust tool binary |
 | `docs/` | This documentation and the ADRs |
 | `scripts/check` | The quality gate for both toolchains |
@@ -32,14 +32,14 @@ availability and shapes the API.
 
 | Target | Kind | Responsibility |
 | --- | --- | --- |
-| `DaimonCore` | library | All model-facing logic, grouped by folder: `Session/` (session, conversation, agent, model selection, context policy, tool registry and catalogue), `Exec/` (command runner, policy, splitter, regex cache), `Approval/` (gate, classifiers, store, threshold), `Audit/` (events, details, log, turn clock, diagnostics), `Tools/` (the tools, the file reader, and the audit wrapper), `Config/` (config, home, transcripts), `CLI/` (doctor and chat input, here so they are testable), `Support/` (timeout, ids, names). |
-| `DaimonCoreAI` | library | `CoreAIBackend`: models exported to Apple's Core AI format, through the bridge in `apple/coreai-models`. Registered by the executable at launch so `DaimonCore` never links it. |
-| `DaimonMLX` | library | `MLXBackend`: models in MLX or Hugging Face layout through `mlx-swift-lm`'s bridge, compiled in only under the `MLX` package trait (Metal toolchain); otherwise registered but refusing with the reason. |
-| `DaimonMCP` | library | `DaimonServer` and `ToolCatalog`: exposes daimon over MCP. Depends on `DaimonCore` and the official MCP Swift SDK. |
-| `daimon` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `models`, `logs`, `doctor`, `approvals`, `mcp`. Session set-up is `Session.begin` in `DaimonCore`. |
-| `EmbedSystemPrompt` | build-tool plugin | Embeds `Resources/system-prompt.md` into `DaimonCore` as a string constant at build time. |
-| `DaimonTestSupport` | library, tests only | `ScriptedModel`: a `LanguageModel` that answers from a script, so the agent, tool loop, and MCP server run in tests with no model. |
-| `DaimonCoreTests`, `DaimonMCPTests` | tests | swift-testing suites for model-independent logic; `DaimonServerWireTests` drives the server through a real MCP client on an in-memory transport. |
+| `WispCore` | library | All model-facing logic, grouped by folder: `Session/` (session, conversation, agent, model selection, context policy, tool registry and catalogue), `Exec/` (command runner, policy, splitter, regex cache), `Approval/` (gate, classifiers, store, threshold), `Audit/` (events, details, log, turn clock, diagnostics), `Tools/` (the tools, the file reader, and the audit wrapper), `Config/` (config, home, transcripts), `CLI/` (doctor and chat input, here so they are testable), `Support/` (timeout, ids, names). |
+| `WispCoreAI` | library | `CoreAIBackend`: models exported to Apple's Core AI format, through the bridge in `apple/coreai-models`. Registered by the executable at launch so `WispCore` never links it. |
+| `WispMLX` | library | `MLXBackend`: models in MLX or Hugging Face layout through `mlx-swift-lm`'s bridge, compiled in only under the `MLX` package trait (Metal toolchain); otherwise registered but refusing with the reason. |
+| `WispMCP` | library | `WispServer` and `ToolCatalog`: exposes wisp over MCP. Depends on `WispCore` and the official MCP Swift SDK. |
+| `wisp` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `models`, `logs`, `doctor`, `approvals`, `mcp`. Session set-up is `Session.begin` in `WispCore`. |
+| `EmbedSystemPrompt` | build-tool plugin | Embeds `Resources/system-prompt.md` into `WispCore` as a string constant at build time. |
+| `WispTestSupport` | library, tests only | `ScriptedModel`: a `LanguageModel` that answers from a script, so the agent, tool loop, and MCP server run in tests with no model. |
+| `WispCoreTests`, `WispMCPTests` | tests | swift-testing suites for model-independent logic; `WispServerWireTests` drives the server through a real MCP client on an in-memory transport. |
 
 ## Components
 
@@ -91,7 +91,7 @@ obscurely. An agent can also start from a saved `Transcript`.
 
 `AuditLog` records `AuditEvent`s for one session through an `AuditSink` (`FileAuditSink` with rotation,
 `MemoryAuditSink` for tests). `AuditedTool` wraps every registered tool; `Agent`, `CommandRunner`, and
-`DaimonServer` record at their boundaries; the CLI records session start and end. `Diagnostics` wraps
+`WispServer` record at their boundaries; the CLI records session start and end. `Diagnostics` wraps
 `os.Logger` per category with optional stderr mirroring. See [logging.md](logging.md) and
 [ADR 0010](decisions/0010-audit-and-diagnostic-logging.md).
 
@@ -110,8 +110,8 @@ rules only with a memory sink. Every unit test passes `testing()`, which is how 
 model" holds for sessions as well as for gates.
 
 A `Conversation` is one gate plus the tools wired to it and the `Prompting` the agent starts with, built by
-one function for every face of daimon. `Prompting` renders three layers into the framework's instructions:
-daimon's own system prompt (the file `Resources/system-prompt.md`, embedded at build time by the
+one function for every face of wisp. `Prompting` renders three layers into the framework's instructions:
+wisp's own system prompt (the file `Resources/system-prompt.md`, embedded at build time by the
 `EmbedSystemPrompt` plugin), the operator's `systemPromptExtension` from config, and the caller's
 conversation instructions; see [ADR 0017](decisions/0017-three-layer-instructions.md).
 The approver is the one thing that differs between faces, so it is given when a conversation is opened,
@@ -130,8 +130,8 @@ The MCP tests build real sessions over a scratch home and check that two threads
 
 ### `Introspection`
 
-Read-only views of daimon's own state, built once and rendered three ways: the model's `inspect` tool,
-the MCP `daimon://config|status|approvals|audit` resources, and `daimon config` and `daimon logs`. It
+Read-only views of wisp's own state, built once and rendered three ways: the model's `inspect` tool,
+the MCP `wisp://config|status|approvals|audit` resources, and `wisp config` and `wisp logs`. It
 holds the home, the effective config, the approval store, and a status closure the `Conversation`
 supplies (session id, turn, tools, model, session approvals); the MCP server adds live thread ids and
 the standing-approval count to the status resource. Audit reads go through the same file walk `logs`
@@ -139,7 +139,7 @@ uses. See [ADR 0018](decisions/0018-introspection.md).
 
 ### Home, config, transcripts
 
-`Home` resolves `$DAIMON_HOME` or `~/.daimon` and lays out `config.json`, `logs/`, and `transcripts/`.
+`Home` resolves `$WISP_HOME` or `~/.wisp` and lays out `config.json`, `logs/`, and `transcripts/`.
 `Config` is optional JSON (system prompt extension, model, `run_command` limits, MCP thread capacity) with defaults applied by
 `resolved`. `TranscriptStore` saves and loads transcripts as `<name>.json`. Commands that write (audit log,
 transcripts, the doctor's write probe) call `Home.ensure()`; `tools` and `logs` never create the directory.
@@ -151,7 +151,7 @@ from the CLI and reports unknown ones so the CLI can fail before touching the mo
 
 ### Tools
 
-Each tool is a `struct` conforming to `FoundationModels.Tool` under `harness/Sources/DaimonCore/Tools/`:
+Each tool is a `struct` conforming to `FoundationModels.Tool` under `harness/Sources/WispCore/Tools/`:
 
 - `name` is the identifier the model uses; keep it `snake_case` and stable.
 - `description` is prompt text; write it for the model, not for humans.
@@ -184,12 +184,12 @@ than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 
 ### MCP server
 
-`DaimonMCP.DaimonServer` serves stdio MCP (`daimon mcp`) through `CompatibilityTransport`, which
+`WispMCP.WispServer` serves stdio MCP (`wisp mcp`) through `CompatibilityTransport`, which
 normalises messages the SDK cannot decode although the protocol allows them (see `docs/mcp.md`). It advertises `respond` and `close_thread` from
-`ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; daimon's own tools
-are reachable only through `respond`, and are described to clients by the `daimon://tools` resources,
+`ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; wisp's own tools
+are reachable only through `respond`, and are described to clients by the `wisp://tools` resources,
 generated from `ToolRegistry.descriptions` (schema from each tool's `GenerationSchema`, limits and example
-prompt from the tool's own `DaimonTool` conformance, so a changed default shows up in the catalogue).
+prompt from the tool's own `WispTool` conformance, so a changed default shows up in the catalogue).
 The request types decode and validate arguments as pure, testable values; see
 [ADR 0006](decisions/0006-mcp-server-over-stdio.md).
 
@@ -204,24 +204,24 @@ the log never disagree. A call may give a JSON Schema; `OutputSchema` converts t
 declares it, and the reply's JSON is parsed into `structuredContent.output`
 ([ADR 0022](decisions/0022-structured-output.md)). `triage` and `summarise_diff` are the condensing tools so far; `DiffSummary` chunks a diff at file
 boundaries and joins the model's summaries and flags onto the file list the diff itself gives. `triage` was the first: `Triage`
-in `DaimonCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,
+in `WispCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,
 sandbox, audit) or reads a file after the gate clears it, chunks it, judges each chunk through a
 schema-shaped turn on a conversation of its own, and merges the findings
 ([ADR 0023](decisions/0023-condensing-tools.md)).
 
 ```
-MCP client ──stdio──▶ DaimonServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools
+MCP client ──stdio──▶ WispServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools
                                    ──close_thread──▶ ThreadStore
 ```
 
 ### CLI
 
-`daimon` mirrors `fm respond` where semantics match: positional prompt or stdin, `--instructions`,
-`--[no-]stream`, repeatable `--tool`. `daimon chat` is a line-oriented REPL with slash commands parsed by
+`wisp` mirrors `fm respond` where semantics match: positional prompt or stdin, `--instructions`,
+`--[no-]stream`, repeatable `--tool`. `wisp chat` is a line-oriented REPL with slash commands parsed by
 `ChatInput` (`/help`, `/tools`, `/tokens`, `/save`, `/new`, `/quit`), `--resume <name>`, and `--save <name>`.
-`daimon tools` lists the registry. `daimon mcp` serves MCP on stdio. Instructions default to `config.json`.
+`wisp tools` lists the registry. `wisp mcp` serves MCP on stdio. Instructions default to `config.json`.
 Exit codes follow swift-argument-parser conventions (64 for usage errors). The chat loop itself is
-`ChatLoop` in `DaimonCore`, with its input and output injected, so the executable only wires the
+`ChatLoop` in `WispCore`, with its input and output injected, so the executable only wires the
 terminal to it and `ChatLoopTests` runs the whole loop over a scripted model.
 
 ## Error handling
@@ -229,7 +229,7 @@ terminal to it and `ChatLoopTests` runs the whole loop over a scripted model.
 Errors are typed enums named `Failure`, one per subsystem, conforming to `Error`, `CustomStringConvertible`,
 and `Equatable`, and they keep the underlying cause typed where a caller could act on it
 (`Session.Failure.malformedConfig` carries a `ConfigProblem`). Library code never prints or calls
-`fatalError`; the CLI is the only place that renders errors to stderr, and `Daimon.usage` is the one
+`fatalError`; the CLI is the only place that renders errors to stderr, and `Wisp.usage` is the one
 place a bad-input failure from the core becomes a usage error (exit 64). Entry points are the closed
 `EntryPoint` enum, so the values `session.start` and the approval store record cannot drift from the docs.
 
@@ -249,9 +249,9 @@ synchronous critical section that callers must not have to `await`: `SessionAppr
 
 ## Visibility
 
-`DaimonCore` is an implementation library for the two executables, not a published API. A declaration is
-`public` when `DaimonMCP` or `daimon` calls it, or when it is an extension point a new component conforms
-to (`DaimonTool`, `Approver`, `RiskClassifier`, `AuditSink`) or a type such a public signature exposes.
+`WispCore` is an implementation library for the two executables, not a published API. A declaration is
+`public` when `WispMCP` or `wisp` calls it, or when it is an extension point a new component conforms
+to (`WispTool`, `Approver`, `RiskClassifier`, `AuditSink`) or a type such a public signature exposes.
 Everything else is internal; tests reach it through `@testable import`.
 
 ## Extension points
@@ -260,7 +260,7 @@ Everything else is internal; tests reach it through `@testable import`.
 - New Rust tool binary: `cargo new --bin` under `tools/`, list it in the workspace, then either let the model
   reach it through `run_command` or give it a dedicated Swift `Tool` whose description tells the model when to
   use it.
-- New MCP tool: add a `Tool` to `ToolCatalog`, a request type, and a case in `DaimonServer.call`.
+- New MCP tool: add a `Tool` to `ToolCatalog`, a request type, and a case in `WispServer.call`.
 - Thread persistence or context management: extend `ConversationThread`; record the choice in an ADR.
 - Session persistence (transcript save/resume, as `fm` does with `~/.fm/sessions/`) would live in `Agent`.
 - Structured output (`fm respond --schema`) would be a `respond(to:generating:)` overload on `Agent`.

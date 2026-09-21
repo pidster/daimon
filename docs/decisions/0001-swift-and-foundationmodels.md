@@ -1,4 +1,4 @@
-# ADR 0001: Implement daimon in Swift, linking FoundationModels directly
+# ADR 0001: Implement wisp in Swift, linking FoundationModels directly
 
 Date: 2026-09-17. Status: accepted.
 

@@ -1,16 +1,16 @@
 # Measurements: what the model can be trusted with
 
-Every delegated task daimon offers is measured against a small eval set on a real model, and the
+Every delegated task wisp offers is measured against a small eval set on a real model, and the
 result ships with the tool catalogue so a calling harness knows which delegations are reliable before it
 spends a call ([ADR 0026](decisions/0026-task-catalogue.md)). A measurement is one eval run on one
 Mac on one day; it is evidence, not a certification.
 
 ## Where to see them
 
-- `daimon tools --markdown` and the MCP resource `daimon://tools.md`: a `Measured:` line under each
+- `wisp tools --markdown` and the MCP resource `wisp://tools.md`: a `Measured:` line under each
   tool that has one, with the task, `passed/total`, the model, the date, and what a pass was.
-- `daimon tools --json` and `daimon://tools`: the same as `measurements` on each tool.
-- `daimon://measurements`: every measurement, including tasks that are not one model tool (`triage`,
+- `wisp tools --json` and `wisp://tools`: the same as `measurements` on each tool.
+- `wisp://measurements`: every measurement, including tasks that are not one model tool (`triage`,
   the risk classifier, schema-shaped replies).
 
 ## What is measured
@@ -32,15 +32,15 @@ model gets a case wrong in practice, keeping cases that do not resemble the prom
 scripts/check eval
 ```
 
-runs `ModelEvalTests` on the configured model with `DAIMON_EVAL_RECORD` pointing at
-`harness/Sources/DaimonCore/Resources/measurements.json`; each test merges its `Measurement` into
+runs `ModelEvalTests` on the configured model with `WISP_EVAL_RECORD` pointing at
+`harness/Sources/WispCore/Resources/measurements.json`; each test merges its `Measurement` into
 that file, replacing the previous one for the same task and model. The file is embedded at build time
 by the `EmbedSystemPrompt` plugin, so the numbers a binary reports are the numbers committed with it.
 Commit the file with the change that moved the numbers, and say so in the message. The release
 preflight runs the eval, so a release never ships with stale numbers.
 
 The eval asserts only floors (half or three quarters recall, and the classifier's hard requirement);
-everything else is reported and recorded. Run `DAIMON_MODEL_TESTS=1 swift test --filter ToolEvalTests`
+everything else is reported and recorded. Run `WISP_MODEL_TESTS=1 swift test --filter ToolEvalTests`
 in `harness/` for one suite.
 
 ## Reading a measurement

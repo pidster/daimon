@@ -1,7 +1,7 @@
-# daimon as an MCP server
+# wisp as an MCP server
 
-`daimon mcp` speaks the Model Context Protocol over stdio, so other agent harnesses can delegate work to the
-on-device model. It advertises two tools: `respond` and `close_thread`. daimon's own tools (`run_command`,
+`wisp mcp` speaks the Model Context Protocol over stdio, so other agent harnesses can delegate work to the
+on-device model. It advertises two tools: `respond` and `close_thread`. wisp's own tools (`run_command`,
 `read_file`, `current_date`) are not exposed directly; they are reachable only by asking `respond` to use
 them, so every command runs under the model's policy, sandbox, and approval with the audit trail of a
 turn ([ADR 0006](decisions/0006-mcp-server-over-stdio.md), amended). Stdout is the protocol channel; diagnostics go to stderr. The
@@ -12,57 +12,57 @@ server runs until the client closes stdin.
 Claude Code (`.mcp.json`):
 
 ```json
-{ "mcpServers": { "daimon": { "command": "/path/to/daimon", "args": ["mcp"] } } }
+{ "mcpServers": { "wisp": { "command": "/path/to/wisp", "args": ["mcp"] } } }
 ```
 
 Codex (`~/.codex/config.toml`):
 
 ```toml
-[mcp_servers.daimon]
-command = "/path/to/daimon"
+[mcp_servers.wisp]
+command = "/path/to/wisp"
 args = ["mcp"]
 ```
 
 ## Client compatibility
 
-daimon speaks MCP through the official Swift SDK (0.12.1). Where the SDK is stricter than the protocol,
-daimon normalises the message before the SDK sees it, in `CompatibilityTransport`, rather than refuse a
+wisp speaks MCP through the official Swift SDK (0.12.1). Where the SDK is stricter than the protocol,
+wisp normalises the message before the SDK sees it, in `CompatibilityTransport`, rather than refuse a
 compliant client. One case so far: an `initialize` whose `capabilities.experimental` has object values,
 which the specification allows and Codex sends (`{"codex/auth-change": {}}`); the SDK declares the field
 as a map of strings and fails the whole request with `-32603`. Each object value is replaced by its
-compact JSON text (`"{}"`), nothing else in the message changes, and daimon never reads the field. Found
+compact JSON text (`"{}"`), nothing else in the message changes, and wisp never reads the field. Found
 and fixed on 2026-09-20 against 0.1.4; the captured request is a regression test.
 
 ## Discovering the model's tools
 
-daimon's own tools are not MCP tools, so a client learns about them from two resources:
+wisp's own tools are not MCP tools, so a client learns about them from two resources:
 
 | URI | Content |
 | --- | --- |
-| `daimon://tools` | JSON: for each tool its `name`, `description`, `parameters` (JSON Schema generated from the same `@Generable` type the model sees), `limits`, and `examplePrompt`. |
-| `daimon://tools.md` | The same as Markdown, with the prompting rules that work for the on-device model. |
+| `wisp://tools` | JSON: for each tool its `name`, `description`, `parameters` (JSON Schema generated from the same `@Generable` type the model sees), `limits`, and `examplePrompt`. |
+| `wisp://tools.md` | The same as Markdown, with the prompting rules that work for the on-device model. |
 
 Both are generated from the live registry, so they cannot drift from what the model can actually call.
 
-## Inspecting daimon
+## Inspecting wisp
 
-Four more resources and one template let a client read daimon's own state without spending a model turn
+Four more resources and one template let a client read wisp's own state without spending a model turn
 ([ADR 0018](decisions/0018-introspection.md)). They are read-only and show the same views as the model's
-[`inspect`](tools/inspect.md) tool and `daimon config`.
+[`inspect`](tools/inspect.md) tool and `wisp config`.
 
 | URI | Content |
 | --- | --- |
-| `daimon://config` | JSON: every setting with defaults applied, the model, the `run_command` policy, and the paths under `~/.daimon`. |
-| `daimon://status` | JSON: the server session id, entry point, model, tools, live `threads` (most recent first), approvals in force for the session, and the count of standing approvals. |
-| `daimon://approvals` | JSON: the standing approvals with pattern, directory, scope, level, expiry, and source. |
-| `daimon://measurements` | JSON | What the eval harness found each delegated task achieves ([measurements.md](measurements.md)); the per-tool ones also appear on `daimon://tools`. |
-| `daimon://audit` | JSON Lines: the last 100 audit events across every session, as written to the audit file. |
-| `daimon://audit/{session}` | JSON Lines: every event of one session or thread id (a `respond` `thread_id`), for reconstructing what a delegated task did. Listed as a resource template. |
+| `wisp://config` | JSON: every setting with defaults applied, the model, the `run_command` policy, and the paths under `~/.wisp`. |
+| `wisp://status` | JSON: the server session id, entry point, model, tools, live `threads` (most recent first), approvals in force for the session, and the count of standing approvals. |
+| `wisp://approvals` | JSON: the standing approvals with pattern, directory, scope, level, expiry, and source. |
+| `wisp://measurements` | JSON | What the eval harness found each delegated task achieves ([measurements.md](measurements.md)); the per-tool ones also appear on `wisp://tools`. |
+| `wisp://audit` | JSON Lines: the last 100 audit events across every session, as written to the audit file. |
+| `wisp://audit/{session}` | JSON Lines: every event of one session or thread id (a `respond` `thread_id`), for reconstructing what a delegated task did. Listed as a resource template. |
 
 The audit resources read the audit file, so they are empty when `audit.enabled` is false. Reading them is
 not itself audited (the model's `inspect` calls are, as tool calls).
-`daimon tools --json` and `daimon tools --markdown` print the same text on the command line. The `respond`
-tool description points at `daimon://tools`.
+`wisp tools --json` and `wisp tools --markdown` print the same text on the command line. The `respond`
+tool description points at `wisp://tools`.
 
 How to prompt for a tool, in short: name it, give exact arguments, say how to report the result, one tool
 per prompt, and restrict `tools` on a new thread to what the task needs. For example:
@@ -76,15 +76,15 @@ Report the exit status and output verbatim, nothing else.
 
 ### `respond`
 
-Run a prompt on the on-device model, with daimon's tools available to it, on a conversation thread.
+Run a prompt on the on-device model, with wisp's tools available to it, on a conversation thread.
 
 | Argument | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `prompt` | string | yes | The task. Keep it short; the model's window is about 4k tokens. |
 | `thread_id` | string | no | Omit to start a thread (an id is generated). Supply an unused id to name a new thread. Supply a known id to continue it. `[A-Za-z0-9._-]{1,64}`. |
-| `instructions` | string | no | Instructions for this thread, added under daimon's own system prompt and the server's configured extension; replaces the server's `--instructions` for the thread. Only when a thread starts; an error afterwards. |
-| `tools` | string[] | no | Names of daimon tools to enable. Only when a thread starts. Omitted: all. `[]`: a text-only thread, which a model that declares no tool calling can still run; a thread that needs tools on such a model is refused with a hint before generation. |
-| `model` | string | no | `system` (default), `private-cloud` (alias `pcc`; data leaves the Mac), or `ollama:<name>` (a model the local Ollama serves; `daimon models` lists them). Only when a thread starts. |
+| `instructions` | string | no | Instructions for this thread, added under wisp's own system prompt and the server's configured extension; replaces the server's `--instructions` for the thread. Only when a thread starts; an error afterwards. |
+| `tools` | string[] | no | Names of wisp tools to enable. Only when a thread starts. Omitted: all. `[]`: a text-only thread, which a model that declares no tool calling can still run; a thread that needs tools on such a model is refused with a hint before generation. |
+| `model` | string | no | `system` (default), `private-cloud` (alias `pcc`; data leaves the Mac), or `ollama:<name>` (a model the local Ollama serves; `wisp models` lists them). Only when a thread starts. |
 | `schema` | object | no | A JSON Schema for this reply. The reply is JSON of that shape through the framework's guided generation, also parsed into `structuredContent.output`. Per call, on any thread; see "Structured output" below. |
 
 Result content is the reply text. `structuredContent`:
@@ -118,7 +118,7 @@ delegated work without reading the log ([ADR 0021](decisions/0021-receipts.md)):
 
 | Field | Meaning |
 | --- | --- |
-| `turn` | The thread's turn number, which `daimon://audit/{thread_id}` events carry as `turn`. |
+| `turn` | The thread's turn number, which `wisp://audit/{thread_id}` events carry as `turn`. |
 | `tools` | Every tool call in order: `name`, the model's `arguments` JSON, and the result's `bytes` and `seconds`; a call that threw has `error` instead. |
 | `files` | Every file `edit_file` wrote: `path`, `mode`, `created`, `bytes` after the edit. |
 | `commands` | Every command that ran: `exitStatus`, `timedOut`, `truncated`, `seconds`. Output is not repeated; the audit log has it verbatim. |
@@ -128,7 +128,7 @@ delegated work without reading the log ([ADR 0021](decisions/0021-receipts.md)):
 | `condensed`, `seconds` | As for the turn; `seconds` is null when the turn did not complete. |
 
 Lists hold at most 64 entries each. Token usage is not reported yet: the framework does not expose it
-for Apple's models, and daimon does not record what local runtimes report (`docs/backlog.md`).
+for Apple's models, and wisp does not record what local runtimes report (`docs/backlog.md`).
 
 `condensed` is true when older turns were dropped to fit the window on this call. Threads live in memory for
 the server's lifetime; the least recently used is evicted beyond `maxThreads` (32), which is audited as a
@@ -171,18 +171,18 @@ The audit `prompt` event carries the schema. Example:
 ## Approval
 
 Commands the model runs inside `respond` that are risky (by default `moderate` and above) need approval.
-If the client advertised elicitation at initialize, daimon asks the client's user through the protocol. The command, directory, risk level, and
+If the client advertised elicitation at initialize, wisp asks the client's user through the protocol. The command, directory, risk level, and
 reasons appear in the title, the message, and the field descriptions, because clients render different
 parts; the full command leads the description so it is never trimmed. **Accept runs the command with the
 scope picked in the form (this turn by default; session; project, 30 days in this directory; always, 30
 days anywhere); Decline or Cancel refuses it; no answer within `approval.timeoutSeconds` (default 600; `0`
 waits forever) refuses it.** Persisted scopes never apply to dangerous commands
 ([approval.md](approval.md)). Approvals given here share the process: a "this session" answer covers every
-thread, and "project" and "always" are written to `~/.daimon/approvals.json` exactly as from the CLI.
+thread, and "project" and "always" are written to `~/.wisp/approvals.json` exactly as from the CLI.
 Without elicitation, the model's tool call is refused with
 `command not approved: … this client does not support elicitation …`; the reply reports that in prose and
 `structuredContent.refusals` carries it structurally. The calling harness should run the command itself
-or start daimon with `--yes`. See [approval.md](approval.md).
+or start wisp with `--yes`. See [approval.md](approval.md).
 
 | Argument | Type | Required |
 | --- | --- | --- |
@@ -192,15 +192,15 @@ or start daimon with `--yes`. See [approval.md](approval.md).
 ### `triage`
 
 Run a build or test command on this Mac, or read an output file already here, and get back only the
-failures. The raw output stays on the Mac: daimon captures it whole (up to 1 MiB, the tail beyond),
+failures. The raw output stays on the Mac: wisp captures it whole (up to 1 MiB, the tail beyond),
 cuts it into 4 KiB chunks at line ends, and judges each chunk in a fresh, tool-less model turn with a
 schema, then merges the lists, drops duplicates, and caps the result
 ([ADR 0023](decisions/0023-condensing-tools.md)).
 
 | Argument | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `command` | string | one of | Shell command line, run with `/bin/sh -c` under daimon's policy, sandbox, and approval exactly as the model's `run_command` would, and audited as `command.outcome`. Pipe stderr in yourself when it matters: `swift test 2>&1`. |
-| `working_directory` | string | no | Absolute directory for the command. Default: daimon's. |
+| `command` | string | one of | Shell command line, run with `/bin/sh -c` under wisp's policy, sandbox, and approval exactly as the model's `run_command` would, and audited as `command.outcome`. Pipe stderr in yourself when it matters: `swift test 2>&1`. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
 | `path` | string | one of | Absolute path of an output file on this Mac; the read clears the gate as `read_file` does. |
 | `model` | string | no | The judging model, as for `respond`; it must declare guided generation. Default: the configured model. |
 | `max_findings` | integer | no | Findings to return at most (default 20); `more` is true when some were dropped. |
@@ -222,7 +222,7 @@ Result content is a headline and one finding per line; `structuredContent`:
 `kind` is `error`, `test-failure`, `warning`, `crash`, or `other`; `location` is the `file:line` or test
 name as printed, or null. For a file source `exitStatus` is null. Each triage is its own audited session
 (`triage-<id>`: start, the command or read, one prompt and response per chunk, end), so
-`daimon://audit/triage-<id>` shows exactly what the model saw. Approval for the command reaches the
+`wisp://audit/triage-<id>` shows exactly what the model saw. Approval for the command reaches the
 client through elicitation as for `respond`.
 
 Measured with `scripts/check eval` on this Mac on 2026-09-20 with the system model: on four abridged
@@ -234,7 +234,7 @@ than its name. Output shapes not in the fixtures are not measured.
 ### `summarise_diff`
 
 Run a command that prints a unified diff (such as `git diff HEAD~3`), or read a diff file already on
-this Mac, and get back a per-file summary with review flags. The diff stays on the Mac: daimon captures
+this Mac, and get back a per-file summary with review flags. The diff stays on the Mac: wisp captures
 it whole (up to 1 MiB), cuts it into 4 KiB chunks at file, then hunk, then line boundaries, judges each
 chunk in a fresh tool-less turn with a schema, and joins the answers onto the file list the diff itself
 gives ([ADR 0023](decisions/0023-condensing-tools.md)). Paths, change kinds, and line counts are read
@@ -247,8 +247,8 @@ dropped. Rules never remove a flag.
 
 | Argument | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `command` | string | one of | A command line that prints a unified diff, run under daimon's policy, sandbox, and approval as `run_command` would. |
-| `working_directory` | string | no | Absolute directory for the command. Default: daimon's. |
+| `command` | string | one of | A command line that prints a unified diff, run under wisp's policy, sandbox, and approval as `run_command` would. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
 | `path` | string | one of | Absolute path of a diff file on this Mac; the read clears the gate as `read_file` does. |
 | `model` | string | no | The judging model, as for `respond`; it must declare guided generation. |
 | `max_files` | integer | no | Files to list at most (default 40); the rest are counted in `more`. |
@@ -272,7 +272,7 @@ Result content is a headline block and one line per flag and per file; `structur
 `change` is `added`, `modified`, `deleted`, or `renamed`; `summary` is null for a file the model said
 nothing about. Flag kinds: `deleted-test` (a test removed or disabled), `secret`, `binary`, `generated`,
 `large`; a flag the model leaves pathless lands on the chunk's only file when it had one. Each summary is its own audited session (`summarise-<id>`), so
-`daimon://audit/summarise-<id>` shows what the model saw. The measured result is in
+`wisp://audit/summarise-<id>` shows what the model saw. The measured result is in
 [measurements.md](measurements.md).
 
 ### `close_thread`
@@ -285,7 +285,7 @@ Free a thread's model session.
 
 ## Audit
 
-Every request and result is recorded in `~/.daimon/logs/audit.jsonl` under the server's session, and each
+Every request and result is recorded in `~/.wisp/logs/audit.jsonl` under the server's session, and each
 thread's turns under the `thread_id` as its own session. See [logging.md](logging.md).
 
 ## Errors
@@ -302,7 +302,7 @@ thread's turns under the `thread_id` as its own session. See [logging.md](loggin
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"respond","arguments":{"prompt":"Say hi"}}}'; sleep 10) \
-| daimon mcp
+| wisp mcp
 ```
 
 The `sleep` keeps stdin open; a real client holds the pipe for the whole session.

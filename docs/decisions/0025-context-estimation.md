@@ -22,7 +22,7 @@ not: a token count for a prompt that has not been sent, without a model call.
 
 - `ResolvedModel.contextSize` states the window when the model or its settings do (the system model's
   property; Ollama's configured `contextLength`, default 8192, sent as `num_ctx` on every request so the
-  server's default cannot differ from the limit daimon condenses against). Otherwise it is nil until an
+  server's default cannot differ from the limit wisp condenses against). Otherwise it is nil until an
   overflow error reports it, which `Agent` records.
 - Executors that report usage keep the last request's input tokens on the model (`UsageReporting`:
   Ollama from `prompt_eval_count`; the scripted test model). Before each prompt, `Agent` adds a rough
@@ -38,7 +38,7 @@ not: a token count for a prompt that has not been sent, without a model call.
 - The instructions survive long threads on Ollama; the trade is a few hundred tokens of headroom and
   a rough prompt estimate. The estimate errs high for ASCII prose and low for CJK text; the budget
   absorbs that.
-- `ollama.contextLength` is a memory choice the operator makes; the doctor and `daimon config` show it.
+- `ollama.contextLength` is a memory choice the operator makes; the doctor and `wisp config` show it.
 - Tests without the model: the scripted model reports 40 input tokens per request, so an agent on a
   50-token window condenses on the second prompt and audits it (`AgentTests`); the Ollama request body
   carries `num_ctx` and the settings round-trip (`OllamaModelTests`).

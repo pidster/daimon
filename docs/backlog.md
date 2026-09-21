@@ -9,14 +9,14 @@ Work agreed but not started, in rough priority order. Each item becomes an ADR w
 
 ## Enabling other harnesses (see the objective)
 
-daimon's offer to another harness is work done locally that the harness would otherwise do with its own
+wisp's offer to another harness is work done locally that the harness would otherwise do with its own
 tokens on a remote model: reading, condensing, classifying, extracting, and answering over local data, so
 the caller's model never ingests the raw material. Other harnesses already run commands locally; that is
 not the differentiator. Items, in order of leverage:
 
 - Done 2026-09-20: receipts. Every `respond` result carries `structuredContent.receipt`, the turn's tool
   calls, commands with exit status, denials, approvals, and errors, folded from the audit events
-  ([ADR 0021](decisions/0021-receipts.md)). Open: token usage, once daimon records what a runtime reports
+  ([ADR 0021](decisions/0021-receipts.md)). Open: token usage, once wisp records what a runtime reports
   (see "Context estimation from the runtime").
 - Done 2026-09-20: structured output. `respond` and the CLI (`--schema`) take a JSON Schema and return
   JSON of that shape through guided generation ([ADR 0022](decisions/0022-structured-output.md)).
@@ -27,7 +27,7 @@ not the differentiator. Items, in order of leverage:
   (`file:line:col: error:`, `error[E…] --> file:line`, `FAILED path::test`) would make those cases exact
   and leave the model the rest; measure it against the eval fixtures first.
 - Done 2026-09-20: a measured task catalogue. `scripts/check eval` records a `Measurement` per task
-  into an embedded resource; the tool catalogue and `daimon://measurements` publish them
+  into an embedded resource; the tool catalogue and `wisp://measurements` publish them
   ([ADR 0026](decisions/0026-task-catalogue.md), [measurements.md](measurements.md)).
 - **Reverse delegation through MCP sampling.** When the on-device model is stuck on a sub-step, ask the
   calling harness's model through the protocol, with data leaving the device only for that step and only
@@ -37,7 +37,7 @@ not the differentiator. Items, in order of leverage:
 
 ## Models
 
-- Done 2026-09-19: `ollama:<name>` models through a daimon-supplied executor
+- Done 2026-09-19: `ollama:<name>` models through a wisp-supplied executor
   ([ADR 0016](decisions/0016-local-runtimes-through-an-executor.md)).
 - Done 2026-09-20: a backend registry with declared capabilities, and MLX Swift and Core AI as backends
   ([ADR 0019](decisions/0019-model-backends.md)); a Core ML approval-risk classifier behind a versioned
@@ -46,8 +46,8 @@ not the differentiator. Items, in order of leverage:
   the usage every reply reports; Ollama is asked for an explicit `contextLength`
   ([ADR 0025](decisions/0025-context-estimation.md)).
 - Done 2026-09-20: agent tests without the model. `ScriptedModel` drives `Agent`, the tool loop,
-  `DaimonServer` over a real client and in its unit tests (the fake thread is gone), and the whole
-  `daimon chat` loop, which moved into `DaimonCore` as `ChatLoop` with injected input and output.
+  `WispServer` over a real client and in its unit tests (the fake thread is gone), and the whole
+  `wisp chat` loop, which moved into `WispCore` as `ChatLoop` with injected input and output.
 
 ## Model backends, deferred
 
@@ -66,7 +66,7 @@ the MLX live test find the Metal library under the test runner.
 - Report to `modelcontextprotocol/swift-sdk`: `Client.Capabilities.experimental` is `[String: String]?`
   (`Sources/MCP/Client/Client.swift:128`, still so on main at `a0ae212`) while the specification allows
   object values; Codex sends `{"codex/auth-change": {}}` and the server fails `initialize` with
-  `-32603`. daimon works around it in `CompatibilityTransport`; drop the workaround when the SDK
+  `-32603`. wisp works around it in `CompatibilityTransport`; drop the workaround when the SDK
   changes the type.
 
 ## Open design

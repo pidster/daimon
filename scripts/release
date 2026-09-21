@@ -13,8 +13,8 @@ case "$VERSION" in *[!0-9.]*|.*|*.|*..*) echo "version must be X.Y.Z" >&2; exit 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 TAG="v$VERSION"
-TARBALL="daimon-$VERSION-arm64.tar.gz"
-TAP_REPO="pidster/homebrew-tap"
+TARBALL="wisp-$VERSION-arm64.tar.gz"
+TAP_REPO="pidster/homebrew-wisp"
 OUT="$ROOT/harness/.build/release-artifacts"
 
 remote() {
@@ -28,8 +28,8 @@ remote() {
 echo "==> preflight"
 [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || { echo "not on main" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 1; }
-CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/Sources/DaimonCore/Audit/AuditEvent.swift)"
-[ "$CURRENT" = "$VERSION" ] || { echo "DaimonVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
+CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/Sources/WispCore/Audit/AuditEvent.swift)"
+[ "$CURRENT" = "$VERSION" ] || { echo "WispVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
 gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated" >&2; exit 1; }
 NOTES="$(awk -v v="$VERSION" '
@@ -44,37 +44,37 @@ scripts/check eval
 
 echo "==> build"
 (cd harness && swift build -c release)
-BIN="harness/.build/release/daimon"
+BIN="harness/.build/release/wisp"
 rm -rf "$OUT"; mkdir -p "$OUT/stage"
-cp "$BIN" "$OUT/stage/daimon"
-strip "$OUT/stage/daimon"
+cp "$BIN" "$OUT/stage/wisp"
+strip "$OUT/stage/wisp"
 cp LICENSE "$OUT/stage/LICENSE"
-[ "$("$OUT/stage/daimon" --version)" = "$VERSION" ] || { echo "built binary reports $("$OUT/stage/daimon" --version)" >&2; exit 1; }
-"$OUT/stage/daimon" doctor
+[ "$("$OUT/stage/wisp" --version)" = "$VERSION" ] || { echo "built binary reports $("$OUT/stage/wisp" --version)" >&2; exit 1; }
+"$OUT/stage/wisp" doctor
 
 echo "==> package"
 {
     printf '%s\n\n' "$NOTES"
-    printf 'Install or upgrade with Homebrew: `brew install pidster/tap/daimon`. Downloading the tarball directly leaves it quarantined; use Homebrew.\n'
+    printf 'Install or upgrade with Homebrew: `brew install pidster/wisp/wisp`. Downloading the tarball directly leaves it quarantined; use Homebrew.\n'
 } > "$OUT/notes.md"
-(cd "$OUT/stage" && tar -czf "../$TARBALL" daimon LICENSE)
+(cd "$OUT/stage" && tar -czf "../$TARBALL" wisp LICENSE)
 (cd "$OUT" && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
 SHA="$(cut -d' ' -f1 "$OUT/$TARBALL.sha256")"
 ls -la "$OUT/$TARBALL"; echo "sha256 $SHA"
 
 echo "==> publish"
-remote git tag -a "$TAG" -m "daimon $VERSION"
+remote git tag -a "$TAG" -m "wisp $VERSION"
 remote git push origin "$TAG"
-remote gh release create "$TAG" "$OUT/$TARBALL" "$OUT/$TARBALL.sha256" --title "daimon $VERSION" \
+remote gh release create "$TAG" "$OUT/$TARBALL" "$OUT/$TARBALL.sha256" --title "wisp $VERSION" \
     --notes-file "$OUT/notes.md"
 
 echo "==> tap formula"
-FORMULA="$OUT/daimon.rb"
+FORMULA="$OUT/wisp.rb"
 cat > "$FORMULA" <<RUBY
-class Daimon < Formula
+class Wisp < Formula
   desc "On-device, tool-using AI microharness for macOS"
-  homepage "https://github.com/pidster/daimon"
-  url "https://github.com/pidster/daimon/releases/download/$TAG/$TARBALL"
+  homepage "https://github.com/pidster/wisp"
+  url "https://github.com/pidster/wisp/releases/download/$TAG/$TARBALL"
   sha256 "$SHA"
   license "MIT"
   version "$VERSION"
@@ -83,17 +83,17 @@ class Daimon < Formula
   depends_on macos: :golden_gate
 
   def install
-    bin.install "daimon"
+    bin.install "wisp"
   end
 
   test do
-    assert_equal "$VERSION", shell_output("#{bin}/daimon --version").strip
+    assert_equal "$VERSION", shell_output("#{bin}/wisp --version").strip
   end
 end
 RUBY
 echo "formula written to $FORMULA"
 TAP_DIR="$OUT/tap"
-remote sh -c "rm -rf '$TAP_DIR' && gh repo clone $TAP_REPO '$TAP_DIR' && mkdir -p '$TAP_DIR/Formula' && cp '$FORMULA' '$TAP_DIR/Formula/daimon.rb' && cd '$TAP_DIR' && git add Formula/daimon.rb && git commit -m 'daimon $VERSION' && git push"
+remote sh -c "rm -rf '$TAP_DIR' && gh repo clone $TAP_REPO '$TAP_DIR' && mkdir -p '$TAP_DIR/Formula' && cp '$FORMULA' '$TAP_DIR/Formula/wisp.rb' && cd '$TAP_DIR' && git add Formula/wisp.rb && git commit -m 'wisp $VERSION' && git push"
 
 echo "==> done"
-echo "verify: brew update && brew install pidster/tap/daimon && daimon doctor"
+echo "verify: brew update && brew install pidster/wisp/wisp && wisp doctor"

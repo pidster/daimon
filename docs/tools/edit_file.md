@@ -38,7 +38,7 @@ directories (…)`, `error: edit not approved: …`.
 
 ## Confinement
 
-Writes land only under the directories the sandbox lets `run_command` write under: the directory daimon
+Writes land only under the directories the sandbox lets `run_command` write under: the directory wisp
 was launched in, the temporary directory, `/private/tmp`, the user cache directory, and
 `sandbox.writablePaths` from `config.json`. The check canonicalises the path (symlinks resolved, so
 `/tmp` is `/private/tmp`) and refuses anything else before touching the file system. With the sandbox
@@ -72,13 +72,13 @@ is in the `tool.call` event's arguments.
 ## Measured with the model
 
 The eval (`ToolEvalTests`, ten small files) reads a file and rewrites one numbered line; the recorded
-result is in [measurements.md](../measurements.md) and on `daimon tools --markdown`. The `line`
+result is in [measurements.md](../measurements.md) and on `wisp tools --markdown`. The `line`
 argument exists because the first version, replace by `find` only, measured 3 of 5 on 2026-09-20: the
 model copied `find` correctly and then put the neighbouring line into `content` too. A write outside
 the writable set is refused with the directories named and no file created.
 
 ## Implementation
 
-`FileWriter` in `harness/Sources/DaimonCore/Tools/FileWriter.swift` (confinement from
+`FileWriter` in `harness/Sources/WispCore/Tools/FileWriter.swift` (confinement from
 `CommandPolicy.writableRoots`, the list the Seatbelt profile is built from), tested in `FileWriterTests`;
 `EditFileTool` is the model-facing wrapper, tested in `ToolWrapperTests`.

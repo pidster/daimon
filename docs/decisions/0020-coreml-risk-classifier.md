@@ -17,8 +17,8 @@ commands, fast, deterministic, and chosen independently of which model runs the 
   rules, the threshold, and the human stay authoritative and the higher level wins.
 - **Contract, version 1.** The model takes one string input `text` (the command line, trimmed, runs of
   whitespace collapsed to one space, case kept) and gives one string output `label` whose values are
-  `safe`, `moderate`, `dangerous`. Its creator metadata carries `daimon.classifier.contract = "1"` and
-  `daimon.classifier.labels = "safe,moderate,dangerous"`. A model that declares another contract, other
+  `safe`, `moderate`, `dangerous`. Its creator metadata carries `wisp.classifier.contract = "1"` and
+  `wisp.classifier.labels = "safe,moderate,dangerous"`. A model that declares another contract, other
   labels, or other features is rejected at load. The version string in the model's metadata is its
   identity in the audit.
 - **Failure is `moderate`.** No configured path, a missing asset, a model Core ML cannot load, a contract
@@ -33,7 +33,7 @@ commands, fast, deterministic, and chosen independently of which model runs the 
   command as every other verdict.
 - `scripts/train-risk-classifier` trains a model from a `text,label` CSV with Create ML and writes the
   contract metadata; `docs/examples/risk-labels.csv` is the eval set; `scripts/check eval` measures a
-  model named by `DAIMON_COREML_MODEL` with the same hard requirement as the on-device model: no
+  model named by `WISP_COREML_MODEL` with the same hard requirement as the on-device model: no
   dangerous command rated safe.
 
 ## Consequences

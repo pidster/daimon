@@ -1,4 +1,4 @@
-# ADR 0014: Approvals have four scopes; project and always persist under ~/.daimon
+# ADR 0014: Approvals have four scopes; project and always persist under ~/.wisp
 
 Date: 2026-09-19. Status: accepted. Amends ADR 0011.
 
@@ -6,8 +6,8 @@ Date: 2026-09-19. Status: accepted. Amends ADR 0011.
 
 Asking on every risky command makes routine delegation (a build-test loop, a git workflow) tedious and
 multiplies exposure to the client's dialog problems. The MCP dialog had lost "approve for this session"
-when it became fieldless. The owner decided that daimon may keep approvals after the process stops, in a
-file under `~/.daimon`.
+when it became fieldless. The owner decided that wisp may keep approvals after the process stops, in a
+file under `~/.wisp`.
 
 ## Decision
 
@@ -15,7 +15,7 @@ file under `~/.daimon`.
   covers a prompt's whole tool loop), `session` (this process), `project` (this exact command in this
   exact directory), or `always` (this exact command anywhere). Chat answers `y`, `s`, `p`, `a`, or `n`; the
   MCP dialog offers the same four in a picker with Accept and Decline; `--yes` and `AutoApprover` mean once.
-- `project` and `always` are written to `~/.daimon/approvals.json` (user-only, atomic writes) by
+- `project` and `always` are written to `~/.wisp/approvals.json` (user-only, atomic writes) by
   `ApprovalStore`, with a random id, the level at grant, the source entry point, and an expiry
   (`approval.persistDays`, default 30). Expired entries are dropped on load.
 - **Exact matching only.** No patterns or prefixes: a prefix rule such as "anything starting with git"
@@ -25,7 +25,7 @@ file under `~/.daimon`.
 - A persisted approval decides only whether to ask. Deny patterns, the sandbox, and the classifier still
   run on every use, and every use is audited as `approval.decided` with decision `cached-project` or
   `cached-always` and the approval id.
-- `daimon approvals` lists standing approvals; `revoke <id>` and `clear` remove them.
+- `wisp approvals` lists standing approvals; `revoke <id>` and `clear` remove them.
 
 ## Consequences
 

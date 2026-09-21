@@ -4,21 +4,21 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:daimon}/harness",
-            "name": "Debug daimon (harness)",
-            "target": "daimon",
+            "cwd": "${workspaceFolder:wisp}/harness",
+            "name": "Debug wisp (harness)",
+            "target": "wisp",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug daimon (harness)"
+            "preLaunchTask": "swift: Build Debug wisp (harness)"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:daimon}/harness",
-            "name": "Release daimon (harness)",
-            "target": "daimon",
+            "cwd": "${workspaceFolder:wisp}/harness",
+            "name": "Release wisp (harness)",
+            "target": "wisp",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release daimon (harness)"
+            "preLaunchTask": "swift: Build Release wisp (harness)"
         }
     ]
 }

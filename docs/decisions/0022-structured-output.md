@@ -4,7 +4,7 @@ Date: 2026-09-20. Status: accepted.
 
 ## Context
 
-A harness that delegates classification, extraction, or triage to daimon wants the answer as data it
+A harness that delegates classification, extraction, or triage to wisp wants the answer as data it
 can branch on, not prose it must parse. The framework has guided generation: a `GenerationSchema`
 constrains decoding so the output is JSON of the declared shape, and every backend either declares
 the capability (`system`, `private-cloud`, Ollama `completion` models through the chat API's `format`,
@@ -12,11 +12,11 @@ Core AI engines that support it) or does not. Callers speak JSON Schema, not the
 `@Generable` types, and the schema is only known at call time.
 
 Options for the schema language: accept any JSON Schema and fail late when the framework cannot express
-it; accept a subset and refuse the rest by name before generation; or invent a daimon-specific shape.
+it; accept a subset and refuse the rest by name before generation; or invent a wisp-specific shape.
 
 ## Decision
 
-`respond` (MCP) and `daimon respond --schema <path>` (CLI) take a JSON Schema and return JSON of that
+`respond` (MCP) and `wisp respond --schema <path>` (CLI) take a JSON Schema and return JSON of that
 shape. `OutputSchema` converts an accepted subset to a `DynamicGenerationSchema` and refuses anything
 outside it by construct name and path before generation: objects with typed properties and `required`,
 strings with `enum`, integers, numbers, booleans, arrays of one item type with bounds, nesting, and

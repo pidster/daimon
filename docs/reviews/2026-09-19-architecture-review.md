@@ -1,7 +1,7 @@
 # Architecture review, 2026-09-19
 
 Scope: the Swift package under `harness/` at commit `994cd89` ("Make Session and Conversation the common
-core under every face"), read in full (`DaimonCore`, `DaimonMCP`, `daimon`, and the test targets) against
+core under every face"), read in full (`WispCore`, `WispMCP`, `wisp`, and the test targets) against
 `CLAUDE.md`, `docs/design.md`, and ADRs 0001 to 0015. Read-only: a `swift build` and one targeted
 `swift test` run to confirm A1; nothing was modified. The earlier reviews
 ([quality](2026-09-17-quality-review.md), [docs](2026-09-19-docs-review.md)) are closed; this one looks
@@ -10,7 +10,7 @@ only for duplication, inconsistency, and structural choices a reviewer would pus
 Ground truth at the time of review:
 
 - `swift build`: passes.
-- `swift test --filter DaimonServerTests/threadsShareTheSessionsStoreAndSessionApprovals`: passes in
+- `swift test --filter WispServerTests/threadsShareTheSessionsStoreAndSessionApprovals`: passes in
   2.45 s, which is the time two on-device classifier calls take (A1).
 
 ## Summary
@@ -39,11 +39,11 @@ replaces it (A5). Everything else is small and mostly mechanical.
 
 #### A1 (high) A unit test runs the on-device model through the default classifier
 
-`harness/Tests/DaimonMCPTests/DaimonServerTests.swift:15-23` (`scratchSession` writes no
+`harness/Tests/WispMCPTests/WispServerTests.swift:15-23` (`scratchSession` writes no
 `config.json`) and `:52-60` (`gate.clear(command: "touch a", …)` twice).
-`harness/Sources/DaimonCore/Config.swift:167-170` makes the default classifier
+`harness/Sources/WispCore/Config.swift:167-170` makes the default classifier
 `CompositeRiskClassifier([RuleRiskClassifier.standard, ModelRiskClassifier()])`, and
-`harness/Sources/DaimonCore/Approval/ModelRiskClassifier.swift:71-75` opens a `LanguageModelSession`
+`harness/Sources/WispCore/Approval/ModelRiskClassifier.swift:71-75` opens a `LanguageModelSession`
 whenever `SystemLanguageModel.default.availability` is `.available`.
 
 Confirmed: the test passes in 2.45 s on this machine (the rest of the suite's tests take milliseconds),
@@ -65,7 +65,7 @@ Effort: M.
 
 #### A2 (high) The `once` approval scope depends on the audit log being attached
 
-`harness/Sources/DaimonCore/Approval/Approval.swift:141-148` (`currentTurnApprovals()` returns `[]`
+`harness/Sources/WispCore/Approval/Approval.swift:141-148` (`currentTurnApprovals()` returns `[]`
 when `audit` is nil), `:263-265` (`if audit != nil { turnApprovals.keys.insert(…) }`), and
 `AuditLog.swift:38-47` (the turn counter lives on the log; `Agent.turn` advances it at
 `Agent.swift:136`).
@@ -89,7 +89,7 @@ Effort: M.
 
 #### A3 (medium) The MCP server stores one thread's parts in two containers, joined by a captured `var`
 
-`harness/Sources/DaimonMCP/DaimonServer.swift:23-26` (`ThreadStore<any RespondingThread>` plus a
+`harness/Sources/WispMCP/WispServer.swift:23-26` (`ThreadStore<any RespondingThread>` plus a
 separate `GateRegistry`), `:149-158` (`var openedGate` mutated inside the `findOrCreate` closure),
 `:163-168` (caller removes the evicted id from `gates` by hand), and `:203-205` (`close` does the same).
 `ThreadStore` is generic over `Thread: Sendable` (`ThreadStore.swift:40`) and already supports any value.
@@ -106,9 +106,9 @@ let the test fake build a real gate (rules only, no model). Effort: S.
 
 #### A4 (medium) `session.start` is assembled in three places with three field sets
 
-`Session.swift:130-137` (seven fields, via `Session.begin`), `DaimonServer.swift:170-177`
+`Session.swift:130-137` (seven fields, via `Session.begin`), `WispServer.swift:170-177`
 (`entryPoint: "mcp-thread"`, three fields, recomputing `instructions` and `model` defaults at `:146-147`
-that `Session.openConversation` computes again at `:203`), and `Daimon.swift:255` (`/new` in chat
+that `Session.openConversation` computes again at `:203`), and `Wisp.swift:255` (`/new` in chat
 records `session.start` with `reason: new` by hand from the executable). `docs/logging.md:38` claims
 "all entry points record the same fields via `Session.begin`"; the thread record omits `unsafe`,
 `autoApprove`, and `resume`.
@@ -119,11 +119,11 @@ event. Effort: S.
 
 #### A5 (medium) `Session` demands an approver from the face that discards it, and builds a conversation MCP never uses
 
-`Daimon.swift:161` passes `DenyingApprover(reason: "unused: the MCP server elicits approval itself")`;
-`DaimonServer.swift:57-59` immediately calls `session.with(approver:)`, which rebuilds `main`
+`Wisp.swift:161` passes `DenyingApprover(reason: "unused: the MCP server elicits approval itself")`;
+`WispServer.swift:57-59` immediately calls `session.with(approver:)`, which rebuilds `main`
 (`Session.swift:149-157`) and is documented as throwing an error "which cannot happen". The `main`
 conversation built by `begin` for the `mcp` entry point is used only to list tool names for the audit
-record (`DaimonServer.swift:175`, `session.tools`).
+record (`WispServer.swift:175`, `session.tools`).
 
 The approver is a per-face channel, not a per-session fact, so it should not be a `Session` field that
 needs a placeholder. `Session.with(approver:)` exists only to work around the field.
@@ -138,7 +138,7 @@ without building a gate. Remove `with(approver:)`. Effort: M.
 `Session.Request.toolNames: [String]` where empty means all (`Session.swift:16`);
 `Session.conversation(toolNames: [String]?)` where nil means "the session's" (`:178`);
 `RespondRequest.toolNames: [String]` where empty means all (`ToolCatalog.swift:112`), converted at
-`DaimonServer.swift:155` with `request.toolNames.isEmpty ? nil : request.toolNames`; and
+`WispServer.swift:155` with `request.toolNames.isEmpty ? nil : request.toolNames`; and
 `ThreadFactory` taking `[String]?` (`:34`). The same optional-versus-empty ambiguity appears in
 `approvalThreshold: RiskLevel?` (nil means never, `Config.swift:158`) next to `approvalTimeout:
 Duration?` (nil means forever, `:162`) which is spelled `0` in the file (`:124`).
@@ -151,8 +151,8 @@ Fix: a `ToolSelection` enum (`.all`, `.named([String])`) carried from the CLI an
 
 `CommandRunner.swift:133-160` (three branches mutate one `decision` dictionary),
 `Approval.swift:222-292` (eight `base.merging([...]) { $1 }` calls), `Agent.swift:94-99, 137, 142-147`,
-`AuditedTool.swift:39-50`, `DaimonServer.swift:94, 115-121, 165-177`, `Session.swift:130-137`,
-`Daimon.swift:255`. Field names are string literals in fourteen places; `docs/logging.md` is the only
+`AuditedTool.swift:39-50`, `WispServer.swift:94, 115-121, 165-177`, `Session.swift:130-137`,
+`Wisp.swift:255`. Field names are string literals in fourteen places; `docs/logging.md` is the only
 schema. The docs review found drift there once already (its O2); nothing prevents the next one.
 
 Fix: one static constructor per `AuditEvent.Kind` (for example
@@ -165,7 +165,7 @@ can assert the documented field set per kind. Effort: M.
 `ToolRegistry.swift:16-28`: the audited and unaudited registries are written out twice; adding a tool
 means editing both, and `docs/tools/README.md` step 4 says "append it to `ToolRegistry.init`" as if it
 were one line. Every real entry point passes an audit log, so the second list exists for the `tools`
-subcommand and the MCP resource reader (`DaimonServer.swift:127`, `Daimon.swift:92`), which only want
+subcommand and the MCP resource reader (`WispServer.swift:127`, `Wisp.swift:92`), which only want
 descriptions and build a live `CommandRunner` to get them.
 
 Fix: always wrap, with `AuditLog.disabled(session:)` when none is given (a `NullAuditSink` costs
@@ -186,7 +186,7 @@ Effort: S.
 
 #### A10 (medium) Library code writes to stderr, and `Session` carries copies of its request
 
-`Session.swift:119` prints the `--unsafe` warning from `DaimonCore`, while the egress note for the same
+`Session.swift:119` prints the `--unsafe` warning from `WispCore`, while the egress note for the same
 situation is returned as a value (`egressNote`, `:80-83`) for the CLI to print. `docs/design.md`
 ("Library code never prints"). `Session` also stores `entryPoint`, `toolNames`, and `instructions`
 (`:66-71`) that duplicate `Request` and `config.instructions` (`:115, 140`).
@@ -197,7 +197,7 @@ derive the three fields. Effort: S.
 #### A11 (medium) `Agent`'s "was this turn condensed" is recomputed by every caller
 
 `Agent.swift:139-145` computes `condensed` for the audit event; `ThreadStore.swift:31-33`
-(`ConversationThread.respond`) and `Daimon.swift:261-268` (chat) each re-derive it from
+(`ConversationThread.respond`) and `Wisp.swift:261-268` (chat) each re-derive it from
 `agent.condensations` before and after. `RespondingThread.respond` returns an unnamed tuple
 (`ThreadStore.swift:8`). Also `Agent.stream` (`Agent.swift:120-126`) has an `else if` branch identical
 to its `if` branch, so a non-prefix snapshot emits `full.dropFirst(emitted.count)`, which is the wrong
@@ -212,7 +212,7 @@ type; delete the duplicate branch and decide what a non-prefix snapshot should d
 #### A12 (low) Short-id generation is copied four times
 
 `String(UUID().uuidString.prefix(8)).lowercased()` at `Session.swift:121`, `AuditedTool.swift:37`,
-`DaimonServer.swift:92`, `ApprovalStore.swift:97`. Fix: `ShortID.make()` in `Audit/`. Effort: S.
+`WispServer.swift:92`, `ApprovalStore.swift:97`. Fix: `ShortID.make()` in `Audit/`. Effort: S.
 
 #### A13 (low) `approval.threshold` is parsed twice with different failure behaviour
 
@@ -223,20 +223,20 @@ silent `?? .moderate`. The quality review's D17 fixed the same pattern for `mode
 #### A14 (low) Name validation `[A-Za-z0-9._-]{1,64}` exists twice
 
 `TranscriptStore.swift:70-75` and `ToolCatalog.swift:98-103` (`validateThreadID`), with different error
-types. Fix: one `SafeName.validate(_:)` in `DaimonCore`; both callers map to their own error. Effort: S.
+types. Fix: one `SafeName.validate(_:)` in `WispCore`; both callers map to their own error. Effort: S.
 
 #### A15 (low) A tool's model-facing text lives in three places
 
 The `Tool` struct (`description`, `@Guide`), the `ToolRegistry.guidance` dictionary keyed by string
 (`ToolDescriptions.swift:27-45`), and `docs/tools/<name>.md`. The dictionary is kept complete by a test,
 but its `limits` text repeats defaults that live in code (`60 s`, `4 KiB`, `100 lines`) and will drift
-when a default changes. Fix: a `DaimonTool: Tool` refinement with `static var limits` and
+when a default changes. Fix: a `WispTool: Tool` refinement with `static var limits` and
 `examplePrompt`, so the registry reads them off the instance; render numbers from the live options.
 Effort: S.
 
 #### A16 (low) CLI option groups and error mapping are copied per subcommand
 
-`Daimon.swift:27-47, 140-154, 173-196` declare `--instructions`, `--model`, `--unsafe`, `--tool`, and
+`Wisp.swift:27-47, 140-154, 173-196` declare `--instructions`, `--model`, `--unsafe`, `--tool`, and
 `--yes` three times with slightly different help text; `Mcp` has no `--tool` although
 `Session.Request.toolNames` supports it and `mcp` threads inherit the session's selection
 (`Session.swift:185`). `catch let failure as Session.Failure { throw ValidationError("\(failure)") }` and
@@ -262,7 +262,7 @@ tests take that path). Fix: split once in `CommandRunner.run` and pass `[SimpleC
 
 `Session.Request.entryPoint: String` (`Session.swift:10`), `ApprovalGate.source: String` defaulting to
 `"unknown"` (`Approval.swift:168`), `ApprovalStore.Entry.source: String`, and the literals `"respond"`,
-`"chat"`, `"mcp"`, `"mcp-thread"` in `Daimon.swift` and `DaimonServer.swift:173`. `docs/logging.md`
+`"chat"`, `"mcp"`, `"mcp-thread"` in `Wisp.swift` and `WispServer.swift:173`. `docs/logging.md`
 enumerates exactly four values. Fix: `enum EntryPoint: String, Codable { respond, chat, mcp, mcpThread }`.
 Effort: S.
 
@@ -281,10 +281,10 @@ is "actors only when awaiting". Effort: S.
 `SessionApprovals` is `public` with only `internal` methods (`Approval.swift:105-115`); `Conversation`
 is `public` but only constructible through `internal` `setUp` (`Session.swift:215-241`);
 `Doctor`, `ChatInput`, `Spawn`, `OutputBuffer`, `RegexCache`, and `withTimeout` mix `public` and
-`internal` without a pattern. `DaimonCore` is exported as a library product (`Package.swift:9`) but
-nothing outside this package consumes it. Fix: decide whether `DaimonCore` is an API or an
+`internal` without a pattern. `WispCore` is exported as a library product (`Package.swift:9`) but
+nothing outside this package consumes it. Fix: decide whether `WispCore` is an API or an
 implementation detail; if the latter, default to `internal` and use `@testable import` (already used by
-every test), keeping `public` for what `DaimonMCP` and `daimon` call. Effort: M.
+every test), keeping `public` for what `WispMCP` and `wisp` call. Effort: M.
 
 #### A22 (low) Errors are named and flattened inconsistently
 
@@ -292,14 +292,14 @@ Nested `Failure` enums in eight types, plus `RuleRiskClassifier.InvalidRule` and
 structs. `Session.loadConfig` (`Session.swift:89-94`) flattens `DecodingError`, `Config.Failure`, and
 `CommandPolicy.Failure` into a string `reason`, so a caller cannot tell a JSON syntax error from a bad
 pattern. `TranscriptStore.Failure.notFound` for `--resume` exits 1 while the other user-input errors exit
-64 (`docs/daimon.md:151`). Fix: name them all `Failure`; keep the underlying error as an associated
+64 (`docs/wisp.md:151`). Fix: name them all `Failure`; keep the underlying error as an associated
 value; map `--resume` failures to `ValidationError`. Effort: S.
 
 #### A23 (low) File placement does not follow the module's own folders
 
 `Approval/Timeout.swift` is a general utility; `Approval/CommandSplitter.swift` is shared by the policy
 layer; `CommandRunner.swift`, `CommandPolicy.swift`, and `FileReader.swift` sit at the root beside
-`Tools/`; `Doctor.swift` and `ChatInput.swift` are CLI concerns inside `DaimonCore` (necessary for
+`Tools/`; `Doctor.swift` and `ChatInput.swift` are CLI concerns inside `WispCore` (necessary for
 testing, but a `CLI/` folder would say so). Fix: `Exec/` (runner, policy, splitter), `Approval/`,
 `Audit/`, `Tools/`, `Session/` (session, conversation, agent, model selection, context), `CLI/`
 (doctor, chat input), `Support/` (timeout, regex cache, short id). Effort: S.
@@ -320,7 +320,7 @@ then the mechanical de-duplications. Effort S (under an hour), M (half a day), L
 - [x] A2 Add a `TurnClock` owned by `Conversation`, shared by gate and audit log; key once-approvals and refusals on it; give `ApprovalGate` its own error type (M)
 - [x] A5 Move the approver from `Session` to `openAgent`/`conversation`; delete `with(approver:)` and the placeholder `DenyingApprover` in `Mcp` (M)
 - [x] A3 Store `OpenThread { thread, gate, audit }` in `ThreadStore`; delete `GateRegistry` and the captured `openedGate` (S)
-- [x] A4 Record thread and `/new` `session.start` events inside `DaimonCore`; align field sets with `logging.md` (S)
+- [x] A4 Record thread and `/new` `session.start` events inside `WispCore`; align field sets with `logging.md` (S)
 - [x] A6 Introduce `ToolSelection` and `Threshold` enums end to end (S)
 - [x] A13 Decode `approval.threshold` once via the `Threshold` enum (S)
 - [x] A7 Typed detail constructors per `AuditEvent.Kind`, with a test that pins the documented field set (M)
@@ -337,8 +337,8 @@ then the mechanical de-duplications. Effort S (under an hour), M (half a day), L
 - [x] A19 `EntryPoint` enum (S)
 - [x] A22 Consistent `Failure` naming; keep underlying errors; `--resume` failures as usage errors (S)
 - [x] A20 Write down the actor-versus-`Mutex` rule in `design.md` (S)
-- [x] A21 Decide `DaimonCore`'s public surface and trim (M)
-- [x] A23 Regroup `DaimonCore` sources into folders (S)
+- [x] A21 Decide `WispCore`'s public surface and trim (M)
+- [x] A23 Regroup `WispCore` sources into folders (S)
 
 ## Status
 
@@ -347,5 +347,5 @@ commit, in the todo order; each commit message names its findings. Departures fr
 A17 keeps the two wordings ("command not approved", "read not approved") behind one `ToolOutput.error`
 renderer, with the read refusal typed as `FileReader.Failure.notApproved`; A20 converts nothing, because
 every existing type already fits the rule once it was written down; A21 trims only `ToolOutput`, because
-the survey found the rest of the public surface is either called by `DaimonMCP` or `daimon` or is an
-extension point, and keeps the `DaimonCore` product export.
+the survey found the rest of the public surface is either called by `WispMCP` or `wisp` or is an
+extension point, and keeps the `WispCore` product export.

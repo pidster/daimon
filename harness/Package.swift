@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "daimon",
+    name: "wisp",
     platforms: [.macOS("27.0")],
     products: [
-        .executable(name: "daimon", targets: ["daimon"]),
-        .library(name: "DaimonCore", targets: ["DaimonCore"]),
-        .library(name: "DaimonMCP", targets: ["DaimonMCP"]),
+        .executable(name: "wisp", targets: ["wisp"]),
+        .library(name: "WispCore", targets: ["WispCore"]),
+        .library(name: "WispMCP", targets: ["WispMCP"]),
     ],
     traits: [
         // MLX Swift compiles Metal kernels at build time and needs the Metal toolchain; off by default
@@ -30,22 +30,22 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "DaimonCore",
+            name: "WispCore",
             exclude: ["Resources/system-prompt.md", "Resources/measurements.json", "Resources/multiplexers.txt"],
             linkerSettings: [.linkedFramework("FoundationModels")],
             plugins: ["EmbedSystemPrompt"]
         ),
         .target(
-            name: "DaimonCoreAI",
+            name: "WispCoreAI",
             dependencies: [
-                "DaimonCore",
+                "WispCore",
                 .product(name: "CoreAILM", package: "coreai-models"),
             ]
         ),
         .target(
-            name: "DaimonMLX",
+            name: "WispMLX",
             dependencies: [
-                "DaimonCore",
+                "WispCore",
                 .product(name: "MLXFoundationModels", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
                 .product(name: "MLXHuggingFace", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
                 .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
@@ -53,47 +53,47 @@ let package = Package(
             ]
         ),
         .target(
-            name: "DaimonMCP",
+            name: "WispMCP",
             dependencies: [
-                "DaimonCore",
+                "WispCore",
                 .product(name: "MCP", package: "swift-sdk"),
                 .product(name: "Logging", package: "swift-log"),
             ]
         ),
         .executableTarget(
-            name: "daimon",
+            name: "wisp",
             dependencies: [
-                "DaimonCore",
-                "DaimonCoreAI",
-                "DaimonMLX",
-                "DaimonMCP",
+                "WispCore",
+                "WispCoreAI",
+                "WispMLX",
+                "WispMCP",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .target(
-            name: "DaimonTestSupport",
-            dependencies: ["DaimonCore"],
-            path: "Tests/DaimonTestSupport"
+            name: "WispTestSupport",
+            dependencies: ["WispCore"],
+            path: "Tests/WispTestSupport"
         ),
         .testTarget(
-            name: "DaimonCoreTests",
-            dependencies: ["DaimonCore", "DaimonTestSupport"]
+            name: "WispCoreTests",
+            dependencies: ["WispCore", "WispTestSupport"]
         ),
         .testTarget(
-            name: "DaimonMCPTests",
-            dependencies: ["DaimonMCP", "DaimonTestSupport"]
+            name: "WispMCPTests",
+            dependencies: ["WispMCP", "WispTestSupport"]
         ),
         .testTarget(
-            name: "DaimonMLXTests",
-            dependencies: ["DaimonMLX", "DaimonTestSupport"]
+            name: "WispMLXTests",
+            dependencies: ["WispMLX", "WispTestSupport"]
         ),
         .testTarget(
-            name: "DaimonCoreAITests",
-            dependencies: ["DaimonCoreAI", "DaimonTestSupport"]
+            name: "WispCoreAITests",
+            dependencies: ["WispCoreAI", "WispTestSupport"]
         ),
         .testTarget(
             name: "ModelEvalTests",
-            dependencies: ["DaimonCore"]
+            dependencies: ["WispCore"]
         ),
         .plugin(
             name: "EmbedSystemPrompt",

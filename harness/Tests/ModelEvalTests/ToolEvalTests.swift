@@ -1,17 +1,17 @@
 import Foundation
 import Testing
 
-@testable import DaimonCore
+@testable import WispCore
 
-/// How reliably the configured model performs delegated tasks through daimon's tools. Needs the
-/// model, so it runs only with `DAIMON_MODEL_TESTS=1` (`scripts/check eval`); each test records a
+/// How reliably the configured model performs delegated tasks through wisp's tools. Needs the
+/// model, so it runs only with `WISP_MODEL_TESTS=1` (`scripts/check eval`); each test records a
 /// `Measurement` that ships with the tool catalogue. Numbers are reported and recorded; only a
 /// floor is asserted so a regression fails the run.
-@Suite(.enabled(if: ProcessInfo.processInfo.environment["DAIMON_MODEL_TESTS"] != nil))
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["WISP_MODEL_TESTS"] != nil))
 struct ToolEvalTests {
     /// A scratch directory inside the writable set.
     private func scratch() throws -> URL {
-        let dir = FileManager.default.temporaryDirectory.appending(path: "daimon-tool-eval-\(UUID().uuidString)")
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-tool-eval-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
@@ -32,7 +32,7 @@ struct ToolEvalTests {
             ),
             ("e.txt", "alpha\nbeta\ngamma\ndelta\n", "gamma", "GAMMA"),
             (
-                "f.json", "{\n  \"name\": \"daimon\",\n  \"debug\": false\n}\n", "  \"debug\": false",
+                "f.json", "{\n  \"name\": \"wisp\",\n  \"debug\": false\n}\n", "  \"debug\": false",
                 "  \"debug\": true"
             ),
             ("g.sh", "#!/bin/sh\nset -eu\necho start\necho done\n", "echo start", "echo starting"),

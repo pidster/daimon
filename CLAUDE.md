@@ -14,9 +14,9 @@ Claude Code-only guidance below the import, and harness-neutral guidance to `AGE
   diagnostics for both languages. The binaries are not installed by the plugin: `sourcekit-lsp` comes
   with Xcode (`xcrun --find sourcekit-lsp`) and `rust-analyzer` from `rustup component add rust-analyzer`
   or Homebrew. A fresh clone needs both on `PATH` and a restart of Claude Code; `/plugin` shows errors.
-- daimon's tools are `mcp__daimon__respond` and `mcp__daimon__close_thread`; its resources are read with
-  the MCP resource tools. If the session starts with the `daimon` server failed to connect, follow the
+- wisp's tools are `mcp__wisp__respond` and `mcp__wisp__close_thread`; its resources are read with
+  the MCP resource tools. If the session starts with the `wisp` server failed to connect, follow the
   release-build note in `AGENTS.md` and then `/mcp`.
-- `/mcp reconnect daimon` clears a stuck approval dialog; retry the turn afterwards.
-- Use `AskUserQuestion` when a decision is the user's to make. It is Claude Code's dialog; daimon's own
+- `/mcp reconnect wisp` clears a stuck approval dialog; retry the turn afterwards.
+- Use `AskUserQuestion` when a decision is the user's to make. It is Claude Code's dialog; wisp's own
   approval dialog is MCP elicitation, which the harness renders and Claude never sees.

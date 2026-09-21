@@ -1,0 +1,19 @@
+#!/bin/sh
+# Launcher used by .mcp.json. Runs the release build of wisp as an MCP
+# server, or explains how to produce one. Stdout is the protocol channel, so
+# every message here goes to stderr.
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BIN="$ROOT/harness/.build/release/wisp"
+
+if [ ! -x "$BIN" ]; then
+    cat >&2 <<MSG
+wisp MCP server: no release build at $BIN
+Build it, then restart your agent harness (or run /mcp in Claude Code):
+    cd "$ROOT/harness" && swift build -c release
+MSG
+    exit 1
+fi
+
+exec "$BIN" mcp "$@"

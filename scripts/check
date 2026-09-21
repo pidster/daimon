@@ -12,10 +12,10 @@ have_crates() {
     ls tools/*/Cargo.toml >/dev/null 2>&1
 }
 
-# True when this shell already runs inside a Seatbelt sandbox (for example when daimon runs the gate
+# True when this shell already runs inside a Seatbelt sandbox (for example when wisp runs the gate
 # through its own run_command). SwiftPM then needs --disable-sandbox, and nested sandbox tests are moot.
 nested_sandbox() {
-    ! sandbox-exec -p '(version 1) (allow default) (deny file-write* (subpath "/nonexistent/daimon-nesting-probe"))' \
+    ! sandbox-exec -p '(version 1) (allow default) (deny file-write* (subpath "/nonexistent/wisp-nesting-probe"))' \
         /usr/bin/true 2>/dev/null
 }
 if nested_sandbox; then SWIFT_SANDBOX="--disable-sandbox"; else SWIFT_SANDBOX=""; fi
@@ -118,10 +118,10 @@ coverage_baseline() {
 
 eval_() {
     echo "==> eval (on-device model; not part of the gate)"
-    record="$ROOT/harness/Sources/DaimonCore/Resources/measurements.json"
-    (cd harness && DAIMON_MODEL_TESTS=1 DAIMON_EVAL_RECORD="$record" swift test $SWIFT_SANDBOX --filter ModelEvalTests 2>&1 \
+    record="$ROOT/harness/Sources/WispCore/Resources/measurements.json"
+    (cd harness && WISP_MODEL_TESTS=1 WISP_EVAL_RECORD="$record" swift test $SWIFT_SANDBOX --filter ModelEvalTests 2>&1 \
         | grep -E 'model classifier|measured:|eval:|^  [a-z]+ -> |^[a-z-]+	|✔|✘|Test run')
-    echo "==> measurements recorded in harness/Sources/DaimonCore/Resources/measurements.json; commit them"
+    echo "==> measurements recorded in harness/Sources/WispCore/Resources/measurements.json; commit them"
 }
 
 format() {

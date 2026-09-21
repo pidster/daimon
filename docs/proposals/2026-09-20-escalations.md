@@ -4,7 +4,7 @@ Date: 2026-09-20. Status: for review. Becomes the next ADR (amending ADR 0011 an
 
 ## Problem
 
-daimon has one way to reach its operator: `Approver`, one protocol with one question ("may this command
+wisp has one way to reach its operator: `Approver`, one protocol with one question ("may this command
 run?") and one channel hard-wired per face (terminal for `chat`, MCP elicitation for `mcp`, deny for
 `respond`, auto for `--yes`). Two things do not fit:
 
@@ -39,8 +39,8 @@ run?") and one channel hard-wired per face (terminal for `chat`, MCP elicitation
 | approval | `ApprovalGate` before a risky command or credential-like read | `ApprovalRequest` as today: command, line, pattern, directory, assessment | `.approved(scope)`, `.denied(reason)`, `.unanswered(waited)` | denied, audited `timed-out` | per scope, as today |
 | inquiry | the model, through a new `ask_operator` tool | `InquiryRequest`: question text, optional `GenerationSchema` for the answer, the thread and turn | `.answered(text)`, `.declined(reason)`, `.unanswered(waited)` | the tool returns `error: no answer from the operator: …` and the model continues | never |
 
-`ask_operator` is a `DaimonTool` like the others: bounded output (the answer is capped at 4 KiB), audited
-as `tool.call` and `tool.result`, listed in `daimon://tools` with an example prompt, selectable with
+`ask_operator` is a `WispTool` like the others: bounded output (the answer is capped at 4 KiB), audited
+as `tool.call` and `tool.result`, listed in `wisp://tools` with an example prompt, selectable with
 `--tool`. Its description tells the model to ask only when it cannot proceed and to ask one thing.
 
 ## Channels
@@ -53,11 +53,11 @@ as `tool.call` and `tool.result`, listed in `daimon://tools` with an example pro
 | `auto` | any, `--yes` | nobody | no | approves once | declines with "no operator (auto)" |
 | `deny` | respond | nobody | no | denies with the usual advice | declines with "no operator; use chat or MCP" |
 | `dialog` (later) | any | the person at this Mac | yes | native alert | native prompt |
-| `queue` (later) | any | any shell | no | `daimon escalations` lists and answers | same |
+| `queue` (later) | any | any shell | no | `wisp escalations` lists and answers | same |
 
 The `result` channel is the new one and is what makes the mobile case work. Its contract:
 
-1. daimon refuses the command (or declines the inquiry) for this turn, records `approval.requested` (or
+1. wisp refuses the command (or declines the inquiry) for this turn, records `approval.requested` (or
    `inquiry.requested`) with `channel: result`, and files a **pending escalation**: a `ShortID`, the verb,
    the exact request, the thread, and an expiry (`escalation.pendingSeconds`, default 600).
 2. The `respond` result carries `pending`: an array of `{id, kind, command|question, pattern, level,
@@ -65,7 +65,7 @@ The `result` channel is the new one and is what makes the mobile case work. Its 
 3. The calling agent puts the question to its operator and calls `respond` again on the same thread with
    `answers: [{id, scope}]` for approvals or `{id, text}` for inquiries. The prompt may be a nudge such as
    "continue".
-4. daimon checks each answer's id is pending, unexpired, and belongs to this thread; on a match it grants
+4. wisp checks each answer's id is pending, unexpired, and belongs to this thread; on a match it grants
    the approval with the given scope (through the same gate path as a dialog answer, so the dangerous
    downgrade and the store apply) or delivers the inquiry answer to the waiting tool call, records
    `approval.decided` (or `inquiry.decided`) with `channel: result`, and removes the id. A stale,
@@ -74,7 +74,7 @@ The `result` channel is the new one and is what makes the mobile case work. Its 
 
 For inquiries on the `result` channel the model's turn ends with the tool having returned "pending; the
 operator will be asked", and the answer arrives as the tool result on the next turn. The framework's
-tool loop cannot suspend across calls, so the tool returns immediately and daimon replays the answer as a
+tool loop cannot suspend across calls, so the tool returns immediately and wisp replays the answer as a
 `toolOutput` on the next prompt, before the new prompt. That replay is the one piece of transcript
 surgery in the design and is recorded as such in the ADR.
 
@@ -113,7 +113,7 @@ public protocol EscalationChannel: Sendable {
 - Config: `escalation: { channel, timeoutSeconds, pendingSeconds }` replaces `approval.timeoutSeconds`;
   `approval` keeps `threshold`, `useModel`, `persistDays`. The old key is read for one release.
 - MCP: `respond` gains `answers` (array) and the result gains `pending` (array); `close_thread` drops that
-  thread's pending ids. The tool description and `daimon://tools.md` explain the redeem flow in two
+  thread's pending ids. The tool description and `wisp://tools.md` explain the redeem flow in two
   sentences.
 - Audit: new kinds `inquiry.requested` and `inquiry.decided`; `approval.requested` and
   `approval.decided` gain `channel` and, for the result channel, `escalationID`; `fields(for:)` and
@@ -125,7 +125,7 @@ public protocol EscalationChannel: Sendable {
   decision order, scopes, and the trust story, and adds inquiry, channels, and the redeem flow).
 - `docs/tools/ask_operator.md`, row in `docs/tools/README.md`.
 - `docs/mcp.md`: `answers`, `pending`, the rule for calling agents.
-- `docs/daimon.md`: `--escalation`, the `escalation` config section, chat's inquiry prompt.
+- `docs/wisp.md`: `--escalation`, the `escalation` config section, chat's inquiry prompt.
 - `docs/logging.md`: the new kinds and fields.
 - `CLAUDE.md`: the rule "when a `respond` result carries `pending`, ask with `AskUserQuestion`, then
   call `respond` again on the same thread with `answers`", next to the git thread instructions.
@@ -139,7 +139,7 @@ public protocol EscalationChannel: Sendable {
 - Gate over the result channel: refusal names the id; a redeemed approval runs the command on the next
   call with the same scope semantics (dangerous downgraded to session, project persisted with source).
 - `AskOperatorTool`: renders answered, declined, unanswered, and pending outcomes; output capped.
-- `DaimonServer`: `pending` in results, `answers` redeemed, unknown ids reported, replay of an inquiry
+- `WispServer`: `pending` in results, `answers` redeemed, unknown ids reported, replay of an inquiry
   answer as a tool output before the next prompt (over the scripted `LanguageModel`, so the whole loop
   runs with no model).
 - `PolicyScenarioTests` unchanged, proving the decision order did not move.
@@ -167,12 +167,12 @@ Each is a working, documented state on its own; review can stop after any of the
 3. **Redeem by the same thread only?** Proposed yes: a pending id belongs to the thread that raised it.
    Allowing another thread to redeem would let a `git` thread approve a `build` thread's command.
 4. **Inquiry over the result channel replays a tool output into the transcript.** It is the honest
-   representation of what happened, but it is the first place daimon writes a transcript entry itself.
+   representation of what happened, but it is the first place wisp writes a transcript entry itself.
    The alternative is to deliver the answer as part of the next prompt text, which is simpler and less
    faithful.
 5. **Should `auto` answer inquiries?** Proposed: decline, because `--yes` means "I accept the risk of
    commands", not "invent answers". The model is told there is no operator and carries on.
 6. **Pending expiry versus dialog timeout.** One setting or two? Proposed two: a dialog wait is seconds
    to minutes; a pending id may reasonably live longer while a person is asked in chat.
-7. **Attestation.** Should `answers` carry an optional `answeredBy: human|agent` that daimon records
+7. **Attestation.** Should `answers` carry an optional `answeredBy: human|agent` that wisp records
    verbatim without trusting it? Cheap, and it gives an honest client a way to say so.

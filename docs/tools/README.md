@@ -1,7 +1,7 @@
 # Tools
 
 Tools the on-device model can call. Each page gives the model-facing contract (name, description, arguments,
-result format) and the limits that protect the context window. `daimon tools` prints the live list.
+result format) and the limits that protect the context window. `wisp tools` prints the live list.
 
 | Tool | Purpose |
 | --- | --- |
@@ -9,18 +9,18 @@ result format) and the limits that protect the context window. `daimon tools` pr
 | [run_command](run_command.md) | Run a shell command with a timeout and bounded output. |
 | [read_file](read_file.md) | Read a text file one page at a time. |
 | [edit_file](edit_file.md) | Write, append to, or replace text in a file, inside the sandbox's writable set. |
-| [inspect](inspect.md) | daimon's own config, status, approvals, and recent audit events; read-only. |
+| [inspect](inspect.md) | wisp's own config, status, approvals, and recent audit events; read-only. |
 
 Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
 registered tool's schema is in the prompt on every turn, so enable only what a task needs.
 
-MCP clients discover these tools through the `daimon://tools` resource, generated from the registry; the
-limits and example prompt for each come from the tool itself (`DaimonTool.limits`, rendered from its live
-options, and `DaimonTool.examplePrompt`). See [../mcp.md](../mcp.md).
+MCP clients discover these tools through the `wisp://tools` resource, generated from the registry; the
+limits and example prompt for each come from the tool itself (`WispTool.limits`, rendered from its live
+options, and `WispTool.examplePrompt`). See [../mcp.md](../mcp.md).
 
 ## Adding a tool
 
-1. Add a `struct` conforming to `DaimonTool` under `harness/Sources/DaimonCore/Tools/`, with an
+1. Add a `struct` conforming to `WispTool` under `harness/Sources/WispCore/Tools/`, with an
    `@Generable` `Arguments` type, `@Guide` descriptions on each property, `limits` rendered from its
    options, and an `examplePrompt` that names the tool.
 2. Keep the work in a pure helper (like `CurrentDateTool.format` or `FileReader`) and test that.

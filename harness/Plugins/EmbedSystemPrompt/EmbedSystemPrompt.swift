@@ -1,7 +1,7 @@
 import Foundation
 import PackagePlugin
 
-/// Embeds text resources into `DaimonCore` as Swift string constants at build time, so each is a plain
+/// Embeds text resources into `WispCore` as Swift string constants at build time, so each is a plain
 /// file in the source tree and the product stays one binary with nothing to ship beside it:
 /// `Resources/system-prompt.md` as `SystemPromptText.text`, `Resources/measurements.json` as
 /// `MeasurementsText.text`, and `Resources/multiplexers.txt` as `MultiplexersText.text`. The text goes into a raw multi-line literal, so it needs no escaping; the

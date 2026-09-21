@@ -11,8 +11,8 @@ device, such as an iterative build-fix loop, needs conversation continuity.
 
 ## Decision
 
-- `respond` accepts an optional `thread_id`. Omitted, daimon creates a thread with a generated id. Supplied and
-  unknown, daimon creates a thread under that id. Supplied and known, the call continues that conversation.
+- `respond` accepts an optional `thread_id`. Omitted, wisp creates a thread with a generated id. Supplied and
+  unknown, wisp creates a thread under that id. Supplied and known, the call continues that conversation.
 - Every `respond` result carries `structuredContent` with `thread_id`, `created`, and `text`, so callers never
   parse the id out of prose.
 - `instructions` and `tools` bind at creation. Passing them for an existing thread is a tool error rather than

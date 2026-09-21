@@ -4,7 +4,7 @@ Date: 2026-09-20. Status: accepted. Amends [ADR 0006](0006-mcp-server-over-stdio
 
 ## Context
 
-daimon's offer to another harness (`docs/objective.md`) is work done locally that the harness would
+wisp's offer to another harness (`docs/objective.md`) is work done locally that the harness would
 otherwise do with its own tokens on a remote model: reading, condensing, classifying, extracting over
 local data, so the caller's model never ingests the raw material. `respond` can be prompted into any
 of this, but a caller then has to coax a 4k-token model through paging and prompting itself, and the
@@ -13,14 +13,14 @@ which a handful of lines matter.
 
 Two shapes were open: a `task` argument on `respond`, or separate tools. And a question of principle:
 ADR 0006 removed the direct `run_command` MCP tool so that every command carries a model turn's audit
-trail and daimon is not a remote shell. Triage must run the build to see its output.
+trail and wisp is not a remote shell. Triage must run the build to see its output.
 
 ## Decision
 
 - `respond` stays general purpose. Each condensing task is its own MCP tool with a fixed contract,
   measured by the eval harness, and described to the caller in `docs/mcp.md`.
 - The first is `triage`: a command to run or a file to read, in; a capped list of `{kind, location,
-  message}` findings, out. `Triage` (`DaimonCore/Condense`) captures the output whole up to 1 MiB,
+  message}` findings, out. `Triage` (`WispCore/Condense`) captures the output whole up to 1 MiB,
   cuts it into 4 KiB chunks at line ends, judges each chunk in a fresh tool-less turn with a schema
   (ADR 0022) on a conversation of its own (`triage-<id>`, audited start to end), and merges the lists
   with duplicates dropped and a cap. The chunk prompt and the schema are fixed in code, not supplied by
@@ -35,7 +35,7 @@ trail and daimon is not a remote shell. Triage must run the build to see its out
 ## Consequences
 
 - A caller spends one tool call and reads a few hundred bytes instead of a log. The receipt of what
-  happened is the triage session in the audit log, reachable as `daimon://audit/triage-<id>`.
+  happened is the triage session in the audit log, reachable as `wisp://audit/triage-<id>`.
 - Measured on 2026-09-20 with the system model (`scripts/check eval`, `TriageEvalTests`): 7 of 7
   expected failures found across four abridged fixtures (swift build, swift test, cargo test, pytest),
   no spurious findings. The model names a failing test by its assertion's `file:line` rather than the
