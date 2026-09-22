@@ -15,9 +15,9 @@ import WispTestSupport
         #expect(on.enabled)
         #expect(on.bold("x") == "\u{1B}[1mx\u{1B}[0m" && on.dim("x") == "\u{1B}[2mx\u{1B}[0m")
         #expect(on.level(.dangerous) == "\u{1B}[38;2;255;107;107mdangerous\u{1B}[0m")
-        #expect(on.level(.safe).contains("38;2;95;205;176m") && on.level(.moderate).contains("38;2;242;185;80m"))
-        #expect(on.prompt("›").hasPrefix("\u{1B}[1m\u{1B}[38;2;168;240;220m›"))
-        #expect(on.muted("x") == "\u{1B}[38;2;74;140;124mx\u{1B}[0m")
+        #expect(on.level(.safe).contains("38;2;143;211;244m") && on.level(.moderate).contains("38;2;242;185;80m"))
+        #expect(on.prompt("›").hasPrefix("\u{1B}[1m\u{1B}[38;2;207;241;255m›"))
+        #expect(on.muted("x") == "\u{1B}[38;2;134;174;200mx\u{1B}[0m")
         #expect(Style.stripped(on.magenta(on.bold("ab"))) == "ab")
     }
 
@@ -30,7 +30,7 @@ import WispTestSupport
         #expect(bare.rendered(style: .plain) == "system · /tmp · never asks")
         let styled = full.rendered(style: Style(enabled: true))
         #expect(Style.stripped(styled) == full.rendered(style: .plain))
-        #expect(styled.contains("\u{1B}[38;2;95;205;176mollama:q") && styled.contains("38;2;74;140;124mcontext"))
+        #expect(styled.contains("\u{1B}[38;2;143;211;244mollama:q") && styled.contains("38;2;134;174;200mcontext"))
         let nearlyFull = ChatStatus(model: "m", directory: "/", approval: "x", contextUsed: 0.85).rendered(
             style: Style(enabled: true))
         #expect(nearlyFull.contains("38;2;242;185;80mcontext 85% used"))

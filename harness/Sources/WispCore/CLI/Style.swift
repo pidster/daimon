@@ -24,15 +24,15 @@ public struct Style: Sendable, Equatable {
         enabled ? "\u{1B}[\(code)m\(text)\u{1B}[0m" : text
     }
 
-    /// wisp's palette, shared with the `wisp-tui` front end: one ghostly green-blue in tones for what
+    /// wisp's palette, shared with the `wisp-tui` front end: one ghostly pale blue in tones for what
     /// wisp itself says, amber for attention, ember for danger, white for the conversation.
     public enum Palette {
         /// The brightest tone: the prompt.
-        public static let glow = (0xA8, 0xF0, 0xDC)
+        public static let glow = (0xCF, 0xF1, 0xFF)
         /// The main tone: model, status facts, ok states.
-        public static let wisp = (0x5F, 0xCD, 0xB0)
+        public static let wisp = (0x8F, 0xD3, 0xF4)
         /// The quiet tone: tool lines, notes, separators.
-        public static let mist = (0x4A, 0x8C, 0x7C)
+        public static let mist = (0x86, 0xAE, 0xC8)
         /// Attention: approvals, moderate, a nearly full context.
         public static let amber = (0xF2, 0xB9, 0x50)
         /// Danger and errors.

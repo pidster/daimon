@@ -10,8 +10,13 @@ use serde_json::Value;
 use crate::palette;
 use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
 
-/// Rows the band occupies: reply in progress, dialog, input, status.
-pub const BAND_HEIGHT: u16 = 4;
+/// Rows the band occupies: reply in progress, dialog, a blank margin, the input box (a padding row,
+/// the input, a padding row), a blank margin, status.
+pub const BAND_HEIGHT: u16 = 8;
+/// The band row the input text sits on.
+pub const INPUT_ROW: u16 = 4;
+/// The band row the status sits on.
+pub const STATUS_ROW: u16 = 7;
 /// Cells of margin on each side of the band and of every committed line.
 pub const MARGIN: u16 = 2;
 /// The input row's placeholder when nothing is typed.
@@ -206,39 +211,47 @@ impl App {
         Action::Quit
     }
 
-    /// Draws the band into `area`, inset by the margin; the input row is tinted edge to edge.
+    /// Draws the band into `area`: text inset by the margin, the input box tinted from margin to
+    /// margin with a cell of padding inside and a padding row above and below.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
+        let margin = MARGIN.min(area.width / 2);
         let inset = Rect {
-            x: area.x + MARGIN.min(area.width / 2),
-            width: area.width.saturating_sub(MARGIN * 2),
+            x: area.x + margin,
+            width: area.width.saturating_sub(margin * 2),
             ..area
         };
-        let rows = [
-            (
-                Line::from(Span::styled(self.partial.clone(), palette::body())),
-                false,
-            ),
-            (self.dialog_line(), false),
-            (self.input_line(), true),
-            (self.status_line(), false),
-        ];
-        for (index, (line, tinted)) in rows.into_iter().enumerate() {
-            let row = index.try_into().unwrap_or(u16::MAX);
-            if row >= area.height {
-                continue;
+        let row = |index: u16, rect: Rect| Rect::new(rect.x, rect.y + index, rect.width, 1);
+        let plain = |frame: &mut Frame, index: u16, line: Line<'static>| {
+            if index < area.height {
+                frame.render_widget(Paragraph::new(line), row(index, inset));
             }
-            if tinted {
-                let full = Rect::new(area.x, area.y + row, area.width, 1);
-                frame.render_widget(Paragraph::new("").style(palette::input_background()), full);
+        };
+        plain(
+            frame,
+            0,
+            Line::from(Span::styled(self.partial.clone(), palette::body())),
+        );
+        plain(frame, 1, self.dialog_line());
+        for index in INPUT_ROW - 1..=INPUT_ROW + 1 {
+            if index < area.height {
+                frame.render_widget(
+                    Paragraph::new("").style(palette::input_background()),
+                    row(index, inset),
+                );
             }
-            let rect = Rect::new(inset.x, inset.y + row, inset.width, 1);
-            let widget = if tinted {
-                Paragraph::new(line).style(palette::input_background())
-            } else {
-                Paragraph::new(line)
-            };
-            frame.render_widget(widget, rect);
         }
+        if INPUT_ROW < area.height {
+            let field = Rect {
+                x: inset.x + 1,
+                width: inset.width.saturating_sub(2),
+                ..row(INPUT_ROW, inset)
+            };
+            frame.render_widget(
+                Paragraph::new(self.input_line()).style(palette::input_background()),
+                field,
+            );
+        }
+        plain(frame, STATUS_ROW, self.status_line());
     }
 
     fn dialog_line(&self) -> Line<'static> {
@@ -544,16 +557,24 @@ mod tests {
         };
         assert_eq!(row(0), "  so far");
         assert_eq!(row(1), "");
-        assert_eq!(row(2), "  › hello");
+        assert_eq!(row(INPUT_ROW), "   › hello");
         assert_eq!(
-            row(3),
+            row(STATUS_ROW),
             "  system · ~/x · main · clean · --yes · context 14% used"
         );
-        // The input row is tinted edge to edge, margin included; the others are not.
-        assert_eq!(buffer[(0, 2)].bg, palette::DEEP);
-        assert_eq!(buffer[(59, 2)].bg, palette::DEEP);
-        assert_eq!(buffer[(0, 3)].bg, ratatui::style::Color::Reset);
-        assert_eq!(buffer[(2, 2)].fg, palette::GLOW);
+        // The input box is tinted from margin to margin over three rows; the margins and the rest are not.
+        for index in INPUT_ROW - 1..=INPUT_ROW + 1 {
+            assert_eq!(buffer[(2, index)].bg, palette::DEEP, "row {index}");
+            assert_eq!(buffer[(57, index)].bg, palette::DEEP, "row {index}");
+            assert_eq!(
+                buffer[(1, index)].bg,
+                ratatui::style::Color::Reset,
+                "row {index}"
+            );
+        }
+        assert_eq!(buffer[(2, INPUT_ROW + 2)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(2, STATUS_ROW)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(3, INPUT_ROW)].fg, palette::GLOW);
         // An empty input shows the placeholder; a nearly full context turns amber.
         let mut status = app.status.clone().unwrap_or_default();
         status.context_used = Some(0.9);
@@ -566,15 +587,15 @@ mod tests {
             .expect("draw");
         let buffer = terminal.backend().buffer();
         let text: String = (0..60)
-            .map(|x| buffer[(x, 2)].symbol().to_string())
+            .map(|x| buffer[(x, INPUT_ROW)].symbol().to_string())
             .collect();
-        assert_eq!(text.trim_end(), format!("  › {PLACEHOLDER}"));
+        assert_eq!(text.trim_end(), format!("   › {PLACEHOLDER}"));
         let row3: String = (0..60)
-            .map(|x| buffer[(x, 3)].symbol().to_string())
+            .map(|x| buffer[(x, STATUS_ROW)].symbol().to_string())
             .collect();
         let at = row3.find("context").unwrap_or(0);
         let column = u16::try_from(row3[..at].chars().count()).unwrap_or(0);
         assert!(at > 0, "no context part in {row3}");
-        assert_eq!(buffer[(column, 3)].fg, palette::AMBER);
+        assert_eq!(buffer[(column, STATUS_ROW)].fg, palette::AMBER);
     }
 }

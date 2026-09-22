@@ -1,17 +1,17 @@
-//! wisp's colours: one ghostly green-blue in four tones for everything wisp itself says, an amber
+//! wisp's colours: one ghostly pale blue in four tones for everything wisp itself says, an amber
 //! accent for things that want attention, an ember accent for danger and errors, and white for the
 //! conversation. True colour; the same values live in the Swift chat's `Style`.
 
 use ratatui::style::{Color, Modifier, Style};
 
 /// The brightest tone: the prompt and things to look at.
-pub const GLOW: Color = Color::Rgb(0xA8, 0xF0, 0xDC);
+pub const GLOW: Color = Color::Rgb(0xCF, 0xF1, 0xFF);
 /// The main tone: model, status facts, ok states.
-pub const WISP: Color = Color::Rgb(0x5F, 0xCD, 0xB0);
+pub const WISP: Color = Color::Rgb(0x8F, 0xD3, 0xF4);
 /// The quiet tone: tool lines, notes, separators.
-pub const MIST: Color = Color::Rgb(0x4A, 0x8C, 0x7C);
+pub const MIST: Color = Color::Rgb(0x86, 0xAE, 0xC8);
 /// The deep tone: the input row's background.
-pub const DEEP: Color = Color::Rgb(0x14, 0x2A, 0x26);
+pub const DEEP: Color = Color::Rgb(0x25, 0x3B, 0x4E);
 /// Attention: approvals, moderate, a nearly full context.
 pub const AMBER: Color = Color::Rgb(0xF2, 0xB9, 0x50);
 /// Danger and errors.
