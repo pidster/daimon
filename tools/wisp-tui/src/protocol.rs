@@ -1,0 +1,181 @@
+//! The JSON Lines protocol `wisp chat --json` speaks (see `docs/wisp.md`, "Headless chat").
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// One line from wisp.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum Outbound {
+    /// A whole line of output, as `/help` prints.
+    Output {
+        /// The text.
+        text: String,
+    },
+    /// A fragment of the streamed reply.
+    Delta {
+        /// The text, no newline of its own.
+        text: String,
+    },
+    /// A note from wisp itself.
+    Note {
+        /// The text.
+        text: String,
+    },
+    /// The status before a prompt: the turn is over and input is wanted.
+    Status(Status),
+    /// An audit event of the conversation.
+    Event(Event),
+    /// An approval the front end must answer.
+    Approval(Approval),
+    /// wisp is exiting.
+    Exit,
+    /// Anything this version does not know.
+    #[serde(other)]
+    Unknown,
+}
+
+/// The status line's facts.
+#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
+pub struct Status {
+    /// The model selection.
+    pub model: String,
+    /// The working directory, abbreviated.
+    pub directory: String,
+    /// The git branch, when in a repository.
+    pub branch: Option<String>,
+    /// Whether tracked files have changes, when known.
+    pub dirty: Option<bool>,
+    /// The approval mode.
+    pub approval: String,
+    /// Fraction of the context window used, when known.
+    #[serde(rename = "contextUsed")]
+    pub context_used: Option<f64>,
+}
+
+/// An audit event, kind and details.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct Event {
+    /// `tool.call`, `tool.result`, `command.outcome`, `file.write`, `context.condensation`, `error`, and so on.
+    pub kind: String,
+    /// The call id pairing a call with its result.
+    pub call: Option<String>,
+    /// Kind-specific fields.
+    #[serde(default)]
+    pub details: Value,
+}
+
+/// An approval request.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct Approval {
+    /// The id to answer with.
+    pub id: String,
+    /// The simple command judged.
+    pub command: String,
+    /// The whole line it is part of.
+    pub line: String,
+    /// The pattern the answer is remembered under.
+    pub pattern: String,
+    /// The working directory.
+    pub directory: String,
+    /// `safe`, `moderate`, or `dangerous`.
+    pub level: String,
+    /// Why.
+    #[serde(default)]
+    pub reasons: Vec<String>,
+}
+
+/// One line to wisp.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum Inbound {
+    /// A chat line, slash commands included.
+    Message {
+        /// The text.
+        text: String,
+    },
+    /// An answer to an approval.
+    Answer {
+        /// The approval's id.
+        id: String,
+        /// `once`, `session`, `project`, `always`, or `no`.
+        decision: String,
+    },
+}
+
+impl Outbound {
+    /// Parses one line; a line that is not JSON is shown as a note, so nothing is lost.
+    pub fn parse(line: &str) -> Self {
+        serde_json::from_str(line).unwrap_or_else(|_| Self::Note {
+            text: line.to_string(),
+        })
+    }
+}
+
+impl Inbound {
+    /// The line to write, newline included.
+    pub fn line(&self) -> String {
+        let mut text = serde_json::to_string(self).unwrap_or_else(|_| String::from("{}"));
+        text.push('\n');
+        text
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_every_outbound_shape() {
+        assert_eq!(
+            Outbound::parse(r#"{"type":"delta","text":"hi"}"#),
+            Outbound::Delta { text: "hi".into() }
+        );
+        let status = Outbound::parse(
+            r#"{"type":"status","model":"system","directory":"~","branch":null,"dirty":true,"approval":"--yes","contextUsed":0.25}"#,
+        );
+        match status {
+            Outbound::Status(s) => {
+                assert_eq!(s.model, "system");
+                assert_eq!(s.branch, None);
+                assert_eq!(s.dirty, Some(true));
+                assert_eq!(s.context_used, Some(0.25));
+            }
+            other => panic!("not a status: {other:?}"),
+        }
+        let event = Outbound::parse(
+            r#"{"type":"event","kind":"tool.call","call":"c","details":{"tool":"read_file"}}"#,
+        );
+        match event {
+            Outbound::Event(e) => assert_eq!(e.details["tool"], "read_file"),
+            other => panic!("not an event: {other:?}"),
+        }
+        assert_eq!(Outbound::parse(r#"{"type":"exit"}"#), Outbound::Exit);
+        assert_eq!(Outbound::parse(r#"{"type":"future"}"#), Outbound::Unknown);
+        assert_eq!(
+            Outbound::parse("plain text"),
+            Outbound::Note {
+                text: "plain text".into()
+            }
+        );
+    }
+
+    #[test]
+    fn writes_inbound_lines() {
+        assert_eq!(
+            Inbound::Message {
+                text: "/help".into()
+            }
+            .line(),
+            "{\"type\":\"message\",\"text\":\"/help\"}\n"
+        );
+        assert_eq!(
+            Inbound::Answer {
+                id: "a".into(),
+                decision: "session".into()
+            }
+            .line(),
+            "{\"type\":\"answer\",\"id\":\"a\",\"decision\":\"session\"}\n"
+        );
+    }
+}

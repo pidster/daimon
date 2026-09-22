@@ -19,6 +19,7 @@
 | [context-management.md](context-management.md) | The small context window: framework APIs, what wisp does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
 | [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
+| [decisions/0029-tui-front-end.md](decisions/0029-tui-front-end.md) | The terminal chat is a Rust front end (`wisp-tui`, ratatui) over a headless `wisp chat --json`; one palette for both faces |
 | [decisions/0028-rename-to-wisp.md](decisions/0028-rename-to-wisp.md) | The project is wisp; one mechanical rename, no compatibility layer, a new Homebrew tap |
 | [decisions/0027-verb-patterns.md](decisions/0027-verb-patterns.md) | Approval patterns include the verb for programs like git and cargo, from an embedded list; old patterns still count |
 | [decisions/0026-task-catalogue.md](decisions/0026-task-catalogue.md) | Eval results ship with the tool catalogue as measurements, recorded by the eval run and embedded at build time |
@@ -37,6 +38,7 @@
 | [engineering.md](engineering.md) | Standards, tooling, the pre-commit gate, and CI |
 | [backends.md](backends.md) | Model backends: Apple's, Ollama, Core AI, MLX; asset preparation, naming, declared capabilities, errors |
 | [decisions/](decisions/) | Architecture Decision Records, one per significant decision |
+| [proposals/2026-09-22-tui-spike.md](proposals/2026-09-22-tui-spike.md) | Spike: a ratatui front end over a headless `wisp chat --json`; what was built, what was answered, what needs a real terminal |
 | [proposals/2026-09-20-escalations.md](proposals/2026-09-20-escalations.md) | For review: two escalation verbs (approval, inquiry) and a choice of channels, including a non-blocking hand-off to the calling agent |
 | [reviews/](reviews/) | Dated code and documentation reviews with their todo lists and status |
 

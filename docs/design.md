@@ -226,7 +226,9 @@ terminal to it and `ChatLoopTests` runs the whole loop over a scripted model. Ch
 live through `ChatEvents.Tap`, an `AuditSink` the conversation is opened with (`Session.openAgent(observer:)`
 tees it beside the log and the receipt collector), so the lines the user sees are rendered from the
 audited events; `ChatStatus` draws the status line above each prompt; `Style` applies colour only on a
-terminal.
+terminal. `wisp chat --json` is the same loop with its IO mapped onto a JSON Lines protocol
+(`ChatProtocol`, `LineRouter`, `JSONApprover`), so a front end in another process, `tools/wisp-tui`,
+can own the screen while the session stays here.
 
 ## Error handling
 

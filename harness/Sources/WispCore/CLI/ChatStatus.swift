@@ -30,16 +30,18 @@ public struct ChatStatus: Equatable, Sendable {
         self.contextUsed = contextUsed
     }
 
-    /// The line, parts separated by ` · `, each in its own colour when styling is on.
+    /// The line, parts separated by ` · `: facts in the main tone, the approval mode and a modest
+    /// context use muted, a context past 80% in amber.
     public func rendered(style: Style) -> String {
-        var parts = [style.cyan(model), style.yellow(directory)]
-        if let branch { parts.append(style.green(branch)) }
-        if let dirty { parts.append(style.green(dirty ? "changes" : "clean")) }
-        parts.append(style.magenta(approval))
+        var parts = [style.wisp(model), style.wisp(directory)]
+        if let branch { parts.append(style.wisp(branch)) }
+        if let dirty { parts.append(style.wisp(dirty ? "changes" : "clean")) }
+        parts.append(style.muted(approval))
         if let contextUsed {
-            parts.append(style.blue("context \(Int((contextUsed * 100).rounded()))% used"))
+            let text = "context \(Int((contextUsed * 100).rounded()))% used"
+            parts.append(contextUsed >= 0.8 ? style.amber(text) : style.muted(text))
         }
-        return parts.joined(separator: style.dim(" · "))
+        return parts.joined(separator: style.muted(" · "))
     }
 
     /// `path` with the current user's home replaced by `~`.

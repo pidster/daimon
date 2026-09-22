@@ -10,7 +10,7 @@ import WispTestSupport
     final class Capture: Sendable {
         let stdout = Mutex<[String]>([])
         let notes = Mutex<[String]>([])
-        let prompts = Mutex<[String?]>([])
+        let prompts = Mutex<[ChatStatus]>([])
         let lines: Mutex<[String]>
 
         init(lines: [String]) { self.lines = Mutex(lines) }
@@ -26,7 +26,7 @@ import WispTestSupport
 
         var output: String { stdout.withLock { $0.joined() } }
         var noted: [String] { notes.withLock { $0 } }
-        var shownStatus: [String?] { prompts.withLock { $0 } }
+        var shownStatus: [ChatStatus] { prompts.withLock { $0 } }
     }
 
     /// A context with a fixed git answer and an inspect view that echoes its argument.
@@ -70,7 +70,7 @@ import WispTestSupport
         // The status line is drawn before every prompt, from the context and the agent.
         let status = capture.shownStatus
         #expect(status.count == 16)
-        #expect(status.first == "system · /repo · main · changes · approve at moderate")
+        #expect(status.first?.rendered(style: .plain) == "system · /repo · main · changes · approve at moderate")
         #expect(notes.contains("usage: /save <name>"))
         #expect(notes.contains("saved 'first'"))
         #expect(notes.contains("unknown command /bogus; /help lists commands"))

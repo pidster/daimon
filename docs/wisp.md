@@ -44,9 +44,11 @@ What a session shows, and where it goes:
   `↳ 2048 bytes in 0.0 s: 1\t# wisp`. `/last` prints the last tool result whole.
 - Replies on stdout; everything else (banner, status, prompt, tool lines, notes, approval dialogs) on
   stderr, so `wisp chat > transcript.txt` captures only the replies.
-- Colour and weight when stdout is a terminal: the prompt and model in cyan, notes and tool lines dim,
-  approvals yellow with the level coloured, errors red. Off when piped, when `NO_COLOR` is set, or when
-  `TERM` is `dumb`.
+- Colour when stdout is a terminal, from wisp's palette (`Style.Palette`, shared with `wisp-tui`): one
+  green-blue in tones, the brightest for the prompt, the main tone for status facts and ok states, a
+  quiet tone for tool lines, notes, and separators; amber for approvals, moderate, and a context past
+  80%; ember for dangerous and errors; white for the conversation, bold for your own words. Off when
+  piped, when `NO_COLOR` is set, or when `TERM` is `dumb`.
 
 | Flag | Meaning |
 | --- | --- |
@@ -80,6 +82,35 @@ empty answer, or end of input refuses it ([approval.md](approval.md)).
 
 Status lines and the `> ` prompt go to stderr, replies to stdout, so `wisp chat 2>/dev/null` prints only
 what the model said. A *turn* is one message from you and everything the model does to answer it.
+
+### Headless chat: `wisp chat --json`
+
+`--json` replaces the terminal with JSON Lines on stdin and stdout so another program can be the face
+while the session, tools, gate, and audit stay in this process. The `wisp-tui` front end in `tools/`
+drives it (spike, 2026-09-22; the shape may change). One object per line, `type` names it.
+
+Out, to the front end:
+
+| `type` | Fields | When |
+| --- | --- | --- |
+| `note` | `text` | The banner, the help line, and anything chat would say on stderr. |
+| `status` | `model`, `directory`, `branch`, `dirty`, `approval`, `contextUsed` (nulls when unknown) | Before each prompt: the turn is over and input is wanted. |
+| `delta` | `text` | A fragment of the streamed reply. |
+| `output` | `text` | A whole line, as `/help` or `/last` print; an empty one ends a reply. |
+| `event` | `kind`, `call`, `turn`, `details` | Every audit event of the conversation, as `logging.md` describes them; the front end chooses what to show. |
+| `approval` | `id`, `command`, `line`, `pattern`, `directory`, `level`, `reasons` | A command needs a decision; answer with the `id` within `approval.timeoutSeconds` or it is refused. |
+| `exit` | | The loop has ended. |
+
+In, from the front end: `{"type":"message","text":"…"}` for a chat line, slash commands included, and
+`{"type":"answer","id":"…","decision":"once|session|project|always|no"}` for an approval. A line that
+is not a JSON object is taken as a message, so the protocol can be driven by hand:
+
+```
+printf 'What is the date in Tokyo?\n/quit\n' | wisp chat --json
+```
+
+Everything else about the session is as for the terminal chat: the same flags, transcripts, and audit.
+Only the presentation moves out of the process.
 
 ### `wisp tools`
 

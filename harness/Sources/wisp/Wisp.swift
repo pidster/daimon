@@ -222,6 +222,9 @@ struct Chat: AsyncParsableCommand {
     @Flag(name: .long, help: "List saved transcripts (for --resume) and exit.")
     var list = false
 
+    @Flag(name: .long, help: "Headless: JSON Lines on stdin and stdout, for a front end such as wisp-tui.")
+    var json = false
+
     mutating func run() async throws {
         let store = TranscriptStore(directory: Wisp.home.transcripts)
         if list {
@@ -231,6 +234,10 @@ struct Chat: AsyncParsableCommand {
         let session = try Wisp.begin(try options.request(entryPoint: .chat, autoApprove: yes, resume: resume))
         defer { session.end() }
         try Wisp.home.ensure()
+        if json {
+            try await runJSON(session: session, store: store)
+            return
+        }
         let style = Style.detect(isTerminal: isatty(FileHandle.standardOutput.fileDescriptor) != 0)
         let tap = ChatEvents.Tap()
         var agent: Agent
@@ -270,12 +277,52 @@ struct Chat: AsyncParsableCommand {
                 note: Self.note,
                 prompt: { status in
                     Self.freshLine()
-                    var text = ""
-                    if let status { text += status + "\n" }
-                    text += style.cyan("›") + " "
+                    let text = status.rendered(style: style) + "\n" + style.prompt("›") + " "
                     FileHandle.standardError.write(Data(text.utf8))
                 }))
         try await loop.run()
+    }
+
+    /// The headless face: JSON Lines in and out, for `wisp-tui` and other front ends (`docs/wisp.md`).
+    private func runJSON(session: Session, store: TranscriptStore) async throws {
+        let router = LineRouter()
+        let out = Mutex(FileHandle.standardOutput)
+        let send: @Sendable (String) -> Void = { line in
+            out.withLock { $0.write(Data((line + "\n").utf8)) }
+        }
+        let reader = Thread {
+            while let line = readLine() { router.receive(line) }
+            router.close()
+        }
+        reader.start()
+        let tap = ChatEvents.Tap()
+        let approver = JSONApprover(router: router, timeout: session.config.approvalTimeout, send: send)
+        var agent: Agent
+        if let resume {
+            let transcript = try Wisp.usage { try store.load(resume) }
+            agent = try session.openAgent(approver: approver, transcript: transcript, observer: tap)
+        } else {
+            agent = try session.openAgent(approver: approver, observer: tap)
+        }
+        let views = session.introspection
+        var loop = ChatLoop(
+            agent: agent, store: store, saveName: save ?? resume, tap: tap,
+            context: .init(
+                directory: FileManager.default.currentDirectoryPath,
+                approval: ChatStatus.approvalMode(threshold: session.config.approvalThreshold, autoApprove: yes),
+                git: GitState.read(in:),
+                inspect: { what in await InspectTool(introspection: views).show(what) },
+                banner: "wisp \(WispVersion.current) · \(agent.model.selection) · \(agent.tools.count) tools"),
+            io: .init(
+                readLine: { router.nextMessage() },
+                print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
+                write: { send(ChatProtocol.encode("delta", ["text": .string($0)])) },
+                note: { send(ChatProtocol.encode("note", ["text": .string($0)])) },
+                prompt: { send(ChatProtocol.encode("status", ChatProtocol.status($0))) }))
+        // Raw events for the front end to render, instead of the terminal lines the loop would note.
+        tap.onEvent { event in send(ChatProtocol.encode("event", ChatProtocol.event(event))) }
+        try await loop.run()
+        send(ChatProtocol.encode("exit"))
     }
 
     /// Whether the last stdout write left the cursor mid-line, so a note can start on a fresh one.

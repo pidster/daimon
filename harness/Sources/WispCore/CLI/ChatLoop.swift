@@ -18,13 +18,13 @@ public struct ChatLoop {
         public var write: (String) -> Void
         /// A status line for the user, kept off stdout. Sendable: tool events arrive from the tool loop.
         public var note: @Sendable (String) -> Void
-        /// The prompt, on a fresh line, with the status line above it when there is one.
-        public var prompt: (String?) -> Void
+        /// The prompt, on a fresh line, with the status above it; the IO renders the status.
+        public var prompt: (ChatStatus) -> Void
 
         /// Creates an IO.
         public init(
             readLine: @escaping () -> String?, print: @escaping (String) -> Void, write: @escaping (String) -> Void,
-            note: @escaping @Sendable (String) -> Void, prompt: @escaping (String?) -> Void
+            note: @escaping @Sendable (String) -> Void, prompt: @escaping (ChatStatus) -> Void
         ) {
             self.readLine = readLine
             self.print = print
@@ -118,9 +118,9 @@ public struct ChatLoop {
     /// - Throws: Only the exit save can throw; everything inside the loop is reported as a note.
     public mutating func run() async throws {
         if let banner = context.banner { io.note(style.bold(banner)) }
-        io.note(style.dim("/help for commands, /quit or Ctrl-D to exit."))
+        io.note(style.muted("/help for commands, /quit or Ctrl-D to exit."))
         loop: while true {
-            io.prompt(await status().rendered(style: style))
+            io.prompt(await status())
             guard let line = io.readLine() else { break loop }
             switch ChatInput(line: line) {
             case .quit:
@@ -174,7 +174,7 @@ public struct ChatLoop {
                     io.print("")
                 } catch {
                     io.print("")
-                    io.note(style.red("error: \(error)"))
+                    io.note(style.ember("error: \(error)"))
                 }
             }
         }
