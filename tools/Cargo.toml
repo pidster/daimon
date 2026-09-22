@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 # One crate per tool binary; add each under tools/<name> and list it here.
-members = []
+members = ["wisp-tui"]
 
 [workspace.package]
 edition = "2024"
