@@ -4,3 +4,8 @@ target/
 *.xcodeproj
 .DS_Store
 *.profraw
+
+# Editor-local launch configurations (the Swift extension for VS Code writes these)
+.vscode/
+# Compiler diagnostic dumps a coverage build can leave beside generated sources
+*.dia

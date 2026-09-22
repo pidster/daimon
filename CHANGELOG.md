@@ -4,6 +4,17 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## 0.7.0
+
+Added:
+
+- `/models` and `/model <name>` in chat: list the models this Mac can run and switch the conversation
+  to one, keeping the transcript. Works in the plain chat and in `wisp-tui`.
+
+Changed:
+
+- The model introduces itself as Wisp.
+
 ## 0.6.1
 
 Fixed:

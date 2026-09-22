@@ -25,7 +25,7 @@ import Testing
         #expect(
             Prompting(instructions: "x").rendered == Prompting.systemPrompt
                 + "\n\nInstructions for this conversation:\nx")
-        #expect(Prompting.systemPrompt.contains("wisp"))
+        #expect(Prompting.systemPrompt.contains("Wisp"))
         #expect(Prompting.systemPrompt.utf8.count < 600, "keep layer 1 small for a 4k window")
     }
 
