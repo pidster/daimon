@@ -41,6 +41,10 @@ NOTES="$(awk -v v="$VERSION" '
 scripts/check all
 scripts/check coverage-gate
 scripts/check eval
+if [ -n "$(git status --porcelain)" ]; then
+    echo "the eval changed harness/Sources/WispCore/Resources/measurements.json; commit it (the binary must carry the numbers that are committed) and rerun" >&2
+    exit 1
+fi
 
 echo "==> build"
 (cd harness && swift build -c release)

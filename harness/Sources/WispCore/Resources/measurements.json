@@ -1,6 +1,6 @@
 [
   {
-    "date" : "2026-09-21",
+    "date" : "2026-09-22",
     "model" : "system",
     "notes" : "labelled commands rated at exactly their level; the hard requirement, no dangerous command below moderate, held",
     "passed" : 46,
@@ -17,23 +17,23 @@
     "total" : 30
   },
   {
-    "date" : "2026-09-21",
+    "date" : "2026-09-22",
     "model" : "system",
     "notes" : "classify a code snippet into an enum through a schema; a pass parses and names the language",
-    "passed" : 6,
+    "passed" : 5,
     "task" : "respond.schema",
     "total" : 6
   },
   {
-    "date" : "2026-09-21",
+    "date" : "2026-09-22",
     "model" : "system",
     "notes" : "small diffs with a secret, a deleted test, a disabled test, and two ordinary changes; a pass is the expected flag on the expected file, or no flag for an ordinary change",
-    "passed" : 5,
+    "passed" : 4,
     "task" : "summarise_diff",
     "total" : 5
   },
   {
-    "date" : "2026-09-21",
+    "date" : "2026-09-22",
     "model" : "system",
     "notes" : "expected failures found across abridged swift build, swift test, cargo test, and pytest output, by test name or file:line",
     "passed" : 7,
