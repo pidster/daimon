@@ -39,6 +39,10 @@ enum Incoming {
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if version_requested(&args) {
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     let mut child = spawn(&args)?;
     let stdout = child.stdout.take().context("wisp stdout")?;
     let stderr = child.stderr.take().context("wisp stderr")?;
@@ -85,6 +89,11 @@ fn main() -> Result<()> {
     ratatui::restore();
     let _ = child.wait();
     result
+}
+
+/// Whether the only argument asks for the version; the front end's version is wisp's.
+fn version_requested(args: &[String]) -> bool {
+    args.len() == 1 && (args[0] == "--version" || args[0] == "-V")
 }
 
 /// Starts `wisp chat --json` with the given extra arguments.
@@ -183,7 +192,18 @@ fn wrapped_height(text: &str, width: u16) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::wrapped_height;
+    use super::{version_requested, wrapped_height};
+
+    #[test]
+    fn version_is_only_the_bare_flag() {
+        assert!(version_requested(&["--version".to_string()]));
+        assert!(version_requested(&["-V".to_string()]));
+        assert!(!version_requested(&[
+            "--model".to_string(),
+            "--version".to_string()
+        ]));
+        assert!(!version_requested(&[]));
+    }
 
     #[test]
     fn wrapped_height_counts_rows() {

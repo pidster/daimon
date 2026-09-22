@@ -29,8 +29,9 @@ every local step and prints the remote ones instead of executing them.
    and commit the file; the binary embeds it, so a release carries the numbers that were committed.
    If the eval nonetheless dirtied the tree the release stops. The eval is the slow step: about eight
    minutes on the on-device model on this Mac (2026-09-22).
-2. Build: `swift build -c release`, `strip`, verify `wisp --version` prints `X.Y.Z` and `wisp doctor`
-   passes on the build machine. The release is built without the `MLX` trait: MLX needs a Metal library
+2. Build: `swift build -c release` and `cargo build --release -p wisp-tui`, `strip` both, verify
+   `wisp --version` and `wisp-tui --version` print `X.Y.Z` (the crate version in `tools/wisp-tui/Cargo.toml`
+   is bumped with `WispVersion.current`) and `wisp doctor` passes on the build machine. The release is built without the `MLX` trait: MLX needs a Metal library
    bundle beside the binary at run time, which the one-file tarball and formula do not carry
    (`docs/backends.md`); MLX is a self-build option until that packaging is decided.
 3. Package: tarball with `wisp` and `LICENSE`; SHA-256 file.

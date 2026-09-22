@@ -225,11 +225,43 @@ struct Chat: AsyncParsableCommand {
     @Flag(name: .long, help: "Headless: JSON Lines on stdin and stdout, for a front end such as wisp-tui.")
     var json = false
 
+    @Flag(name: .long, help: "The plain line-based chat, even when wisp-tui is installed beside wisp.")
+    var plain = false
+
+    /// The front end to hand a terminal session to: `wisp-tui` beside this executable, when it exists
+    /// and the session is interactive and not already headless or asked to stay plain.
+    static func frontEnd(
+        besides executable: URL, json: Bool, plain: Bool, interactive: Bool,
+        exists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+    ) -> URL? {
+        guard !json, !plain, interactive else { return nil }
+        let candidate = executable.deletingLastPathComponent().appending(path: "wisp-tui")
+        return exists(candidate.path) ? candidate : nil
+    }
+
+    /// Replaces this process with `wisp-tui`, which spawns `wisp chat --json` on this same binary.
+    /// Returns only if the exec failed.
+    private static func handOff(to frontEnd: URL, executable: URL) {
+        let passthrough = Array(CommandLine.arguments.dropFirst(2))  // after `wisp chat`
+        setenv("WISP_BIN", executable.path, 1)
+        let argv: [UnsafeMutablePointer<CChar>?] = ([frontEnd.path] + passthrough).map { strdup($0) } + [nil]
+        execv(frontEnd.path, argv)
+        for pointer in argv { free(pointer) }
+    }
+
     mutating func run() async throws {
         let store = TranscriptStore(directory: Wisp.home.transcripts)
         if list {
             for name in try store.list() { print(name) }
             return
+        }
+        let executable = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        let interactive =
+            isatty(FileHandle.standardInput.fileDescriptor) != 0
+            && isatty(FileHandle.standardOutput.fileDescriptor) != 0
+        if let frontEnd = Self.frontEnd(besides: executable, json: json, plain: plain, interactive: interactive) {
+            Self.handOff(to: frontEnd, executable: executable)
+            Self.note("could not start \(frontEnd.path); continuing with the plain chat")
         }
         let session = try Wisp.begin(try options.request(entryPoint: .chat, autoApprove: yes, resume: resume))
         defer { session.end() }

@@ -32,6 +32,12 @@ wisp --no-tools --schema verdict.json "Which language is this: fn main() {}"
 
 Interactive session. Lines starting with `/` are commands; anything else goes to the model. Replies stream.
 
+On a terminal, when `wisp-tui` is installed beside `wisp` (the Homebrew formula installs both), `wisp chat`
+hands the session to it: the conversation scrolls in the terminal's own scrollback above a pinned band
+with the reply in progress, an approval dialog, the input, and the status
+([ADR 0029](decisions/0029-tui-front-end.md)). `--plain` keeps the line-based chat below; a piped
+session is always plain. `wisp-tui` takes the same arguments as `wisp chat` and can be run directly.
+
 What a session shows, and where it goes:
 
 - A banner with the version, model, tool count, and audit session, then a status line above every
@@ -60,6 +66,8 @@ What a session shows, and where it goes:
 | `--unsafe` | Disable the `run_command` policy and sandbox. |
 | `-m, --model <model>` | As for `respond`. |
 | `-y, --yes` | Approve risky commands without asking; the status line says `--yes`. |
+| `--plain` | The line-based chat even when `wisp-tui` is installed. |
+| `--json` | Headless: JSON Lines on stdin and stdout; see "Headless chat". |
 
 | Command | Effect |
 | --- | --- |

@@ -28,6 +28,8 @@ remote() {
 echo "==> preflight"
 [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || { echo "not on main" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 1; }
+grep -q "^version = \"$VERSION\"" tools/wisp-tui/Cargo.toml || { echo "tools/wisp-tui/Cargo.toml version is not $VERSION" >&2; exit 1; }
+command -v cargo >/dev/null || { echo "cargo is needed to build wisp-tui" >&2; exit 1; }
 CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/Sources/WispCore/Audit/AuditEvent.swift)"
 [ "$CURRENT" = "$VERSION" ] || { echo "WispVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
@@ -48,12 +50,16 @@ fi
 
 echo "==> build"
 (cd harness && swift build -c release)
+(cd tools && cargo build --release -q -p wisp-tui)
 BIN="harness/.build/release/wisp"
+TUI="tools/target/release/wisp-tui"
 rm -rf "$OUT"; mkdir -p "$OUT/stage"
 cp "$BIN" "$OUT/stage/wisp"
-strip "$OUT/stage/wisp"
+cp "$TUI" "$OUT/stage/wisp-tui"
+strip "$OUT/stage/wisp" "$OUT/stage/wisp-tui"
 cp LICENSE "$OUT/stage/LICENSE"
 [ "$("$OUT/stage/wisp" --version)" = "$VERSION" ] || { echo "built binary reports $("$OUT/stage/wisp" --version)" >&2; exit 1; }
+[ "$("$OUT/stage/wisp-tui" --version)" = "$VERSION" ] || { echo "wisp-tui reports $("$OUT/stage/wisp-tui" --version); set version in tools/wisp-tui/Cargo.toml" >&2; exit 1; }
 "$OUT/stage/wisp" doctor
 
 echo "==> package"
@@ -61,7 +67,7 @@ echo "==> package"
     printf '%s\n\n' "$NOTES"
     printf 'Install or upgrade with Homebrew: `brew install pidster/tap/wisp`. Downloading the tarball directly leaves it quarantined; use Homebrew.\n'
 } > "$OUT/notes.md"
-(cd "$OUT/stage" && tar -czf "../$TARBALL" wisp LICENSE)
+(cd "$OUT/stage" && tar -czf "../$TARBALL" wisp wisp-tui LICENSE)
 (cd "$OUT" && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
 SHA="$(cut -d' ' -f1 "$OUT/$TARBALL.sha256")"
 ls -la "$OUT/$TARBALL"; echo "sha256 $SHA"
@@ -87,11 +93,12 @@ class Wisp < Formula
   depends_on macos: :golden_gate
 
   def install
-    bin.install "wisp"
+    bin.install "wisp", "wisp-tui"
   end
 
   test do
     assert_equal "$VERSION", shell_output("#{bin}/wisp --version").strip
+    assert_equal "$VERSION", shell_output("#{bin}/wisp-tui --version").strip
   end
 end
 RUBY
