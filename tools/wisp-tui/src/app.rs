@@ -10,15 +10,14 @@ use serde_json::Value;
 use crate::palette;
 use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
 
-/// Rows the band occupies: reply in progress, dialog, a blank margin, the input box (a padding row,
-/// the input, a padding row), a blank margin, status.
-pub const BAND_HEIGHT: u16 = 8;
+/// Rows the band occupies: reply in progress, dialog, a blank margin, the input box, status.
+pub const BAND_HEIGHT: u16 = 5;
 /// The band row the input text sits on.
-pub const INPUT_ROW: u16 = 4;
+pub const INPUT_ROW: u16 = 3;
 /// The band row the status sits on.
-pub const STATUS_ROW: u16 = 7;
+pub const STATUS_ROW: u16 = 4;
 /// Cells of margin on each side of the band and of every committed line.
-pub const MARGIN: u16 = 2;
+pub const MARGIN: u16 = 1;
 /// The input row's placeholder when nothing is typed.
 pub const PLACEHOLDER: &str = "Ask wisp to do anything";
 
@@ -211,8 +210,8 @@ impl App {
         Action::Quit
     }
 
-    /// Draws the band into `area`: text inset by the margin, the input box tinted from margin to
-    /// margin with a cell of padding inside and a padding row above and below.
+    /// Draws the band into `area`: text inset by the margin, the input box one tinted row from margin
+    /// to margin with a cell of padding inside, a blank row above it.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let margin = MARGIN.min(area.width / 2);
         let inset = Rect {
@@ -232,15 +231,11 @@ impl App {
             Line::from(Span::styled(self.partial.clone(), palette::body())),
         );
         plain(frame, 1, self.dialog_line());
-        for index in INPUT_ROW - 1..=INPUT_ROW + 1 {
-            if index < area.height {
-                frame.render_widget(
-                    Paragraph::new("").style(palette::input_background()),
-                    row(index, inset),
-                );
-            }
-        }
         if INPUT_ROW < area.height {
+            frame.render_widget(
+                Paragraph::new("").style(palette::input_background()),
+                row(INPUT_ROW, inset),
+            );
             let field = Rect {
                 x: inset.x + 1,
                 width: inset.width.saturating_sub(2),
@@ -555,26 +550,21 @@ mod tests {
                 .trim_end()
                 .to_string()
         };
-        assert_eq!(row(0), "  so far");
+        assert_eq!(row(0), " so far");
         assert_eq!(row(1), "");
-        assert_eq!(row(INPUT_ROW), "   › hello");
+        assert_eq!(row(INPUT_ROW), "  › hello");
         assert_eq!(
             row(STATUS_ROW),
-            "  system · ~/x · main · clean · --yes · context 14% used"
+            " system · ~/x · main · clean · --yes · context 14% used"
         );
-        // The input box is tinted from margin to margin over three rows; the margins and the rest are not.
-        for index in INPUT_ROW - 1..=INPUT_ROW + 1 {
-            assert_eq!(buffer[(2, index)].bg, palette::DEEP, "row {index}");
-            assert_eq!(buffer[(57, index)].bg, palette::DEEP, "row {index}");
-            assert_eq!(
-                buffer[(1, index)].bg,
-                ratatui::style::Color::Reset,
-                "row {index}"
-            );
-        }
-        assert_eq!(buffer[(2, INPUT_ROW + 2)].bg, ratatui::style::Color::Reset);
-        assert_eq!(buffer[(2, STATUS_ROW)].bg, ratatui::style::Color::Reset);
-        assert_eq!(buffer[(3, INPUT_ROW)].fg, palette::GLOW);
+        // The input box is one tinted row from margin to margin; the margins and the rest are not.
+        assert_eq!(buffer[(1, INPUT_ROW)].bg, palette::DEEP);
+        assert_eq!(buffer[(58, INPUT_ROW)].bg, palette::DEEP);
+        assert_eq!(buffer[(0, INPUT_ROW)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(59, INPUT_ROW)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(1, INPUT_ROW - 1)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(1, STATUS_ROW)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(2, INPUT_ROW)].fg, palette::GLOW);
         // An empty input shows the placeholder; a nearly full context turns amber.
         let mut status = app.status.clone().unwrap_or_default();
         status.context_used = Some(0.9);
@@ -589,7 +579,7 @@ mod tests {
         let text: String = (0..60)
             .map(|x| buffer[(x, INPUT_ROW)].symbol().to_string())
             .collect();
-        assert_eq!(text.trim_end(), format!("   › {PLACEHOLDER}"));
+        assert_eq!(text.trim_end(), format!("  › {PLACEHOLDER}"));
         let row3: String = (0..60)
             .map(|x| buffer[(x, STATUS_ROW)].symbol().to_string())
             .collect();
