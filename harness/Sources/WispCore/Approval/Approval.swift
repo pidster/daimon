@@ -77,16 +77,16 @@ public struct TerminalApprover: Approver {
     public static func render(_ request: ApprovalRequest, style: Style) -> String {
         var lines = [
             "",
-            style.yellow("⚠ approve") + " [" + style.level(request.assessment.level) + "] "
+            style.amber("⚠ approve") + " [" + style.level(request.assessment.level) + "] "
                 + style.bold(request.command),
         ]
-        if request.line != request.command { lines.append(style.dim("  part of: \(request.line)")) }
-        lines.append(style.dim("  in \(ChatStatus.abbreviated(request.workingDirectory))"))
+        if request.line != request.command { lines.append(style.muted("  part of: \(request.line)")) }
+        lines.append(style.muted("  in \(ChatStatus.abbreviated(request.workingDirectory))"))
         for reason in request.assessment.reasons {
-            lines.append(style.dim("  - " + (reason.count > 110 ? String(reason.prefix(110)) + "…" : reason)))
+            lines.append(style.muted("  - " + (reason.count > 110 ? String(reason.prefix(110)) + "…" : reason)))
         }
-        lines.append(style.dim("  remembered as: \(request.pattern)"))
-        lines.append("  [y]once  [s]ession  [p]roject 30d  [a]lways 30d  [n]o " + style.cyan("›") + " ")
+        lines.append(style.muted("  remembered as: \(request.pattern)"))
+        lines.append("  [y]once  [s]ession  [p]roject 30d  [a]lways 30d  [n]o " + style.prompt("›") + " ")
         return lines.joined(separator: "\n")
     }
 

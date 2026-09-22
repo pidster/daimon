@@ -277,7 +277,7 @@ struct Chat: AsyncParsableCommand {
                 note: Self.note,
                 prompt: { status in
                     Self.freshLine()
-                    let text = status.rendered(style: style) + "\n" + style.cyan("›") + " "
+                    let text = status.rendered(style: style) + "\n" + style.prompt("›") + " "
                     FileHandle.standardError.write(Data(text.utf8))
                 }))
         try await loop.run()

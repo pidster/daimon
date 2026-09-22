@@ -118,7 +118,7 @@ public struct ChatLoop {
     /// - Throws: Only the exit save can throw; everything inside the loop is reported as a note.
     public mutating func run() async throws {
         if let banner = context.banner { io.note(style.bold(banner)) }
-        io.note(style.dim("/help for commands, /quit or Ctrl-D to exit."))
+        io.note(style.muted("/help for commands, /quit or Ctrl-D to exit."))
         loop: while true {
             io.prompt(await status())
             guard let line = io.readLine() else { break loop }
@@ -174,7 +174,7 @@ public struct ChatLoop {
                     io.print("")
                 } catch {
                     io.print("")
-                    io.note(style.red("error: \(error)"))
+                    io.note(style.ember("error: \(error)"))
                 }
             }
         }

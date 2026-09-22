@@ -44,9 +44,11 @@ What a session shows, and where it goes:
   `↳ 2048 bytes in 0.0 s: 1\t# wisp`. `/last` prints the last tool result whole.
 - Replies on stdout; everything else (banner, status, prompt, tool lines, notes, approval dialogs) on
   stderr, so `wisp chat > transcript.txt` captures only the replies.
-- Colour and weight when stdout is a terminal: the prompt and model in cyan, notes and tool lines dim,
-  approvals yellow with the level coloured, errors red. Off when piped, when `NO_COLOR` is set, or when
-  `TERM` is `dumb`.
+- Colour when stdout is a terminal, from wisp's palette (`Style.Palette`, shared with `wisp-tui`): one
+  green-blue in tones, the brightest for the prompt, the main tone for status facts and ok states, a
+  quiet tone for tool lines, notes, and separators; amber for approvals, moderate, and a context past
+  80%; ember for dangerous and errors; white for the conversation, bold for your own words. Off when
+  piped, when `NO_COLOR` is set, or when `TERM` is `dumb`.
 
 | Flag | Meaning |
 | --- | --- |

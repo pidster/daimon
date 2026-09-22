@@ -4,6 +4,14 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `wisp chat --json`, a headless chat speaking JSON Lines, and `wisp-tui`, a Rust front end over it
+  that keeps the conversation in the terminal's scrollback above a pinned input and status band. A
+  spike on a branch; the protocol may change.
+
 ## 0.5.0
 
 Fixed:

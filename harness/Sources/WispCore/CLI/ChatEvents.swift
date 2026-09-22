@@ -10,31 +10,32 @@ public enum ChatEvents {
         switch event.kind {
         case .toolCall:
             let tool = d["tool"]?.stringValue ?? "?"
-            return style.dim("⚙ \(tool) \(summary(ofArguments: d["arguments"]?.stringValue ?? "", tool: tool))")
+            return style.muted("⚙ \(tool) \(summary(ofArguments: d["arguments"]?.stringValue ?? "", tool: tool))")
         case .toolResult:
             // A command's outcome line already says what happened; its rendered result adds nothing.
             if d["tool"]?.stringValue == "run_command" { return nil }
             let bytes = d["bytes"]?.intValue ?? 0
             let seconds = d["seconds"]?.doubleValue ?? 0
             let head = firstLine(of: d["output"]?.stringValue ?? "")
-            return style.dim("  ↳ \(bytes) bytes in \(String(format: "%.1f", seconds)) s: \(head)")
+            return style.muted("  ↳ \(bytes) bytes in \(String(format: "%.1f", seconds)) s: \(head)")
         case .commandOutcome:
             let status = d["exitStatus"]?.intValue ?? 0
-            let mark = status == 0 ? style.green("exit \(status)") : style.red("exit \(status)")
+            let mark = status == 0 ? style.wisp("exit \(status)") : style.ember("exit \(status)")
             var extras: [String] = []
             if d["timedOut"]?.boolValue == true { extras.append("timed out") }
             if d["truncated"]?.boolValue == true { extras.append("output truncated") }
-            return style.dim("  ↳ ") + mark + style.dim(extras.isEmpty ? "" : " (\(extras.joined(separator: ", ")))")
+            return style.muted("  ↳ ") + mark
+                + style.muted(extras.isEmpty ? "" : " (\(extras.joined(separator: ", ")))")
         case .fileWrite:
             let mode = d["mode"]?.stringValue ?? "?"
             let path = d["path"]?.stringValue ?? "?"
             let after = d["bytesAfter"]?.intValue ?? 0
-            return style.dim("  ↳ \(mode) \(path), now \(after) bytes")
+            return style.muted("  ↳ \(mode) \(path), now \(after) bytes")
         case .error where event.call != nil:
-            return style.red("  ↳ error: \(d["message"]?.stringValue ?? "")")
+            return style.ember("  ↳ error: \(d["message"]?.stringValue ?? "")")
         case .condensation:
             let reason = d["reason"]?.stringValue ?? ""
-            return style.dim(
+            return style.muted(
                 "(context condensed, \(reason): \(d["turnsBefore"]?.intValue ?? 0) → \(d["turnsAfter"]?.intValue ?? 0) turns)"
             )
         default:

@@ -3,15 +3,19 @@
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use serde_json::Value;
 
+use crate::palette;
 use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
 
 /// Rows the band occupies: reply in progress, dialog, input, status.
 pub const BAND_HEIGHT: u16 = 4;
+/// Cells of margin on each side of the band and of every committed line.
+pub const MARGIN: u16 = 2;
+/// The input row's placeholder when nothing is typed.
+pub const PLACEHOLDER: &str = "Ask wisp to do anything";
 
 /// A line committed to scrollback, with its style.
 #[derive(Debug, Clone, PartialEq)]
@@ -202,21 +206,38 @@ impl App {
         Action::Quit
     }
 
-    /// Draws the band into `area`.
+    /// Draws the band into `area`, inset by the margin; the input row is tinted edge to edge.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        let dim = Style::default().add_modifier(Modifier::DIM);
+        let inset = Rect {
+            x: area.x + MARGIN.min(area.width / 2),
+            width: area.width.saturating_sub(MARGIN * 2),
+            ..area
+        };
         let rows = [
-            Line::from(Span::styled(self.partial.clone(), Style::default())),
-            self.dialog_line(),
-            self.input_line(),
-            self.status_line(dim),
+            (
+                Line::from(Span::styled(self.partial.clone(), palette::body())),
+                false,
+            ),
+            (self.dialog_line(), false),
+            (self.input_line(), true),
+            (self.status_line(), false),
         ];
-        for (index, line) in rows.into_iter().enumerate() {
+        for (index, (line, tinted)) in rows.into_iter().enumerate() {
             let row = index.try_into().unwrap_or(u16::MAX);
-            if row < area.height {
-                let rect = Rect::new(area.x, area.y + row, area.width, 1);
-                frame.render_widget(Paragraph::new(line), rect);
+            if row >= area.height {
+                continue;
             }
+            if tinted {
+                let full = Rect::new(area.x, area.y + row, area.width, 1);
+                frame.render_widget(Paragraph::new("").style(palette::input_background()), full);
+            }
+            let rect = Rect::new(inset.x, inset.y + row, inset.width, 1);
+            let widget = if tinted {
+                Paragraph::new(line).style(palette::input_background())
+            } else {
+                Paragraph::new(line)
+            };
+            frame.render_widget(widget, rect);
         }
     }
 
@@ -224,70 +245,67 @@ impl App {
         let Some(approval) = &self.approval else {
             return Line::default();
         };
-        let level = match approval.level.as_str() {
-            "dangerous" => Color::Red,
-            "moderate" => Color::Yellow,
-            _ => Color::Green,
-        };
         Line::from(vec![
-            Span::styled("⚠ approve ", Style::default().fg(Color::Yellow)),
-            Span::styled(format!("[{}] ", approval.level), Style::default().fg(level)),
+            Span::styled("⚠ approve ", palette::amber()),
             Span::styled(
-                approval.command.clone(),
-                Style::default().add_modifier(Modifier::BOLD),
+                format!("[{}] ", approval.level),
+                palette::level(&approval.level),
             ),
+            Span::styled(approval.command.clone(), palette::user()),
             Span::styled(
                 format!("  remembered as {}  ", approval.pattern),
-                Style::default().add_modifier(Modifier::DIM),
+                palette::muted(),
             ),
-            Span::raw("[y]once [s]ession [p]roject [a]lways [n]o"),
+            Span::styled("[y]once [s]ession [p]roject [a]lways [n]o", palette::body()),
         ])
     }
 
     fn input_line(&self) -> Line<'static> {
         let prompt = if self.busy { "…" } else { "›" };
+        let text = if self.input.is_empty() && !self.busy {
+            Span::styled(PLACEHOLDER, palette::muted())
+        } else {
+            Span::styled(self.input.clone(), palette::user())
+        };
         Line::from(vec![
-            Span::styled(format!("{prompt} "), Style::default().fg(Color::Cyan)),
-            Span::raw(self.input.clone()),
+            Span::styled(format!("{prompt} "), palette::prompt()),
+            text,
         ])
     }
 
-    fn status_line(&self, dim: Style) -> Line<'static> {
+    fn status_line(&self) -> Line<'static> {
         let Some(status) = &self.status else {
-            return Line::from(Span::styled("connecting…", dim));
+            return Line::from(Span::styled("connecting…", palette::muted()));
         };
+        let sep = || Span::styled(" · ", palette::muted());
         let mut spans = vec![
-            Span::styled(status.model.clone(), Style::default().fg(Color::Cyan)),
-            Span::styled(" · ", dim),
-            Span::styled(status.directory.clone(), Style::default().fg(Color::Yellow)),
+            Span::styled(status.model.clone(), palette::wisp()),
+            sep(),
+            Span::styled(status.directory.clone(), palette::wisp()),
         ];
         if let Some(branch) = &status.branch {
-            spans.push(Span::styled(" · ", dim));
-            spans.push(Span::styled(
-                branch.clone(),
-                Style::default().fg(Color::Green),
-            ));
+            spans.push(sep());
+            spans.push(Span::styled(branch.clone(), palette::wisp()));
         }
         if let Some(dirty) = status.dirty {
-            spans.push(Span::styled(" · ", dim));
+            spans.push(sep());
             spans.push(Span::styled(
                 if dirty { "changes" } else { "clean" },
-                Style::default().fg(Color::Green),
+                palette::wisp(),
             ));
         }
-        spans.push(Span::styled(" · ", dim));
-        spans.push(Span::styled(
-            status.approval.clone(),
-            Style::default().fg(Color::Magenta),
-        ));
+        spans.push(sep());
+        spans.push(Span::styled(status.approval.clone(), palette::muted()));
         if let Some(used) = status.context_used {
-            spans.push(Span::styled(" · ", dim));
+            spans.push(sep());
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let percent = (used * 100.0).round() as u8;
-            spans.push(Span::styled(
-                format!("context {percent}% used"),
-                Style::default().fg(Color::Blue),
-            ));
+            let style = if used >= 0.8 {
+                palette::amber()
+            } else {
+                palette::muted()
+            };
+            spans.push(Span::styled(format!("context {percent}% used"), style));
         }
         Line::from(spans)
     }
@@ -524,12 +542,39 @@ mod tests {
                 .trim_end()
                 .to_string()
         };
-        assert_eq!(row(0), "so far");
+        assert_eq!(row(0), "  so far");
         assert_eq!(row(1), "");
-        assert_eq!(row(2), "› hello");
+        assert_eq!(row(2), "  › hello");
         assert_eq!(
             row(3),
-            "system · ~/x · main · clean · --yes · context 14% used"
+            "  system · ~/x · main · clean · --yes · context 14% used"
         );
+        // The input row is tinted edge to edge, margin included; the others are not.
+        assert_eq!(buffer[(0, 2)].bg, palette::DEEP);
+        assert_eq!(buffer[(59, 2)].bg, palette::DEEP);
+        assert_eq!(buffer[(0, 3)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(2, 2)].fg, palette::GLOW);
+        // An empty input shows the placeholder; a nearly full context turns amber.
+        let mut status = app.status.clone().unwrap_or_default();
+        status.context_used = Some(0.9);
+        let empty = App {
+            status: Some(status),
+            ..Default::default()
+        };
+        terminal
+            .draw(|frame| empty.render(frame, frame.area()))
+            .expect("draw");
+        let buffer = terminal.backend().buffer();
+        let text: String = (0..60)
+            .map(|x| buffer[(x, 2)].symbol().to_string())
+            .collect();
+        assert_eq!(text.trim_end(), format!("  › {PLACEHOLDER}"));
+        let row3: String = (0..60)
+            .map(|x| buffer[(x, 3)].symbol().to_string())
+            .collect();
+        let at = row3.find("context").unwrap_or(0);
+        let column = u16::try_from(row3[..at].chars().count()).unwrap_or(0);
+        assert!(at > 0, "no context part in {row3}");
+        assert_eq!(buffer[(column, 3)].fg, palette::AMBER);
     }
 }

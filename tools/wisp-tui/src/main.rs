@@ -6,6 +6,7 @@
 //! wisp binary (default `wisp` on `PATH`).
 
 mod app;
+mod palette;
 mod protocol;
 
 use std::io::{BufRead, BufReader, Write};
@@ -17,12 +18,11 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use ratatui::crossterm::event::{self, Event as TermEvent, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Widget, Wrap};
 use ratatui::{TerminalOptions, Viewport};
 
-use app::{Action, App, BAND_HEIGHT, HistoryLine, LineKind};
+use app::{Action, App, BAND_HEIGHT, HistoryLine, LineKind, MARGIN};
 use protocol::Outbound;
 
 /// What the main loop waits on.
@@ -155,17 +155,18 @@ fn run(
 /// Writes one history line into scrollback above the band, wrapped to the width.
 fn insert(terminal: &mut ratatui::DefaultTerminal, line: &HistoryLine, width: u16) -> Result<()> {
     let style = match line.kind {
-        LineKind::User => Style::default().add_modifier(Modifier::BOLD),
-        LineKind::Reply | LineKind::Output => Style::default(),
-        LineKind::Tool | LineKind::Note => Style::default().add_modifier(Modifier::DIM),
-        LineKind::Error => Style::default().fg(Color::Red),
+        LineKind::User => palette::user(),
+        LineKind::Reply | LineKind::Output => palette::body(),
+        LineKind::Tool | LineKind::Note => palette::muted(),
+        LineKind::Error => palette::ember(),
     };
-    let height = wrapped_height(&line.text, width);
+    let inner = width.saturating_sub(MARGIN * 2).max(1);
+    let height = wrapped_height(&line.text, inner);
     let text = line.text.clone();
     terminal.insert_before(height, move |buffer| {
         Paragraph::new(Line::from(Span::styled(text, style)))
             .wrap(Wrap { trim: false })
-            .render(Rect::new(0, 0, width, height), buffer);
+            .render(Rect::new(MARGIN.min(width / 2), 0, inner, height), buffer);
     })?;
     Ok(())
 }
