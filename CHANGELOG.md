@@ -4,6 +4,13 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## 0.6.1
+
+Fixed:
+
+- `wisp chat` launched through `PATH` did not find `wisp-tui`: it looked beside `argv[0]`, a bare name,
+  rather than beside the process's real executable, so the plain chat started instead of the front end.
+
 ## 0.6.0
 
 Added:

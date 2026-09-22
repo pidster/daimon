@@ -255,7 +255,9 @@ struct Chat: AsyncParsableCommand {
             for name in try store.list() { print(name) }
             return
         }
-        let executable = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        // The real path of this process, not argv[0], which is a bare name when launched through PATH.
+        let executable = (Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0]))
+            .resolvingSymlinksInPath()
         let interactive =
             isatty(FileHandle.standardInput.fileDescriptor) != 0
             && isatty(FileHandle.standardOutput.fileDescriptor) != 0
