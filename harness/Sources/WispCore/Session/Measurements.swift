@@ -77,7 +77,7 @@ public enum Measurements {
         _ measurement: Measurement, to path: String? = ProcessInfo.processInfo.environment[recordVariable]
     ) throws {
         print("measured: \(measurement.task) on \(measurement.model): \(measurement.summary)")
-        guard let path else { return }
+        guard let path, !path.isEmpty else { return }
         let url = URL(fileURLWithPath: path)
         let existing = (try? String(contentsOf: url, encoding: .utf8)).flatMap(decode) ?? []
         try Data(encode(merge(existing, with: measurement)).utf8).write(to: url)

@@ -29,6 +29,7 @@ import Testing
         #expect(Measurements.decode(MeasurementsText.text) != nil)
         // Reporting without a record file only prints; with one it merges into it, creating it first.
         #expect(throws: Never.self) { try Measurements.report(triage, to: nil) }
+        #expect(throws: Never.self) { try Measurements.report(triage, to: "") }  // an empty variable records nothing
         let record = FileManager.default.temporaryDirectory.appending(path: "wisp-measure-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: record) }
         try? Measurements.report(triage, to: record.path)
