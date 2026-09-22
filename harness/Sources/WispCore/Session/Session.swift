@@ -265,14 +265,16 @@ public struct Session: Sendable {
     ///   - transcript: A saved conversation to resume, or nil to start fresh.
     ///   - observer: A sink that also sees every event of this conversation as it is recorded; chat
     ///     shows tool activity through it.
+    ///   - model: A model other than the configured one; chat's `/model` switches this way.
     /// - Returns: The agent over the session's tools, recording to the session's audit log.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used.
     public func openAgent(
-        approver: any Approver, transcript: Transcript? = nil, observer: (any AuditSink)? = nil
+        approver: any Approver, transcript: Transcript? = nil, observer: (any AuditSink)? = nil,
+        model: ModelSelection? = nil
     ) throws -> Agent {
         let conversation = try Conversation.setUp(
             session: self, audit: audit, approver: approver, prompting: prompting, toolNames: toolNames,
-            model: config.model, observer: observer)
+            model: model ?? config.model, observer: observer)
         return try conversation.openAgent(transcript: transcript)
     }
 

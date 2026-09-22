@@ -295,7 +295,15 @@ struct Chat: AsyncParsableCommand {
                 approval: ChatStatus.approvalMode(threshold: session.config.approvalThreshold, autoApprove: yes),
                 git: GitState.read(in:),
                 inspect: { what in await InspectTool(introspection: views).show(what) },
-                banner: banner),
+                banner: banner,
+                models: {
+                    await ModelListing.lines(config: session.config, home: Wisp.home, current: session.config.model)
+                },
+                openModel: { selection, transcript in
+                    try session.openAgent(
+                        approver: TerminalApprover(style: style), transcript: transcript, observer: tap,
+                        model: selection)
+                }),
             style: style,
             io: .init(
                 readLine: { readLine() },
@@ -346,7 +354,13 @@ struct Chat: AsyncParsableCommand {
                 approval: ChatStatus.approvalMode(threshold: session.config.approvalThreshold, autoApprove: yes),
                 git: GitState.read(in:),
                 inspect: { what in await InspectTool(introspection: views).show(what) },
-                banner: "wisp \(WispVersion.current) · \(agent.model.selection) · \(agent.tools.count) tools"),
+                banner: "wisp \(WispVersion.current) · \(agent.model.selection) · \(agent.tools.count) tools",
+                models: {
+                    await ModelListing.lines(config: session.config, home: Wisp.home, current: session.config.model)
+                },
+                openModel: { selection, transcript in
+                    try session.openAgent(approver: approver, transcript: transcript, observer: tap, model: selection)
+                }),
             io: .init(
                 readLine: { router.nextMessage() },
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
@@ -442,27 +456,7 @@ struct Models: AsyncParsableCommand {
 
     func run() async throws {
         let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
-        for selection in [ModelSelection.system, .privateCloud] {
-            let state: String
-            do {
-                let resolved = try selection.resolve(config: config, home: Wisp.home)
-                state = "available; \(resolved.capabilityNames.joined(separator: ", "))"
-            } catch {
-                state = "unavailable: \(error)"
-            }
-            let mark = selection == config.model ? "*" : " "
-            print("\(mark) \(selection)\t\(state)")
-        }
-        for backend in ModelBackends.all {
-            do {
-                for model in try await backend.installed(config: config, home: Wisp.home) {
-                    let mark = model.selection == config.model ? "*" : " "
-                    print("\(mark) \(model.selection)\t\(model.detail)")
-                }
-            } catch {
-                print("  \(backend.scheme):*\tunavailable: \(error)")
-            }
-        }
+        for line in await ModelListing.lines(config: config, home: Wisp.home, current: config.model) { print(line) }
     }
 }
 

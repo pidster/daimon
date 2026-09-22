@@ -1,4 +1,5 @@
 import Foundation
+import FoundationModels
 
 /// The `wisp chat` read-eval-print loop over an agent, with its input and output injected so the
 /// whole loop runs in tests over a scripted model. The CLI supplies the terminal; tests supply lines.
@@ -46,23 +47,31 @@ public struct ChatLoop {
         public var inspect: (@Sendable (String) async -> String)?
         /// A banner line for the start of the session.
         public var banner: String?
+        /// Lists the models for `/models`; nil makes the command unavailable.
+        public var models: (@Sendable () async -> [String])?
+        /// Opens an agent on another model over a transcript, for `/model`; nil makes it unavailable.
+        public var openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)?
 
         /// Creates a context.
         public init(
             directory: String, approval: String,
             git: @escaping @Sendable (String) -> (branch: String?, dirty: Bool?) = { _ in (nil, nil) },
-            inspect: (@Sendable (String) async -> String)? = nil, banner: String? = nil
+            inspect: (@Sendable (String) async -> String)? = nil, banner: String? = nil,
+            models: (@Sendable () async -> [String])? = nil,
+            openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil
         ) {
             self.directory = directory
             self.approval = approval
             self.git = git
             self.inspect = inspect
             self.banner = banner
+            self.models = models
+            self.openModel = openModel
         }
     }
 
-    /// The conversation.
-    public let agent: Agent
+    /// The conversation; replaced by `/model`, which resumes the transcript on another model.
+    public private(set) var agent: Agent
     /// Where `/save` and the exit save go.
     public let store: TranscriptStore
     /// The name the transcript saves under on exit and for a bare `/save`; nil saves nothing on exit.
@@ -141,6 +150,26 @@ public struct ChatLoop {
                 io.print(await inspect(what))
             case .last:
                 io.print(tap.lastToolOutput ?? "no tool has run yet")
+            case .models:
+                guard let models = context.models else {
+                    io.note("models are not listed here")
+                    continue
+                }
+                for line in await models() { io.print(line) }
+            case .model(nil):
+                io.print("model: \(agent.model.selection) (\(agent.model.capabilityNames.joined(separator: ", ")))")
+            case .model(let name?):
+                guard let openModel = context.openModel else {
+                    io.note("the model cannot be switched here")
+                    continue
+                }
+                do {
+                    let selection = try ModelSelection(parsing: name)
+                    agent = try openModel(selection, agent.transcript)
+                    io.note(style.muted("model: \(selection); the transcript continues"))
+                } catch {
+                    io.note(style.ember("error: \(error)"))
+                }
             case .tokens:
                 do {
                     let tokens = try await agent.contextTokens().map(String.init) ?? "unknown"

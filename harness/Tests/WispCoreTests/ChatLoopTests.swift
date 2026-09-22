@@ -83,6 +83,47 @@ import WispTestSupport
         #expect(sink.events.filter { $0.kind == .prompt }.count == 2)
     }
 
+    @Test func modelsListsAndModelSwitchesKeepingTheTranscript() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let first = Agent(
+            instructions: "x", tools: [],
+            model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("from system")])))
+        let context = ChatLoop.Context(
+            directory: "/r", approval: "--yes",
+            models: { ["* system\tavailable", "  ollama:q\t3B"] },
+            openModel: { selection, transcript in
+                Agent(
+                    transcript: transcript, tools: [],
+                    model: ResolvedModel(selection: selection, custom: ScriptedModel(steps: [.say("from ollama")])))
+            })
+        let capture = Capture(lines: [
+            "/models", "/model", "one", "/model ollama:q", "/model", "two", "/model gpt-5", "/quit",
+        ])
+        var loop = ChatLoop(
+            agent: first, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
+        try await loop.run()
+        let out = capture.output
+        #expect(out.contains("* system\tavailable\n  ollama:q\t3B\n"))
+        #expect(out.contains("model: system (toolCalling, guidedGeneration)\n"))
+        #expect(out.contains("from system\n") && out.contains("from ollama\n"))
+        #expect(out.contains("model: ollama:q (toolCalling, guidedGeneration)\n"))
+        #expect(capture.noted.contains("model: ollama:q; the transcript continues"))
+        #expect(capture.noted.contains { $0.hasPrefix("error: unknown model 'gpt-5'") })
+        // The transcript carried over: both turns are in the switched agent, and the status shows the model.
+        #expect(loop.agent.model.selection == .ollama("q"))
+        #expect(loop.agent.transcript.turnCount == 2)
+        #expect(capture.shownStatus.last?.model == "ollama:q")
+        // Without the closures the commands say so.
+        let bare = Capture(lines: ["/models", "/model x", "/quit"])
+        var plain = ChatLoop(
+            agent: first, store: TranscriptStore(directory: dir), saveName: nil, context: Self.context, io: bare.io)
+        try await plain.run()
+        #expect(
+            bare.noted.contains("models are not listed here")
+                && bare.noted.contains("the model cannot be switched here"))
+    }
+
     @Test func endOfInputSavesUnderTheDefaultNameAndErrorsAreNotes() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(at: dir) }

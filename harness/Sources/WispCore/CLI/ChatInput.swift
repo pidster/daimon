@@ -16,6 +16,10 @@ public enum ChatInput: Equatable, Sendable {
     case inspect(String)
     /// Show the last tool result in full.
     case last
+    /// List the models the session could switch to.
+    case models
+    /// Switch the conversation to a model, or show the current one when nil.
+    case model(String?)
     /// A message for the model.
     case message(String)
     /// A slash command that does not exist.
@@ -50,6 +54,8 @@ public enum ChatInput: Equatable, Sendable {
         case "tokens": self = .tokens
         case "inspect", "status": self = .inspect(argument ?? (command == "status" ? "status" : "status"))
         case "last": self = .last
+        case "models": self = .models
+        case "model": self = .model(argument)
         default: self = .unknown(command)
         }
     }
@@ -61,6 +67,8 @@ public enum ChatInput: Equatable, Sendable {
         /tokens        show how much of the context window the conversation uses
         /inspect [what] show wisp's own config, status (default), approvals, or audit
         /last          show the last tool result in full
+        /models        list the models this Mac can run
+        /model [name]  switch the conversation to a model, keeping the transcript; no name shows the current one
         /save [name]   save the transcript to ~/.wisp/transcripts
         /new           start a fresh conversation with the same instructions and tools
         /quit          exit (also /exit, a bare exit or quit, Ctrl-D)

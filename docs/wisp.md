@@ -76,6 +76,8 @@ What a session shows, and where it goes:
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
 | `/inspect [what]`, `/status` | wisp's own `config`, `status` (default), `approvals`, or `audit`, as the model's `inspect` tool shows them. |
 | `/last` | The last tool result in full; the live line shows only its first line. |
+| `/models` | The models this Mac can run, as `wisp models` lists them. |
+| `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, `/q`, a bare `exit`, `quit`, or `q`, Ctrl-D | Exit, saving if a name is set. |

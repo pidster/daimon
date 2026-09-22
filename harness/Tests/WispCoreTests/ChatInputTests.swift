@@ -3,6 +3,13 @@ import Testing
 @testable import WispCore
 
 @Suite struct ChatInputTests {
+    @Test func parsesModelCommands() {
+        #expect(ChatInput(line: "/models") == .models)
+        #expect(ChatInput(line: "/model") == .model(nil))
+        #expect(ChatInput(line: "/model ollama:qwen3-coder") == .model("ollama:qwen3-coder"))
+        #expect(ChatInput.helpText.contains("/models") && ChatInput.helpText.contains("/model [name]"))
+    }
+
     @Test func parsesCommandsAndMessages() {
         #expect(ChatInput(line: "/quit") == .quit)
         #expect(ChatInput(line: " /exit ") == .quit)
