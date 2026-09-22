@@ -10,6 +10,10 @@
 | [mcp.md](mcp.md) | wisp as an MCP server: client setup, `respond`, `triage`, structured output, receipts, errors |
 | [design.md](design.md) | Architecture: components, data flow, extension points |
 | [fm-cli.md](fm-cli.md) | What the Apple `fm` command family does and does not offer, as observed |
+| [local-model-evaluation.md](local-model-evaluation.md) | Local-model research, candidate shortlist, and agreed workload/delegation evaluation design |
+| [local-model-installation.md](local-model-installation.md) | Selected model revisions, local installation, offline smoke results, and remaining integration work |
+| [on-device-ai-todo.md](on-device-ai-todo.md) | Draft backlog for four on-device AI use cases, model routing, and prompt-linked transcript/audit records |
+| [model-controls.md](model-controls.md) | Draft common controls for reasoning mode, effort, native speed mode, performance preferences, and reasoning output |
 | [approval.md](approval.md) | Risk classification (rules + on-device model), approval scopes and persistence, eval results |
 | [logging.md](logging.md) | The audit log (format, kinds, `wisp logs`) and diagnostics (`WISP_LOG`, unified logging) |
 | [context-management.md](context-management.md) | The small context window: framework APIs, what wisp does, design rules |
