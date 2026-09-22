@@ -212,8 +212,8 @@ impl App {
         Action::Quit
     }
 
-    /// Draws the band into `area`. Text is inset by the margin everywhere, and one cell further on the
-    /// input row; the input's tint runs edge to edge with half-block strips above and below it.
+    /// Draws the band into `area`. Text is inset by the margin everywhere; the input's tint runs edge
+    /// to edge with half-block strips above and below it.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let margin = MARGIN.min(area.width / 2);
         let inset = Rect {
@@ -248,14 +248,9 @@ impl App {
                 Paragraph::new("").style(palette::input_background()),
                 row(INPUT_ROW, area),
             );
-            let field = Rect {
-                x: inset.x + 1,
-                width: inset.width.saturating_sub(1),
-                ..row(INPUT_ROW, inset)
-            };
             frame.render_widget(
                 Paragraph::new(self.input_line()).style(palette::input_background()),
-                field,
+                row(INPUT_ROW, inset),
             );
         }
         strip(frame, INPUT_ROW + 1, "▀");
@@ -565,7 +560,7 @@ mod tests {
         };
         assert_eq!(row(0), " so far");
         assert_eq!(row(1), "");
-        assert_eq!(row(INPUT_ROW), "  › hello");
+        assert_eq!(row(INPUT_ROW), " › hello");
         assert_eq!(
             row(STATUS_ROW),
             " system · ~/x · main · clean · --yes · context 14% used"
@@ -578,7 +573,7 @@ mod tests {
         assert_eq!(buffer[(0, INPUT_ROW + 1)].symbol(), "▀");
         assert_eq!(buffer[(0, INPUT_ROW + 1)].bg, ratatui::style::Color::Reset);
         assert_eq!(buffer[(0, STATUS_ROW)].bg, ratatui::style::Color::Reset);
-        assert_eq!(buffer[(2, INPUT_ROW)].fg, palette::GLOW);
+        assert_eq!(buffer[(1, INPUT_ROW)].fg, palette::GLOW);
         // An empty input shows the placeholder; a nearly full context turns amber.
         let mut status = app.status.clone().unwrap_or_default();
         status.context_used = Some(0.9);
@@ -593,7 +588,7 @@ mod tests {
         let text: String = (0..60)
             .map(|x| buffer[(x, INPUT_ROW)].symbol().to_string())
             .collect();
-        assert_eq!(text.trim_end(), format!("  › {PLACEHOLDER}"));
+        assert_eq!(text.trim_end(), format!(" › {PLACEHOLDER}"));
         let row3: String = (0..60)
             .map(|x| buffer[(x, STATUS_ROW)].symbol().to_string())
             .collect();
