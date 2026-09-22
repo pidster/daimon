@@ -35,6 +35,14 @@ not the differentiator. Items, in order of leverage:
 - **Roots and progress.** Use the client's declared roots as the sandbox's writable root; send progress
   notifications during long commands.
 
+## Terminal front end
+
+Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Next, in order: line editing and
+history in `wisp-tui`'s input (cursor keys, multi-line composition, paste); a `turn` event in the
+protocol and a decision on raw versus pre-rendered events; the formula installing both binaries with
+`wisp chat` handing off to `wisp-tui` when present; a bordered approval dialog with the reasons inside
+it; Markdown-ish rendering of replies at commit time.
+
 ## Models
 
 - Done 2026-09-19: `ollama:<name>` models through a wisp-supplied executor

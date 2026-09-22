@@ -10,7 +10,8 @@ Added:
 
 - `wisp chat --json`, a headless chat speaking JSON Lines, and `wisp-tui`, a Rust front end over it
   that keeps the conversation in the terminal's scrollback above a pinned input and status band. A
-  spike on a branch; the protocol may change.
+  merged from a one-day spike ([ADR 0029](docs/decisions/0029-tui-front-end.md)); the protocol may
+  still change. Not yet installed by the formula: build it with `cargo build` in `tools/`.
 
 ## 0.5.0
 
