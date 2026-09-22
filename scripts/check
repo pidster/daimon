@@ -116,12 +116,18 @@ coverage_baseline() {
     echo "baseline set to $total% in $BASELINE_FILE"
 }
 
+# eval: run the model evaluation and assert its floors. `eval record` also writes each task's
+# measurement into the embedded measurements.json, to commit; a plain eval (what a release runs)
+# leaves the file alone, since the sets are small and a rerun re-rolls the numbers.
 eval_() {
     echo "==> eval (on-device model; not part of the gate)"
-    record="$ROOT/harness/Sources/WispCore/Resources/measurements.json"
+    record=""
+    if [ "${1:-}" = "record" ]; then record="$ROOT/harness/Sources/WispCore/Resources/measurements.json"; fi
     (cd harness && WISP_MODEL_TESTS=1 WISP_EVAL_RECORD="$record" swift test $SWIFT_SANDBOX --filter ModelEvalTests 2>&1 \
         | grep -E 'model classifier|measured:|eval:|^  [a-z]+ -> |^[a-z-]+	|✔|✘|Test run')
-    echo "==> measurements recorded in harness/Sources/WispCore/Resources/measurements.json; commit them"
+    if [ -n "$record" ]; then
+        echo "==> measurements recorded in harness/Sources/WispCore/Resources/measurements.json; commit them"
+    fi
 }
 
 format() {
@@ -175,9 +181,9 @@ case "${1:-all}" in
     coverage) coverage ;;
     coverage-gate) coverage_gate ;;
     coverage-baseline) coverage_baseline ;;
-    eval) eval_ ;;
+    eval) eval_ "${2:-}" ;;
     hygiene) hygiene ;;
     all) hygiene; lint; build; test_ ;;
     install-hooks) install_hooks ;;
-    *) echo "usage: scripts/check [lint|build|test|format|coverage|coverage-gate|coverage-baseline|eval|hygiene|all|install-hooks]" >&2; exit 64 ;;
+    *) echo "usage: scripts/check [lint|build|test|format|coverage|coverage-gate|coverage-baseline|eval [record]|hygiene|all|install-hooks]" >&2; exit 64 ;;
 esac

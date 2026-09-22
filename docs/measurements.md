@@ -29,12 +29,15 @@ model gets a case wrong in practice, keeping cases that do not resemble the prom
 ## How to run and record
 
 ```
-scripts/check eval
+scripts/check eval record
 ```
 
 runs `ModelEvalTests` on the configured model with `WISP_EVAL_RECORD` pointing at
 `harness/Sources/WispCore/Resources/measurements.json`; each test merges its `Measurement` into
-that file, replacing the previous one for the same task and model. The file is embedded at build time
+that file, replacing the previous one for the same task and model. A plain `scripts/check eval`, which
+is what a release runs, asserts the floors and records nothing: the sets are small, a rerun re-rolls
+the numbers (on 2026-09-22 two consecutive runs gave 5 and 6 of 6 for the same task), and the file
+should change only when someone means it to. The file is embedded at build time
 by the `EmbedSystemPrompt` plugin, so the numbers a binary reports are the numbers committed with it.
 Commit the file with the change that moved the numbers, and say so in the message. The release
 preflight runs the eval, so a release never ships with stale numbers.

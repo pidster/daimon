@@ -17,10 +17,11 @@ Where the numbers could live: a doc page (stale, unreachable to a client), a fil
 - A `Measurement` is one eval run of one task on one model: `task`, `tool` when the task is a model
   tool, `model`, `date`, `passed`, `total`, and one sentence of `notes` saying what a pass is.
 - Eval tests call `Measurements.report`, which prints the result and, when `WISP_EVAL_RECORD`
-  names a file, merges it there by task and model. `scripts/check eval` points that at
+  names a file, merges it there by task and model. `scripts/check eval record` points that at
   `Resources/measurements.json`, embedded at build time by the same plugin as the system prompt, so a
-  binary carries the numbers committed with it and the release preflight (which runs the eval)
-  refreshes them.
+  binary carries the numbers committed with it. Amended 2026-09-22: the release preflight runs the
+  eval without recording, because the sets are small and each run re-rolls the numbers; recording is a
+  deliberate act followed by a commit.
 - The catalogue attaches measurements to each tool by name (`ToolDescription.measurements`, a
   `Measured:` line in the Markdown); `wisp://measurements` lists them all, including tasks that
   are not one tool.

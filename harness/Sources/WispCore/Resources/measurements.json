@@ -8,10 +8,10 @@
     "total" : 47
   },
   {
-    "date" : "2026-09-21",
+    "date" : "2026-09-22",
     "model" : "system",
     "notes" : "read a small file with read_file, then rewrite one numbered line with edit_file, ten files attempted three times each; a pass is the file ending up exactly as intended",
-    "passed" : 25,
+    "passed" : 26,
     "task" : "edit_file.replace",
     "tool" : "edit_file",
     "total" : 30
@@ -20,7 +20,7 @@
     "date" : "2026-09-22",
     "model" : "system",
     "notes" : "classify a code snippet into an enum through a schema; a pass parses and names the language",
-    "passed" : 5,
+    "passed" : 6,
     "task" : "respond.schema",
     "total" : 6
   },
@@ -28,7 +28,7 @@
     "date" : "2026-09-22",
     "model" : "system",
     "notes" : "small diffs with a secret, a deleted test, a disabled test, and two ordinary changes; a pass is the expected flag on the expected file, or no flag for an ordinary change",
-    "passed" : 4,
+    "passed" : 5,
     "task" : "summarise_diff",
     "total" : 5
   },

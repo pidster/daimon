@@ -23,10 +23,12 @@ every local step and prints the remote ones instead of executing them.
 
 1. Preflight: clean tree on `main`, `WispVersion.current` equals `X.Y.Z`, no existing tag, `gh` is
    authenticated, `CHANGELOG.md` has a non-empty `## X.Y.Z` section, `scripts/check` passes (the full
-   test run), `scripts/check coverage-gate` passes, and `scripts/check eval` passes. The eval records its numbers into
-   `harness/Sources/WispCore/Resources/measurements.json`; if that changed, the release stops so you
-   commit the new numbers first, because the binary embeds the file and must carry what is committed.
-   The eval is the slow step: on this Mac about eight minutes on the on-device model (2026-09-22).
+   test run), `scripts/check coverage-gate` passes, and `scripts/check eval` passes. The release's eval only asserts the
+   floors; it does not rewrite `harness/Sources/WispCore/Resources/measurements.json`, because the sets
+   are small and every run re-rolls the numbers. Record deliberately with `scripts/check eval record`
+   and commit the file; the binary embeds it, so a release carries the numbers that were committed.
+   If the eval nonetheless dirtied the tree the release stops. The eval is the slow step: about eight
+   minutes on the on-device model on this Mac (2026-09-22).
 2. Build: `swift build -c release`, `strip`, verify `wisp --version` prints `X.Y.Z` and `wisp doctor`
    passes on the build machine. The release is built without the `MLX` trait: MLX needs a Metal library
    bundle beside the binary at run time, which the one-file tarball and formula do not carry
