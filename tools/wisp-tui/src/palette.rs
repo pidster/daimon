@@ -51,6 +51,10 @@ pub fn ember() -> Style {
 pub fn input_background() -> Style {
     Style::default().bg(DEEP)
 }
+/// The half-block strips above and below the input: the tint as a foreground on the plain background.
+pub fn input_edge() -> Style {
+    Style::default().fg(DEEP)
+}
 /// A risk level in its colour.
 pub fn level(level: &str) -> Style {
     match level {

@@ -10,12 +10,14 @@ use serde_json::Value;
 use crate::palette;
 use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
 
-/// Rows the band occupies: reply in progress, dialog, a blank row, the input, status.
-pub const BAND_HEIGHT: u16 = 5;
+/// Rows the band occupies: reply in progress, dialog, a half-height strip, the input, a half-height
+/// strip, status. The strips are rows of half-block glyphs in the tint, which read as half a line of
+/// padding above and below the input; a terminal cannot tint less than a row.
+pub const BAND_HEIGHT: u16 = 6;
 /// The band row the input text sits on.
 pub const INPUT_ROW: u16 = 3;
 /// The band row the status sits on.
-pub const STATUS_ROW: u16 = 4;
+pub const STATUS_ROW: u16 = 5;
 /// Cells of margin on each side of the band and of every committed line.
 pub const MARGIN: u16 = 1;
 /// The input row's placeholder when nothing is typed.
@@ -210,8 +212,8 @@ impl App {
         Action::Quit
     }
 
-    /// Draws the band into `area`. Text is inset by the margin everywhere; the input row's tint runs
-    /// edge to edge, since the inset text already gives it padding.
+    /// Draws the band into `area`. Text is inset by the margin everywhere, and one cell further on the
+    /// input row; the input's tint runs edge to edge with half-block strips above and below it.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let margin = MARGIN.min(area.width / 2);
         let inset = Rect {
@@ -231,16 +233,32 @@ impl App {
             Line::from(Span::styled(self.partial.clone(), palette::body())),
         );
         plain(frame, 1, self.dialog_line());
+        let strip = |frame: &mut Frame, index: u16, glyph: &str| {
+            if index < area.height {
+                let text = glyph.repeat(usize::from(area.width));
+                frame.render_widget(
+                    Paragraph::new(text).style(palette::input_edge()),
+                    row(index, area),
+                );
+            }
+        };
+        strip(frame, INPUT_ROW - 1, "▄");
         if INPUT_ROW < area.height {
             frame.render_widget(
                 Paragraph::new("").style(palette::input_background()),
                 row(INPUT_ROW, area),
             );
+            let field = Rect {
+                x: inset.x + 1,
+                width: inset.width.saturating_sub(1),
+                ..row(INPUT_ROW, inset)
+            };
             frame.render_widget(
                 Paragraph::new(self.input_line()).style(palette::input_background()),
-                row(INPUT_ROW, inset),
+                field,
             );
         }
+        strip(frame, INPUT_ROW + 1, "▀");
         plain(frame, STATUS_ROW, self.status_line());
     }
 
@@ -547,17 +565,20 @@ mod tests {
         };
         assert_eq!(row(0), " so far");
         assert_eq!(row(1), "");
-        assert_eq!(row(INPUT_ROW), " › hello");
+        assert_eq!(row(INPUT_ROW), "  › hello");
         assert_eq!(
             row(STATUS_ROW),
             " system · ~/x · main · clean · --yes · context 14% used"
         );
-        // The input row's tint runs edge to edge; the rows around it are plain.
+        // The input row's tint runs edge to edge, with half-block strips above and below in the tint.
         assert_eq!(buffer[(0, INPUT_ROW)].bg, palette::DEEP);
         assert_eq!(buffer[(59, INPUT_ROW)].bg, palette::DEEP);
-        assert_eq!(buffer[(0, INPUT_ROW - 1)].bg, ratatui::style::Color::Reset);
+        assert_eq!(buffer[(0, INPUT_ROW - 1)].symbol(), "▄");
+        assert_eq!(buffer[(59, INPUT_ROW - 1)].fg, palette::DEEP);
+        assert_eq!(buffer[(0, INPUT_ROW + 1)].symbol(), "▀");
+        assert_eq!(buffer[(0, INPUT_ROW + 1)].bg, ratatui::style::Color::Reset);
         assert_eq!(buffer[(0, STATUS_ROW)].bg, ratatui::style::Color::Reset);
-        assert_eq!(buffer[(1, INPUT_ROW)].fg, palette::GLOW);
+        assert_eq!(buffer[(2, INPUT_ROW)].fg, palette::GLOW);
         // An empty input shows the placeholder; a nearly full context turns amber.
         let mut status = app.status.clone().unwrap_or_default();
         status.context_used = Some(0.9);
@@ -572,7 +593,7 @@ mod tests {
         let text: String = (0..60)
             .map(|x| buffer[(x, INPUT_ROW)].symbol().to_string())
             .collect();
-        assert_eq!(text.trim_end(), format!(" › {PLACEHOLDER}"));
+        assert_eq!(text.trim_end(), format!("  › {PLACEHOLDER}"));
         let row3: String = (0..60)
             .map(|x| buffer[(x, STATUS_ROW)].symbol().to_string())
             .collect();
