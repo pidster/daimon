@@ -131,10 +131,10 @@ an existing thread:
 
 - `thread_id`: `git` (or `git2`, `git3` if the thread was closed).
 - `tools`: `["run_command"]`, so the model has nothing else to reach for.
-- `model`: `ollama:qwen3-coder`, the local Ollama model. It follows a fixed instruction reliably and its
-  context window is far larger than the on-device model's, so a thread survives many commits with hook
-  output. If Ollama is not running the thread fails to start with a clear error; then use the default
-  `system` model and keep prompts short.
+- `model`: `ollama:granite4.1:8b`, the default local Ollama model (see the model choice below). It
+  follows a fixed instruction reliably and its context window is far larger than the on-device model's,
+  so a thread survives many commits with hook output. If Ollama is not running the thread fails to start
+  with a clear error; then use the default `system` model and keep prompts short.
 - `instructions` (the conversation layer; wisp's own system prompt and the config extension stay
   underneath it):
 
@@ -163,8 +163,18 @@ The `wisp` server is this repository's own release build, for dogfooding, launch
 `scripts/wisp-mcp`. **If the server fails to connect at start-up, the cause is almost always a missing
 release build**: tell the user to run `cd harness && swift build -c release` and reconnect, and offer to
 run the build yourself. The build is also stale after code changes until it is rerun. Use `respond` to
-delegate small, self-contained tasks to the on-device model (pass back `thread_id` to continue) and
-`close_thread` when done. Read the `wisp://tools` resource (or run `wisp tools --markdown`) for the
+delegate small, self-contained tasks to a local model (pass back `thread_id` to continue) and
+`close_thread` when done.
+
+Which model to pass as `model` when a thread starts (measured in the Ollama section of `docs/backends.md`):
+
+| Work | Model | Why |
+| --- | --- | --- |
+| Default: git, single commands, fixed instructions, short lookups | `ollama:granite4.1:8b` | As fast as the larger models on these, at 5.4 GB |
+| Complex: multi-step tasks, reading and reasoning over several files or outputs | `ollama:qwen3.8:27b` | The newest Qwen; it reasons before it answers, about 10 s more per turn |
+| Ollama not running | `system` | Always there; keep prompts short for its 4k-token window |
+
+If `wisp models` does not list the model, `ollama pull <name>` fetches it; ask before pulling. Read the `wisp://tools` resource (or run `wisp tools --markdown`) for the
 model's tools and the prompt shapes that work; `wisp://config`, `wisp://status`, `wisp://approvals`,
 and `wisp://audit/{thread_id}` show its state. Commands the model runs need approval through MCP
 elicitation; a client without it gets a refusal.
