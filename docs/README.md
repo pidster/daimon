@@ -19,6 +19,20 @@
 | [context-management.md](context-management.md) | The small context window: framework APIs, what wisp does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
 | [decisions/0013-model-selection.md](decisions/0013-model-selection.md) | Which model a session runs on (`system` or `private-cloud`), and why the default stays on device |
+| [decisions/0015-per-command-approval.md](decisions/0015-per-command-approval.md) | Approve each simple command in a line, remembered by its program |
+| [decisions/0014-persisted-approvals.md](decisions/0014-persisted-approvals.md) | Approvals have four scopes; project and always persist under ~/.wisp |
+| [decisions/0012-homebrew-release.md](decisions/0012-homebrew-release.md) | Release through a Homebrew tap, unsigned, semver from 0.1.0 |
+| [decisions/0011-risk-classifier-and-approval.md](decisions/0011-risk-classifier-and-approval.md) | Classify command risk with rules plus the on-device model, and ask above a threshold |
+| [decisions/0010-audit-and-diagnostic-logging.md](decisions/0010-audit-and-diagnostic-logging.md) | Verbatim JSON Lines audit log plus unified-logging diagnostics |
+| [decisions/0009-command-policy-and-sandbox.md](decisions/0009-command-policy-and-sandbox.md) | run_command is governed by a CommandPolicy and a Seatbelt sandbox |
+| [decisions/0008-context-condensation.md](decisions/0008-context-condensation.md) | Recover from context overflow by condensing to recent turns |
+| [decisions/0007-conversation-threads.md](decisions/0007-conversation-threads.md) | Conversation threads over MCP |
+| [decisions/0006-mcp-server-over-stdio.md](decisions/0006-mcp-server-over-stdio.md) | wisp is an MCP server over stdio |
+| [decisions/0005-tools-as-plain-binaries.md](decisions/0005-tools-as-plain-binaries.md) | Tools are plain binaries; the harness owns the model-facing schema |
+| [decisions/0004-enforced-standards.md](decisions/0004-enforced-standards.md) | Standards are enforced by tooling, shared between hook and CI |
+| [decisions/0003-callback-streaming.md](decisions/0003-callback-streaming.md) | Stream via a delta callback, not an AsyncSequence wrapper |
+| [decisions/0002-macos-27-baseline.md](decisions/0002-macos-27-baseline.md) | macOS 27 is the platform baseline |
+| [decisions/0001-swift-and-foundationmodels.md](decisions/0001-swift-and-foundationmodels.md) | Implement wisp in Swift, linking FoundationModels directly |
 | [decisions/0029-tui-front-end.md](decisions/0029-tui-front-end.md) | The terminal chat is a Rust front end (`wisp-tui`, ratatui) over a headless `wisp chat --json`; one palette for both faces |
 | [decisions/0028-rename-to-wisp.md](decisions/0028-rename-to-wisp.md) | The project is wisp; one mechanical rename, no compatibility layer, a new Homebrew tap |
 | [decisions/0027-verb-patterns.md](decisions/0027-verb-patterns.md) | Approval patterns include the verb for programs like git and cargo, from an embedded list; old patterns still count |

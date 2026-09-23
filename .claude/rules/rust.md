@@ -3,10 +3,13 @@ paths:
   - "tools/**"
 ---
 
-# Rust guidance for tool binaries
+# Rust guidance for the Cargo workspace
 
-- One crate per tool under `tools/<name>`, listed in the workspace `members`. The workspace is empty until
-  the first real tool; `scripts/check` skips Rust checks until a `tools/*/Cargo.toml` exists.
+- One crate per binary under `tools/<name>`, listed in the workspace `members`. Today there is one,
+  `wisp-tui`; `scripts/check` runs fmt, clippy, build, and tests on the workspace.
+- `wisp-tui` is a front end, not a tool (ADR 0029): it speaks the `wisp chat --json` protocol
+  (`docs/wisp.md`, "Headless chat") and owns the terminal; it has no model or policy logic of its own.
+  Its crate version follows `WispVersion.current`, and the release checks they match.
 - A tool binary is an ordinary CLI program: arguments in, stdout out, meaningful exit code. It knows
   nothing about agents or MCP (ADR 0005). The harness declares the model-facing schema and description in
   Swift; the model may also reach any binary through `run_command`.

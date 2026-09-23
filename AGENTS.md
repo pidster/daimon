@@ -25,7 +25,7 @@ only what applies everywhere and to every agent.
 | Path | Contents |
 | --- | --- |
 | `harness/` | Swift package. Targets: `WispCore` (all logic), `WispCoreAI` (Core AI model backend), `WispMLX` (MLX backend, real only under the `MLX` trait), `WispMCP` (MCP server), `wisp` (CLI, argument parsing only, registers backends), tests. |
-| `tools/` | Cargo workspace reserved for Rust tool binaries. Empty; checks activate with the first crate. |
+| `tools/` | Cargo workspace. `wisp-tui`, the terminal front end over `wisp chat --json` (ADR 0029); future tool binaries go here too. The gate runs fmt, pedantic clippy, and tests on it. |
 | `docs/` | Documentation and ADRs. Part of every change (see Definition of done). |
 | `scripts/check` | The quality gate and the pre-commit hook's body. |
 
@@ -52,7 +52,8 @@ Smoke-testing against the live model (never in unit tests):
 export WISP_HOME=/tmp/wisp-scratch     # keep smoke state out of the real ~/.wisp
 harness/.build/debug/wisp tools
 harness/.build/debug/wisp --yes "Use run_command to run: uname -m"
-harness/.build/debug/wisp chat            # /help, /tokens, /save, /new, /quit; answers y/n/a to approvals
+harness/.build/debug/wisp chat --plain    # /help, /models, /model, /tokens, /save, /new, /quit; y/s/p/a/n to approvals
+(cd tools && cargo build) && WISP_BIN=harness/.build/debug/wisp tools/target/debug/wisp-tui   # the front end
 harness/.build/debug/wisp logs --last 20  # audit summaries; --json for raw events
 WISP_LOG=debug harness/.build/debug/wisp "…"   # mirror diagnostics to stderr
 ```
@@ -76,7 +77,9 @@ the single set-up path for every face; `respond` and `chat` open the session's o
 `WispMCP` opens one per `thread_id` through `Session.conversation` (threads held by
 `ThreadStore`/`ConversationThread` actors), so all of them share one config, approval store, and
 session-approval set. `WispMCP` exposes `respond`, `triage` (build or test output condensed to a failure list on device,
-ADR 0023), `summarise_diff` (a diff condensed to per-file lines and review flags), and `close_thread`; wisp's own tools are reachable only through `respond`. Details: `docs/design.md`.
+ADR 0023), `summarise_diff` (a diff condensed to per-file lines and review flags), and `close_thread`; wisp's own tools are reachable only through `respond`. `ChatLoop` is the chat for every face: the
+plain terminal chat, and `wisp chat --json`, which maps it onto JSON Lines (`ChatProtocol`) for
+`tools/wisp-tui`, the ratatui front end that `wisp chat` hands a terminal session to (ADR 0029). Details: `docs/design.md`.
 
 ## Rules
 
@@ -99,6 +102,12 @@ ADR 0023), `summarise_diff` (a diff condensed to per-file lines and review flags
 - **Releases** run the full test suite and `scripts/check coverage-gate` in preflight. Line coverage
   must not fall below `harness/coverage-baseline`; after adding tests, record the new figure with
   `scripts/check coverage-baseline` and commit it (`docs/release.md`).
+- **Docs sweep before every release, before `scripts/release` is run.** Read the pages a user and an
+  agent meet first against the code as it stands, fix what is stale, and commit the sweep on its own
+  ("Bring the docs up to date for X.Y.Z", or "Docs sweep for X.Y.Z: nothing stale"). The list is in
+  `docs/release.md`, step 0. The per-change rule keeps each feature's own page right; the sweep catches
+  what a feature changes elsewhere (a tool list, a layout table, a quick start). The release preflight
+  checks mechanically that every page is in the docs index; everything else is the sweep's job.
 - **CI is disabled** until a macOS 27 runner exists; the hook is the only automated gate.
 
 ## Gotchas that cross languages

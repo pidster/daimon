@@ -2,16 +2,16 @@
 
 **wisp** is a small, on-device AI agent for the Mac. It runs Apple's built-in Foundation Model, the same
 one behind Apple Intelligence and the `fm` command, and gives it tools: it can run shell commands, read
-files, and tell the time, and it can be extended with more. With the default model nothing leaves your
+and edit files, tell the time, and look at its own state, and it can be extended with more. With the default model nothing leaves your
 machine; Apple's Private Cloud Compute model is available as an explicit opt-in, and any model served by a
 local Ollama can be chosen with `--model ollama:<name>`. Commands the model runs
 may use the network unless you turn that off.
 
-Note: Apple's Private Cloud Compute model is not yet available due to a signing issue.
-
 It has two faces:
 
 - **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it.
+  On a terminal the chat runs in `wisp-tui`: the conversation scrolls in your terminal's own history
+  above a pinned input and status line.
 - **An MCP server.** Other agent harnesses such as Claude Code or Codex can hand it self-contained work to do
   locally: run a build, summarise a file, classify some text.
 
@@ -21,7 +21,8 @@ sandbox that confines what it can write, is classified for risk, and needs your 
 Everything that happens is written to an audit log you can read back, and anything it remembers can be
 listed and revoked. [trust.md](docs/trust.md) states exactly what it can and cannot do to your Mac.
 
-Note: Apple's Private Cloud Compute model is not yet available due to a signing issue.
+Apple's Private Cloud Compute model is not available from this build: it needs an entitlement Apple
+grants only to signed App Store apps ([backends.md](docs/backends.md), "Private Cloud Compute").
 
 ## Quick start
 
@@ -31,7 +32,7 @@ Requirements: an Apple silicon Mac on macOS 27 or later with Apple Intelligence 
 brew install pidster/tap/wisp
 wisp doctor                     # checks the model, sandbox, config, and home directory
 wisp "What is the date in Tokyo?"
-wisp chat                       # interactive; ask it to run your tests; type /help for commands
+wisp chat                       # interactive; /help for commands, /models and /model to switch models
 wisp --yes "Run the tests in $PWD and tell me if they pass"   # non-interactive: approve risky commands
 wisp logs --last 20             # what just happened, from the audit log
 wisp approvals                  # what it has been told to remember; revoke or clear here
@@ -56,8 +57,10 @@ To let another harness use it, register it as an MCP server. For Claude Code, in
 ```
 
 It exposes `respond` (run a task on the on-device model, with wisp's tools; pass back the returned
-`thread_id` to continue a conversation) and `close_thread`. wisp's own tools are used by the model, not
-called directly.
+`thread_id` to continue a conversation), `triage` (run or read build and test output and get back only
+the failures), `summarise_diff` (a diff as per-file lines and review flags), and `close_thread`. The raw
+output behind `triage` and `summarise_diff` never leaves the Mac. wisp's own tools are used by the
+model, not called directly.
 
 ## Documentation
 
@@ -68,6 +71,8 @@ Everything is under [docs/](docs/README.md). Start with the one that matches you
 | Understand what wisp is for and what is out of scope | [objective.md](docs/objective.md) |
 | Use the command line: subcommands, flags, `config.json`, exit codes | [wisp.md](docs/wisp.md) |
 | See what the model can do and the limits on each tool | [tools/](docs/tools/README.md) |
+| Know how well each delegated task works, as measured | [measurements.md](docs/measurements.md) |
+| Choose a model or a local backend | [backends.md](docs/backends.md) |
 | Connect it to another harness over MCP | [mcp.md](docs/mcp.md) |
 | Know what it can do to your Mac, what it remembers, and how to undo | [trust.md](docs/trust.md) |
 | Know how commands are confined and when you are asked | [tools/run_command.md](docs/tools/run_command.md), [approval.md](docs/approval.md) |
@@ -83,8 +88,8 @@ macOS and the framework offer for confinement.
 
 ## Setup for developers
 
-You need macOS 27 and Xcode 27 (the Command Line Tools alone lack the `@Generable` macro plugin). Rust is
-optional until the first tool crate lands.
+You need macOS 27 and Xcode 27 (the Command Line Tools alone lack the `@Generable` macro plugin), and
+Rust 1.98 or later for the terminal front end in `tools/`.
 
 ```bash
 git clone git@github.com:pidster/wisp.git
@@ -94,14 +99,17 @@ cd harness
 swift build
 .build/debug/wisp tools
 .build/debug/wisp "What is the date in Tokyo?"
+cd ../tools
+cargo build                       # wisp-tui, the terminal front end
+WISP_BIN=../harness/.build/debug/wisp target/debug/wisp-tui
 ```
 
 The repository is laid out as:
 
 | Path | What it is |
 | --- | --- |
-| `harness/` | The Swift package: the `wisp` binary and the `WispCore` and `WispMCP` libraries |
-| `tools/` | A Cargo workspace reserved for Rust tool binaries |
+| `harness/` | The Swift package: the `wisp` binary, `WispCore`, `WispMCP`, and the model backends |
+| `tools/` | The Cargo workspace: `wisp-tui`, the terminal front end over `wisp chat --json` |
 | `docs/` | Documentation and decision records |
 | `scripts/check` | The quality gate: lint, warnings-as-errors build, tests, hygiene, coverage, model eval |
 
@@ -110,7 +118,7 @@ How we work, in short:
 - `scripts/check` is the whole gate and the pre-commit hook runs it. Lint is strict, warnings are errors,
   Swift 6 strict concurrency stays on, and no escape hatches.
 - Tests never need the model. The model is exercised by running the binary, and by `scripts/check eval`
-  for the risk classifier.
+  for the classifier and every delegated task ([measurements.md](docs/measurements.md)).
 - A change is done when it is tested, documented in code, and documented in `docs/`, in the same commit.
   Non-obvious or hard-to-reverse choices get a decision record.
 - Dogfooding: `.mcp.json` registers this repository's own release build (`swift build -c release`) as an

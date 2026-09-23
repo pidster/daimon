@@ -26,6 +26,15 @@ remote() {
 }
 
 echo "==> preflight"
+missing=""
+for page in docs/*.md docs/decisions/*.md docs/proposals/*.md docs/tools/*.md; do
+    case "$page" in docs/README.md|docs/tools/README.md) continue ;; esac
+    name="${page#docs/}"
+    index=docs/README.md
+    case "$page" in docs/tools/*) index=docs/tools/README.md; name="${page#docs/tools/}" ;; esac
+    grep -q "($name)" "$index" || missing="$missing $page"
+done
+[ -z "$missing" ] || { echo "not in the docs index:$missing (see docs/release.md, step 0)" >&2; exit 1; }
 [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || { echo "not on main" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 1; }
 grep -q "^version = \"$VERSION\"" tools/wisp-tui/Cargo.toml || { echo "tools/wisp-tui/Cargo.toml version is not $VERSION" >&2; exit 1; }

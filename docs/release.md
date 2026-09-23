@@ -16,12 +16,32 @@ wisp ships as one arm64 binary through a Homebrew tap. This page is the procedur
 The binary is unsigned for now; Homebrew does not quarantine what it downloads, so Gatekeeper does not
 intervene. A signed and notarised `.pkg` is a possible later channel.
 
+## Step 0: the docs sweep, before running the script
+
+Do this first, by hand or by an agent, and commit it on its own before `scripts/release` (AGENTS.md,
+"Docs sweep before every release"). Each change keeps its own page right; this catches what a change
+made stale elsewhere. Read each against the code as it stands:
+
+| Page | Check |
+| --- | --- |
+| `README.md` | What wisp can do, the quick start commands, the MCP tool list, the doc map, developer setup, the layout table |
+| `AGENTS.md`, `CLAUDE.md` | The layout table, the architecture paragraph, the model's tool list, the MCP tool names, the smoke-test commands |
+| `docs/README.md` | Every page, ADR, and proposal has a row with a current description (the preflight checks presence, not accuracy) |
+| `docs/wisp.md` | Every subcommand, flag, chat command, and config field the binary has; `wisp --help` and `/help` are the source |
+| `docs/mcp.md` | Every MCP tool, argument, result field, and resource `ToolCatalog` declares |
+| `docs/tools/README.md`, `docs/trust.md` | The model's tools, and what each can change on the Mac |
+| `docs/design.md` | Components added or moved since the last release |
+| `docs/backlog.md` | Shipped items marked done with the date; nothing listed as next that has shipped |
+| `CHANGELOG.md` | The `## Unreleased` section names every user-visible change since the last tag (`git log vPREV..`) |
+
+Commit it as "Bring the docs up to date for X.Y.Z", or "Docs sweep for X.Y.Z: nothing stale".
+
 ## Procedure
 
 `scripts/release X.Y.Z` does all of it and refuses to continue at the first problem. `--dry-run` performs
 every local step and prints the remote ones instead of executing them.
 
-1. Preflight: clean tree on `main`, `WispVersion.current` equals `X.Y.Z`, no existing tag, `gh` is
+1. Preflight: every `docs/*.md`, decision, and proposal is linked from `docs/README.md`; clean tree on `main`, `WispVersion.current` equals `X.Y.Z`, no existing tag, `gh` is
    authenticated, `CHANGELOG.md` has a non-empty `## X.Y.Z` section, `scripts/check` passes (the full
    test run), `scripts/check coverage-gate` passes, and `scripts/check eval` passes. The release's eval only asserts the
    floors; it does not rewrite `harness/Sources/WispCore/Resources/measurements.json`, because the sets
