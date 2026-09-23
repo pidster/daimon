@@ -38,6 +38,18 @@ not the differentiator. Items, in order of leverage:
 - **Roots and progress.** Use the client's declared roots as the sandbox's writable root; send progress
   notifications during long commands.
 
+## Use cases chosen for later
+
+Picked on 2026-09-23 alongside secret scanning, the condensers, watch mode, and `system_info`, and left
+for after them:
+
+- **Bulk classification.** Label hundreds of commits, issues, or log lines into categories with
+  structured output (ADR 0022): too cheap a job for a remote model, and measurable with the eval harness.
+- **Git chores.** Commit message drafts, PR descriptions, and changelog lines from a diff;
+  `summarise_diff` already produces most of what they need.
+- **Offline work.** wisp as the agent when there is no network: on a plane, or on a network that cannot
+  reach a remote model. Mostly a matter of documenting and testing what already works without one.
+
 ## Terminal front end
 
 Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Input history shipped 2026-09-23
