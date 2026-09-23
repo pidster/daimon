@@ -296,8 +296,8 @@ struct Chat: AsyncParsableCommand {
                 git: GitState.read(in:),
                 inspect: { what in await InspectTool(introspection: views).show(what) },
                 banner: banner,
-                models: {
-                    await ModelListing.lines(config: session.config, home: Wisp.home, current: session.config.model)
+                models: { current, tools in
+                    await ModelListing.lines(config: session.config, home: Wisp.home, current: current, tools: tools)
                 },
                 openModel: { selection, transcript in
                     try session.openAgent(
@@ -355,8 +355,8 @@ struct Chat: AsyncParsableCommand {
                 git: GitState.read(in:),
                 inspect: { what in await InspectTool(introspection: views).show(what) },
                 banner: "wisp \(WispVersion.current) · \(agent.model.selection) · \(agent.tools.count) tools",
-                models: {
-                    await ModelListing.lines(config: session.config, home: Wisp.home, current: session.config.model)
+                models: { current, tools in
+                    await ModelListing.lines(config: session.config, home: Wisp.home, current: current, tools: tools)
                 },
                 openModel: { selection, transcript in
                     try session.openAgent(approver: approver, transcript: transcript, observer: tap, model: selection)
@@ -451,12 +451,23 @@ struct ConfigCommand: ParsableCommand {
 /// Lists the models a session can run on: Apple's two and whatever each local backend serves.
 struct Models: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "List the models available to --model and config.json.",
-        discussion: "Apple's models are checked with the framework; each local backend lists what it serves.")
+        abstract: "List the models usable with --model and config.json.",
+        discussion:
+            "A model is listed when it resolves and declares tool calling (or, with --no-tools, when it can "
+            + "hold a conversation at all). --all adds the rest with the reason each is excluded.")
+
+    @Flag(name: .long, help: "Also list the models that cannot be used, with the reason.")
+    var all = false
+
+    @Flag(name: .customLong("no-tools"), help: "List the models usable for a conversation with no tools.")
+    var noTools = false
 
     func run() async throws {
         let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
-        for line in await ModelListing.lines(config: config, home: Wisp.home, current: config.model) { print(line) }
+        let tools: [any Tool] = noTools ? [] : ToolRegistry(runner: config.runner).all
+        let lines = await ModelListing.lines(
+            config: config, home: Wisp.home, current: config.model, tools: tools, all: all)
+        for line in lines { print(line) }
     }
 }
 

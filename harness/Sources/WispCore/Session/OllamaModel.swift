@@ -427,6 +427,16 @@ public struct OllamaBackend: ModelBackend {
     public func resolve(_ name: String, config: Config.Resolved, home: Home) throws -> ResolvedModel {
         do {
             let model = try OllamaModel(name: name, settings: config.ollama).checked()
+            // An embedding model (no `completion`) cannot hold a conversation; refuse it here, not at
+            // the first prompt, so listings leave it out and `/model` explains.
+            guard model.reported?.contains("completion") == true else {
+                let reported = (model.reported ?? []).joined(separator: ", ")
+                throw ModelSelection.Failure.unavailable(
+                    model: "ollama:\(name)",
+                    reason:
+                        "Ollama reports it cannot hold a conversation (capabilities: \(reported.isEmpty ? "none" : reported))"
+                )
+            }
             return ResolvedModel(
                 selection: .ollama(name), custom: model, capabilitySource: .runtime,
                 asset: "\(config.ollama.baseURL.absoluteString) \(name)", contextSize: config.ollama.contextLength)

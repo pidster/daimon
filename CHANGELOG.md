@@ -4,6 +4,16 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Changed:
+
+- `wisp models` and `/models` list only the models that can serve the conversation: they must resolve
+  and, when the conversation has tools, declare tool calling. `--all` adds the excluded ones with the
+  reason; `--no-tools` judges for a conversation without tools. An Ollama model that cannot hold a
+  conversation, such as an embedding model, is refused by `--model` and `/model` with that reason
+  instead of failing at the first prompt.
+
 ## 0.8.0
 
 Added:

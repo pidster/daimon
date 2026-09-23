@@ -51,7 +51,7 @@ hint otherwise. Who declares them:
 | Backend | Source of the declaration |
 | --- | --- |
 | `system`, `private-cloud` | the framework |
-| `ollama` | the server's `/api/show` `capabilities` for that model (`tools`, `completion`, `thinking`, `vision`); an embedding model declares nothing |
+| `ollama` | the server's `/api/show` `capabilities` for that model (`tools`, `completion`, `thinking`, `vision`); a model without `completion`, such as an embedding model, is refused at resolution because it cannot hold a conversation |
 | `coreai` | the bundle: tool-call markers in the tokenizer, a thinking format, the engine's guided-generation support |
 | `mlx` | the operator, in `config.json`; an undeclared model is text only |
 

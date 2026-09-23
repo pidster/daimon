@@ -91,7 +91,7 @@ import WispTestSupport
             model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("from system")])))
         let context = ChatLoop.Context(
             directory: "/r", approval: "--yes",
-            models: { ["* system\tavailable", "  ollama:q\t3B"] },
+            models: { current, _ in ["current \(current)", "  ollama:q\t3B"] },
             openModel: { selection, transcript in
                 Agent(
                     transcript: transcript, tools: [],
@@ -104,7 +104,7 @@ import WispTestSupport
             agent: first, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
         try await loop.run()
         let out = capture.output
-        #expect(out.contains("* system\tavailable\n  ollama:q\t3B\n"))
+        #expect(out.contains("current system\n  ollama:q\t3B\n"))
         #expect(out.contains("model: system (toolCalling, guidedGeneration)\n"))
         #expect(out.contains("from system\n") && out.contains("from ollama\n"))
         #expect(out.contains("model: ollama:q (toolCalling, guidedGeneration)\n"))

@@ -182,6 +182,14 @@ final class FakeOllama: URLProtocol {
         // A thread conversation resolves the same way.
         let thread = try session.conversation(id: "t", approver: DenyingApprover(reason: "x"))
         #expect(try await thread.openAgent().respond(to: "hi").text == "ok")
+        // An embedding model cannot hold a conversation: it is refused at resolution, with the reason.
+        FakeOllama.serve("/api/show", body: #"{"capabilities":["embedding"]}"#)
+        do {
+            _ = try session.openAgent(approver: DenyingApprover(reason: "x"))
+            Issue.record("an embedding model opened a conversation")
+        } catch ModelSelection.Failure.unavailable(let model, let reason) {
+            #expect(model == "ollama:q" && reason.contains("cannot hold a conversation (capabilities: embedding)"))
+        }
         // A text-only model refuses tools with a hint, and runs with none.
         FakeOllama.serve("/api/show", body: #"{"capabilities":["completion"]}"#)
         #expect(throws: ModelSelection.Failure.self) { try session.openAgent(approver: DenyingApprover(reason: "x")) }

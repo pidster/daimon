@@ -47,8 +47,9 @@ public struct ChatLoop {
         public var inspect: (@Sendable (String) async -> String)?
         /// A banner line for the start of the session.
         public var banner: String?
-        /// Lists the models for `/models`; nil makes the command unavailable.
-        public var models: (@Sendable () async -> [String])?
+        /// Lists the models `/models` offers: those that can serve a conversation on the given current
+        /// model with the given tools; nil makes the command unavailable.
+        public var models: (@Sendable (ModelSelection, [any Tool]) async -> [String])?
         /// Opens an agent on another model over a transcript, for `/model`; nil makes it unavailable.
         public var openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)?
 
@@ -57,7 +58,7 @@ public struct ChatLoop {
             directory: String, approval: String,
             git: @escaping @Sendable (String) -> (branch: String?, dirty: Bool?) = { _ in (nil, nil) },
             inspect: (@Sendable (String) async -> String)? = nil, banner: String? = nil,
-            models: (@Sendable () async -> [String])? = nil,
+            models: (@Sendable (ModelSelection, [any Tool]) async -> [String])? = nil,
             openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil
         ) {
             self.directory = directory
@@ -155,7 +156,7 @@ public struct ChatLoop {
                     io.note("models are not listed here")
                     continue
                 }
-                for line in await models() { io.print(line) }
+                for line in await models(agent.model.selection, agent.tools) { io.print(line) }
             case .model(nil):
                 io.print("model: \(agent.model.selection) (\(agent.model.capabilityNames.joined(separator: ", ")))")
             case .model(let name?):

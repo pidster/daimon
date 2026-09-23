@@ -76,7 +76,7 @@ What a session shows, and where it goes:
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
 | `/inspect [what]`, `/status` | wisp's own `config`, `status` (default), `approvals`, or `audit`, as the model's `inspect` tool shows them. |
 | `/last` | The last tool result in full; the live line shows only its first line. |
-| `/models` | The models this Mac can run, as `wisp models` lists them. |
+| `/models` | The models this conversation could switch to: those that resolve and declare what its tools need, as `wisp models` decides; the current one marked `*`. |
 | `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
@@ -144,15 +144,29 @@ See [logging.md](logging.md) for the event catalogue.
 
 ### `wisp models`
 
-Lists what `--model` and `config.json` can name: `system` and `private-cloud` with their availability and
-declared capabilities as the framework reports them, then every model each local backend serves (Ollama
-from its `/api/tags`, with parameter count and size). The configured default is marked with `*`. A
-backend that does not answer gets one line saying so; the others are still listed.
+Lists the models `--model` and `config.json` can use: Apple's two, then every model each local backend
+serves, each shown only if it can serve a conversation. That is decided by logic, not a list of names:
+the model must resolve (installed, reachable, entitled, and able to converse; an Ollama model that does
+not report `completion`, such as an embedding model, cannot) and must declare tool calling, since a
+conversation has tools. The configured default is marked with `*`; each line gives the backend's detail
+and the declared capabilities. A backend that does not answer gets one line in parentheses.
+
+| Flag | Effect |
+| --- | --- |
+| `--no-tools` | Judge for a conversation with no tools, so text-only models are listed too |
+| `--all` | Add the excluded models, each with the reason it cannot be used |
 
 ```
-* system	available; toolCalling, guidedGeneration, vision
-  private-cloud	unavailable: model 'private-cloud' is unavailable: this binary lacks the com.apple.developer.private-cloud-compute entitlement, …
-  ollama:qwen3-coder:latest	30.5B 18.6 GB
+* system	toolCalling, guidedGeneration, vision
+  ollama:qwen3-coder:latest	30.5B 18.56 GB; toolCalling, guidedGeneration
+```
+
+With `--all`, on the same Mac on 2026-09-23:
+
+```
+  private-cloud	not usable: … lacks the com.apple.developer.private-cloud-compute entitlement, …
+  ollama:nomic-embed-text:latest	not usable: … Ollama reports it cannot hold a conversation (capabilities: embedding)
+  ollama:deepseek-coder-v2:latest	not usable: … does not support tool calling (capabilities runtime); …
 ```
 
 `private-cloud` is refused from every unsigned build; see [backends.md](backends.md), "Private Cloud
