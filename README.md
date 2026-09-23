@@ -37,6 +37,7 @@ wisp chat                       # interactive; /help for commands, /models and /
 wisp --yes "Run the tests in $PWD and tell me if they pass"   # non-interactive: approve risky commands
 wisp logs --last 20             # what just happened, from the audit log
 wisp approvals                  # what it has been told to remember; revoke or clear here
+make test; wisp notify "Tests finished" --sound   # a macOS notification, from you or from the model
 ```
 
 Running tests is a "moderate" action, so `chat` asks you before doing it; plain `wisp "…"` cannot ask
