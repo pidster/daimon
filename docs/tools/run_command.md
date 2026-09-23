@@ -84,6 +84,12 @@ The invariant: a write succeeds if and only if the real file lands inside the wr
 one different mechanism, but creating one needs write access to the destination directory and the same
 volume, so it can only alias files the command could already reach.
 
+### Setuid programs
+
+Seatbelt will not execute a setuid binary, so `/bin/ps` and `/usr/bin/top` fail inside the sandbox
+(`execvp() of '/bin/ps' failed: Operation not permitted`, verified on macOS 27 on 2026-09-23). The
+`system_info` tool reads the process table through `libproc` instead ([system_info](system_info.md)).
+
 ### Nested sandboxes
 
 Seatbelt lets a process re-apply an identical profile but refuses a different one

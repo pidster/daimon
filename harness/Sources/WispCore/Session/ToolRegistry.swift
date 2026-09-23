@@ -34,6 +34,7 @@ public struct ToolRegistry: Sendable {
                 EditFileTool(writer: FileWriter(options: runner), approval: approval, audit: audit), audit: audit),
             AuditedTool(InspectTool(introspection: introspection), audit: audit),
             AuditedTool(NotifyTool(notifier: notifier, audit: audit), audit: audit),
+            AuditedTool(SystemInfoTool(runner: commandRunner), audit: audit),
         ]
     }
 

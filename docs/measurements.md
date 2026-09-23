@@ -21,6 +21,7 @@ Mac on one day; it is evidence, not a certification.
 | `triage` | `TriageEvalTests`, abridged swift build, swift test, cargo test, and pytest output | an expected failure found, by test name or file:line |
 | `summarise_diff` | `DiffSummaryEvalTests`, five small diffs | the expected flag (secret, deleted or disabled test) on the expected file, or no flag for an ordinary change, from the rules and the model together; every file must also get a summary line. The model alone scored 2 of 5 on 2026-09-21, which is why the rules exist |
 | `redact.thorough` | `RedactionEvalTests`, a ticket, a service log, a meeting note, build output, a stack trace | every expected value (names, an account number, a user id, an address, a private hostname) replaced by the rules and the model together, and every phrase that must survive unchanged; the judge runs under wisp's own system prompt, as callers' passes do |
+| `system_info.topic` | `SystemInfoEvalTests`, eight plain questions about the Mac, twice each, with `run_command` also offered | a `system_info` call in the turn naming the expected topic (and port or process); three runs on 2026-09-23 scored 15, 14, and 16 of 16 |
 | `edit_file.replace` | `ToolEvalTests`, ten small files | after read_file then edit_file replace by line number, the file is exactly as intended |
 | `respond.schema` | `ToolEvalTests`, six code snippets | the schema-shaped reply parses and names the language |
 

@@ -11,6 +11,7 @@ result format) and the limits that protect the context window. `wisp tools` prin
 | [edit_file](edit_file.md) | Write, append to, or replace text in a file, inside the sandbox's writable set. |
 | [inspect](inspect.md) | wisp's own config, status, approvals, and recent audit events; read-only. |
 | [notify](notify.md) | Show the user a macOS notification; bounded, rate-limited, audited, no approval. |
+| [system_info](system_info.md) | Ports, free space, folder sizes, busy processes, memory, one process, battery, macOS, network; read-only. |
 
 Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
 registered tool's schema is in the prompt on every turn, so enable only what a task needs.

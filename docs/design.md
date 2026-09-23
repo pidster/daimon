@@ -211,6 +211,9 @@ with `wisp scan` and `wisp redact` ([ADR 0031](decisions/0031-secret-scanning-an
 and ranking for logs, a parsed `.ips` for crashes, a merged outline for JSON
 ([ADR 0032](decisions/0032-log-and-json-condensers.md)). The server's `condense` helper gives every
 condensing tool its conversation, runner, gate, and capture.
+`system_info` (`SystemInfo`, `ProcessTable`) answers questions about the Mac from fixed read-only probes
+through the conversation's runner without the gate, and from `libproc` for processes, since Seatbelt
+will not run the setuid `ps` ([ADR 0034](decisions/0034-system-info.md)).
 `wisp watch` is `Watcher` in `WispCore/Session`: a loop over an `AsyncStream` of triggers (start,
 FSEvents changes from `FileWatcher`, an interval) whose running, triaging, notifying, and reporting are
 injected, so it is tested without time or the file system ([ADR 0033](decisions/0033-watch-mode.md)).

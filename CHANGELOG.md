@@ -26,6 +26,10 @@ Added:
   an interval, triages a failing run with the model, and posts a notification when it starts or stops
   failing (`--notify change|failure|always|never`).
 
+- The model tool `system_info`: listening ports, free space, folder sizes, your busiest processes,
+  memory, one process, battery, macOS and hardware, and network, from fixed read-only probes wisp parses,
+  so `wisp "what is using port 8080?"` gets a short, right answer.
+
 Fixed:
 
 - `summarise_diff`'s `secret` flag quoted the start of the added line, handing the credential to the
