@@ -7,7 +7,7 @@
 | [wisp.md](wisp.md) | Command reference: subcommands, flags, `~/.wisp`, `config.json`, exit codes |
 | [tools/](tools/README.md) | One page per model-facing tool: contract, result format, limits |
 | [measurements.md](measurements.md) | What the eval harness found each delegated task achieves, how it is recorded, and where it is published |
-| [mcp.md](mcp.md) | wisp as an MCP server: client setup, `respond`, `triage`, structured output, receipts, errors |
+| [mcp.md](mcp.md) | wisp as an MCP server: client setup, `respond`, the condensing tools, structured output, receipts, errors |
 | [design.md](design.md) | Architecture: components, data flow, extension points |
 | [fm-cli.md](fm-cli.md) | What the Apple `fm` command family does and does not offer, as observed |
 | [local-model-evaluation.md](local-model-evaluation.md) | Local-model research, candidate shortlist, and agreed workload/delegation evaluation design |

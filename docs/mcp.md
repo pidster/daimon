@@ -1,9 +1,10 @@
 # wisp as an MCP server
 
 `wisp mcp` speaks the Model Context Protocol over stdio, so other agent harnesses can delegate work to the
-on-device model. It advertises two tools: `respond` and `close_thread`. wisp's own tools (`run_command`,
-`read_file`, `current_date`) are not exposed directly; they are reachable only by asking `respond` to use
-them, so every command runs under the model's policy, sandbox, and approval with the audit trail of a
+on-device model. It advertises `respond`; six condensing tools that keep raw material on the Mac and
+return a small result (`triage`, `summarise_diff`, `scan_secrets`, `redact`, `condense_log`,
+`json_shape`); and `close_thread`. wisp's own tools (`run_command`, `read_file`, `system_info`, and the
+rest) are not exposed directly; they are reachable only by asking `respond` to use them, so every command runs under the model's policy, sandbox, and approval with the audit trail of a
 turn ([ADR 0006](decisions/0006-mcp-server-over-stdio.md), amended). Stdout is the protocol channel; diagnostics go to stderr. The
 server runs until the client closes stdin.
 

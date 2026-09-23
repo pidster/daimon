@@ -2,19 +2,22 @@
 
 **wisp** is a small, on-device AI agent for the Mac. It runs Apple's built-in Foundation Model, the same
 one behind Apple Intelligence and the `fm` command, and gives it tools: it can run shell commands, read
-and edit files, tell the time, look at its own state, and send you a macOS notification, and it can be
-extended with more. With the default model nothing leaves your
+and edit files, answer questions about the Mac (ports, disk, processes, battery), tell the time, look at
+its own state, and send you a macOS notification, and it can be extended with more. With the default model nothing leaves your
 machine; Apple's Private Cloud Compute model is available as an explicit opt-in, and any model served by a
 local Ollama can be chosen with `--model ollama:<name>`. Commands the model runs
 may use the network unless you turn that off.
 
 It has two faces:
 
-- **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it.
+- **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it;
+  watch a build and hear when it breaks (`wisp watch`); scan a commit for secrets or redact a log before
+  you share it (`wisp scan`, `wisp redact`).
   On a terminal the chat runs in `wisp-tui`: the conversation scrolls in your terminal's own history
   above a pinned input and status line.
 - **An MCP server.** Other agent harnesses such as Claude Code or Codex can hand it self-contained work to do
-  locally: run a build, summarise a file, classify some text.
+  locally: run a build and return only its failures, condense a log or a large JSON file, scan or redact
+  text, summarise a diff, classify some text.
 
 It is deliberately a *microharness*: the smallest correct agent loop, not a framework. What makes it worth
 using is the care around that loop. Every command the model wants to run passes a deny list, runs inside a
