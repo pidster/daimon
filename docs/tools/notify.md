@@ -40,6 +40,9 @@ to deliver quietly, or a Focus mode is on: in System Settings, Notifications, Sc
 Banners or Alerts. Seen on this Mac on 2026-09-23: both test notifications arrived in the stack and
 neither showed a banner.
 
+A helper app posting through Apple's `UserNotifications`, so banners come from Wisp itself, is planned
+for when wisp can be signed ([backlog.md](../backlog.md), "When wisp can be signed").
+
 ## Implementation
 
 `Notifier` in `harness/Sources/WispCore/Support/Notifier.swift`, one per session so the rate limit covers

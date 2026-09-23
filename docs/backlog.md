@@ -42,6 +42,21 @@ history in `wisp-tui`'s input (cursor keys, multi-line composition, paste); a `t
 protocol and a decision on raw versus pre-rendered events; a bordered approval dialog with the reasons inside
 it; Markdown-ish rendering of replies at commit time.
 
+## When wisp can be signed
+
+Two things wait on a Developer ID or App Store signature rather than on code.
+
+- **A notification helper app.** `Wisp Notifier.app`, a tiny agent bundle (`LSUIElement`) in the
+  formula's `libexec`, posting through `UserNotifications` instead of `osascript`
+  ([ADR 0030](decisions/0030-notifications.md)). Gains: banners as "Wisp" with its own icon and its
+  own row in Notification settings, action buttons and click-through ("Show" opening the audit or the
+  terminal), and no Script Editor attribution. `wisp notify` and the `notify` tool launch the helper
+  when it is installed and authorised, and fall back to `osascript` otherwise. The open fact to settle
+  first: whether macOS grants notification authorisation to the bundle as shipped; signing removes
+  that doubt.
+- **Private Cloud Compute.** The `com.apple.developer.private-cloud-compute` entitlement is granted to
+  signed App Store apps only ([backends.md](backends.md), "Private Cloud Compute").
+
 ## Models
 
 - Done 2026-09-19: `ollama:<name>` models through a wisp-supplied executor

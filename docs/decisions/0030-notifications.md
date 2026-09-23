@@ -27,8 +27,9 @@ model posting one should go through the approval gate like a command.
 
 - The model can tell you a long task has finished without you watching the terminal; a harness
   delegating through `respond` can ask it to.
-- Banners appear as coming from Script Editor, and macOS may ask once to allow them. A signed app bundle
-  would fix both; not worth it for this.
+- Banners appear as coming from Script Editor, and macOS may ask once to allow them. A helper app
+  bundle posting through `UserNotifications` would fix both; it is planned for when wisp can be signed
+  (`backlog.md`).
 - A misbehaving model can post at most five banners a minute, each visible in the audit log.
 - Tests: the argument list, cleaning, the off switch, the empty-message and rate-limit refusals on an
   injected clock, the audit event, and the tool's replies (`NotifierTests`); the real `osascript` path
