@@ -17,10 +17,12 @@ public struct ToolRegistry: Sendable {
     ///   - audit: Where tool calls are recorded; nil records nothing.
     ///   - approval: The gate risky tools consult; nil never asks.
     ///   - introspection: What `inspect` shows; the default sees the default home and config.
+    ///   - notifier: Posts `notify`'s notifications; the session shares one across conversations.
     public init(
         runner: CommandRunner.Options = CommandRunner.Options(), reader: FileReader = FileReader(),
         audit: AuditLog? = nil, approval: ApprovalGate? = nil,
-        introspection: Introspection = Introspection(home: Home.resolve(), config: Config().resolved)
+        introspection: Introspection = Introspection(home: Home.resolve(), config: Config().resolved),
+        notifier: Notifier = Notifier()
     ) {
         let audit = audit ?? .disabled(session: "unaudited")
         let commandRunner = CommandRunner(options: runner, audit: audit, approval: approval)
@@ -31,6 +33,7 @@ public struct ToolRegistry: Sendable {
             AuditedTool(
                 EditFileTool(writer: FileWriter(options: runner), approval: approval, audit: audit), audit: audit),
             AuditedTool(InspectTool(introspection: introspection), audit: audit),
+            AuditedTool(NotifyTool(notifier: notifier, audit: audit), audit: audit),
         ]
     }
 

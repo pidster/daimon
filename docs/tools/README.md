@@ -10,6 +10,7 @@ result format) and the limits that protect the context window. `wisp tools` prin
 | [read_file](read_file.md) | Read a text file one page at a time. |
 | [edit_file](edit_file.md) | Write, append to, or replace text in a file, inside the sandbox's writable set. |
 | [inspect](inspect.md) | wisp's own config, status, approvals, and recent audit events; read-only. |
+| [notify](notify.md) | Show the user a macOS notification; bounded, rate-limited, audited, no approval. |
 
 Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
 registered tool's schema is in the prompt on every turn, so enable only what a task needs.

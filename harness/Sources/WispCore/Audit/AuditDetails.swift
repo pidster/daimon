@@ -145,6 +145,22 @@ extension AuditEvent {
             ["tool": .string(tool), "isError": .bool(isError), "text": .string(text), "seconds": .double(seconds)]
         }
 
+        /// `notification`: what was asked to be shown, by whom, and whether it was.
+        public static func notification(
+            title: String, body: String, source: String, outcome: Notifier.Outcome
+        ) -> [String: JSONValue] {
+            var details: [String: JSONValue] = [
+                "title": .string(title), "body": .string(body), "source": .string(source),
+            ]
+            switch outcome {
+            case .posted: details["outcome"] = "posted"
+            case .refused(let reason):
+                details["outcome"] = "refused"
+                details["reason"] = .string(reason)
+            }
+            return details
+        }
+
         /// `error`.
         public static func error(message: String, context: String?) -> [String: JSONValue] {
             var details: [String: JSONValue] = ["message": .string(message)]
@@ -220,6 +236,7 @@ extension AuditEvent {
         case .policyDecision: ["command", "workingDirectory", "verdict", "reason", "sandbox", "network", "nested"]
         case .commandOutcome: ["command", "exitStatus", "timedOut", "truncated", "stdout", "stderr", "seconds"]
         case .fileWrite: ["path", "mode", "created", "bytesBefore", "bytesAfter"]
+        case .notification: ["title", "body", "source", "outcome", "reason"]
         case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount", "reason"]
         case .mcpRequest: ["tool", "arguments"]
         case .mcpResult: ["tool", "isError", "text", "seconds"]

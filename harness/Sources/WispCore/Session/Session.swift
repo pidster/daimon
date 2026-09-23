@@ -139,6 +139,8 @@ public struct Session: Sendable {
     public let toolNames: [String]
     /// The classifier every conversation's gate uses.
     let classifier: any RiskClassifier
+    /// Posts notifications for every conversation, so the rate limit covers them all.
+    public let notifier: Notifier
 
     /// Which face this session is.
     public var entryPoint: EntryPoint { request.entryPoint }
@@ -234,7 +236,8 @@ public struct Session: Sendable {
             request: request, home: home, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
             sessionApprovals: SessionApprovals(), notes: notes, toolNames: toolNames,
-            classifier: dependencies.makeClassifier(config, home))
+            classifier: dependencies.makeClassifier(config, home),
+            notifier: Notifier(enabled: config.notificationsEnabled, perMinute: config.notificationsPerMinute))
     }
 
     /// Where `approval.coremlModel` points: absolute or `~` as given, anything else under
@@ -350,7 +353,8 @@ public struct Conversation: Sendable {
             source: session.entryPoint, sessionApprovals: session.sessionApprovals)
         let registry = ToolRegistry(
             runner: session.config.runner, audit: audit, approval: gate,
-            introspection: session.introspection(for: audit, tools: toolNames, model: model))
+            introspection: session.introspection(for: audit, tools: toolNames, model: model),
+            notifier: session.notifier)
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(

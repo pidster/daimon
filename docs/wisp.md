@@ -175,6 +175,16 @@ server answers and lists the model), `/usr/bin/sandbox-exec` present,
 `config.json` parses, `~/.wisp` writable. Run it first
 when something is wrong. `wisp --version` prints the version.
 
+### `wisp notify <message>`
+
+Shows a macOS notification: `--title` (default `wisp`), `--subtitle`, `--sound`. The same notifier as the
+model's `notify` tool, so the same bounds, per-minute limit, and off switch apply, and the request is
+audited as `notification` with source `user`. Exits non-zero with the reason when it is refused.
+
+```
+make test && wisp notify "Tests pass" --title "Build" --sound
+```
+
 ### `wisp approvals`
 
 `wisp approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, pattern
@@ -215,6 +225,7 @@ State lives in `~/.wisp`, or `$WISP_HOME` when set. Any command that writes ther
 | `model` | `system` | `system`, `private-cloud`, or `ollama:<name>`. See [ADR 0013](decisions/0013-model-selection.md) and [ADR 0016](decisions/0016-local-runtimes-through-an-executor.md). |
 | `ollama` | `{ "baseURL": "http://127.0.0.1:11434", "timeoutSeconds": 120, "contextLength": 8192 }` | Where Ollama serves `ollama:<name>` models, how long one generation request may take, and the context window asked of the server on every request (`num_ctx`), which wisp condenses against. See [backends.md](backends.md). |
 | `coreai` | `{ "modelsDirectory": "<home>/models/coreai" }` | Where exported Core AI bundles live for `coreai:<name>` models. See [backends.md](backends.md). |
+| `notifications` | `{ "enabled": true, "perMinute": 5 }` | Whether the `notify` tool and `wisp notify` post at all, and at most how many in any minute across the process; see [tools/notify.md](tools/notify.md). |
 | `mlx` | `{ "modelsDirectory": "<home>/models/mlx", "models": {} }` | Where MLX model directories live for `mlx:<name>` models, and per model the capabilities the operator declares (`toolCalling`, `guidedGeneration`, `reasoning`, `vision`). Needs a build with `--traits MLX`. See [backends.md](backends.md). |
 | `commandTimeoutSeconds` | 60 | Wall-clock limit for `run_command`. |
 | `commandMaxOutputBytes` | 4096 | Bytes kept from each of stdout and stderr by `run_command`. |

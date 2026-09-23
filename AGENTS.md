@@ -65,7 +65,7 @@ subshell); the server exits on EOF. `docs/mcp.md` has a ready-made example.
 
 `Agent` wraps one `LanguageModelSession` created by a `ResolvedModel` (`ModelSelection`: `system` or
 `private-cloud`, or `ollama:<name>` through wisp's own executor, ADR 0016; adapters are obsoleted on macOS 27, ADR 0013); the framework runs the tool loop. `ToolRegistry` is the single
-list of tools the model sees (`current_date`, `run_command`, `read_file`, `edit_file`, `inspect`), each wrapped by `AuditedTool`.
+list of tools the model sees (`current_date`, `run_command`, `read_file`, `edit_file`, `inspect`, `notify`), each wrapped by `AuditedTool`.
 `CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus on-device
 model classifier, ask at `moderate` and above through an `Approver` per entry point), then runs `/bin/sh -c`
 under `sandbox-exec` with a generated profile, bounded output and a timeout. `FileReader` pages files.

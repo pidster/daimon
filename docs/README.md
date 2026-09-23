@@ -33,6 +33,7 @@
 | [decisions/0003-callback-streaming.md](decisions/0003-callback-streaming.md) | Stream via a delta callback, not an AsyncSequence wrapper |
 | [decisions/0002-macos-27-baseline.md](decisions/0002-macos-27-baseline.md) | macOS 27 is the platform baseline |
 | [decisions/0001-swift-and-foundationmodels.md](decisions/0001-swift-and-foundationmodels.md) | Implement wisp in Swift, linking FoundationModels directly |
+| [decisions/0030-notifications.md](decisions/0030-notifications.md) | Notifications through osascript with the text in argv, bounded, rate-limited, and audited, without approval |
 | [decisions/0029-tui-front-end.md](decisions/0029-tui-front-end.md) | The terminal chat is a Rust front end (`wisp-tui`, ratatui) over a headless `wisp chat --json`; one palette for both faces |
 | [decisions/0028-rename-to-wisp.md](decisions/0028-rename-to-wisp.md) | The project is wisp; one mechanical rename, no compatibility layer, a new Homebrew tap |
 | [decisions/0027-verb-patterns.md](decisions/0027-verb-patterns.md) | Approval patterns include the verb for programs like git and cargo, from an embedded list; old patterns still count |

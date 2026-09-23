@@ -24,6 +24,7 @@ public struct AuditEvent: Codable, Equatable, Sendable {
         case policyDecision = "policy.decision"
         case commandOutcome = "command.outcome"
         case fileWrite = "file.write"
+        case notification = "notification"
         case classifierVerdict = "classifier.verdict"
         case approvalRequested = "approval.requested"
         case approvalDecided = "approval.decided"
@@ -86,6 +87,10 @@ public struct AuditEvent: Codable, Equatable, Sendable {
             body = "\(details["verdict"]?.stringValue ?? "?") \(details["command"]?.stringValue ?? "")"
         case .commandOutcome:
             body = "exit=\(details["exitStatus"]?.intValue ?? 0) \(details["command"]?.stringValue ?? "")"
+        case .notification:
+            body =
+                "\(details["outcome"]?.stringValue ?? "?") from \(details["source"]?.stringValue ?? "?"): "
+                + (details["title"]?.stringValue ?? "")
         case .fileWrite:
             body =
                 "\(details["mode"]?.stringValue ?? "?") \(details["path"]?.stringValue ?? "") "

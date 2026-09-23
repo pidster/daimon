@@ -172,7 +172,9 @@ tool can change no more than a command could. Each edit is cleared by the gate a
 `edit_file <mode> <path>` and recorded as `file.write` ([ADR 0024](decisions/0024-edit-file.md)). The
 tools do not share one control path: `run_command` passes the policy patterns, the gate, and Seatbelt;
 `edit_file` the writable list and the gate; `read_file` the gate's rules only; `inspect` and
-`current_date` none.
+`current_date` none. `NotifyTool` posts through the session's `Notifier` (`osascript` with the text in
+`argv`), bounded, rate-limited, and audited as `notification`, without the gate
+([ADR 0030](decisions/0030-notifications.md)).
 
 `RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which checks the
 `CommandPolicy` patterns, consults `ApprovalGate` (rules plus on-device model classifier, ask at

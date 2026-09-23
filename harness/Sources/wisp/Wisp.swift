@@ -17,7 +17,7 @@ struct Wisp: AsyncParsableCommand {
         subcommands: [
             Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
             DoctorCommand.self,
-            Approvals.self,
+            Approvals.self, Notify.self,
         ],
         defaultSubcommand: Respond.self
     )
@@ -457,6 +457,34 @@ struct Models: AsyncParsableCommand {
     func run() async throws {
         let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
         for line in await ModelListing.lines(config: config, home: Wisp.home, current: config.model) { print(line) }
+    }
+}
+
+/// Posts a macOS notification from the command line, through the same notifier the model's `notify`
+/// tool uses: bounded, rate-limited, audited as `notification` with source `user`.
+struct Notify: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Show a macOS notification.",
+        discussion: "The same path as the model's notify tool: bounded text, a per-minute limit, audited.")
+
+    @Argument(help: "The message.")
+    var message: String
+
+    @Option(name: [.short, .long], help: "The title (default: wisp).")
+    var title = "wisp"
+
+    @Option(name: .long, help: "A second line under the title.")
+    var subtitle: String?
+
+    @Flag(name: .long, help: "Play the default notification sound.")
+    var sound = false
+
+    func run() throws {
+        let session = try Wisp.begin(.init(entryPoint: .notify))
+        defer { session.end() }
+        let outcome = session.notifier.post(
+            .init(title: title, body: message, subtitle: subtitle, sound: sound), source: .user, audit: session.audit)
+        if case .refused(let reason) = outcome { throw ValidationError("notification not shown: \(reason)") }
     }
 }
 

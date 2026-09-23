@@ -9,6 +9,8 @@ public enum EntryPoint: String, Sendable, Codable, CaseIterable {
     case mcp
     /// One MCP `thread_id`, a conversation under an `mcp` session.
     case mcpThread = "mcp-thread"
+    /// `wisp notify`, a person posting a notification.
+    case notify
 
     /// The entry point of a further conversation opened under this one.
     public var thread: EntryPoint {

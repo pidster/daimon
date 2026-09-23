@@ -4,6 +4,14 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- Notifications: the model's new `notify` tool and `wisp notify <message>` show a macOS notification.
+  Text is bounded, at most five a minute (`notifications.perMinute`), `notifications.enabled: false`
+  turns them off, and every request is audited as `notification`.
+
 ## 0.7.0
 
 Added:

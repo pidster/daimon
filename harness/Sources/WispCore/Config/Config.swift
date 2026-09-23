@@ -29,6 +29,22 @@ public struct Config: Codable, Equatable, Sendable {
     public var coreai: CoreAIConfig?
     /// Where MLX model directories for `mlx:<name>` models live, and what each may do.
     public var mlx: MLXConfig?
+    /// Notifications from the `notify` tool and `wisp notify`.
+    public var notifications: NotificationsConfig?
+
+    /// Notification settings in the file.
+    public struct NotificationsConfig: Codable, Equatable, Sendable {
+        /// Whether notifications are posted at all; default true.
+        public var enabled: Bool?
+        /// At most this many in any minute; default 5.
+        public var perMinute: Int?
+
+        /// Creates settings; nil fields take defaults.
+        public init(enabled: Bool? = nil, perMinute: Int? = nil) {
+            self.enabled = enabled
+            self.perMinute = perMinute
+        }
+    }
 
     /// MLX settings in the file.
     public struct MLXConfig: Codable, Equatable, Sendable {
@@ -139,7 +155,7 @@ public struct Config: Codable, Equatable, Sendable {
         commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
         audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil,
-        coreai: CoreAIConfig? = nil, mlx: MLXConfig? = nil
+        coreai: CoreAIConfig? = nil, mlx: MLXConfig? = nil, notifications: NotificationsConfig? = nil
     ) {
         self.systemPromptExtension = systemPromptExtension
         self.instructions = instructions
@@ -153,6 +169,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.ollama = ollama
         self.coreai = coreai
         self.mlx = mlx
+        self.notifications = notifications
     }
 
     /// Reads the file at `url`, or returns an empty config if it does not exist.
@@ -200,7 +217,9 @@ public struct Config: Codable, Equatable, Sendable {
                 contextLength: ollama?.contextLength ?? OllamaSettings.default.contextLength),
             coreaiModelsDirectory: coreai?.modelsDirectory,
             mlxModelsDirectory: mlx?.modelsDirectory,
-            mlxModels: (mlx?.models ?? [:]).mapValues { $0.capabilities ?? [] }
+            mlxModels: (mlx?.models ?? [:]).mapValues { $0.capabilities ?? [] },
+            notificationsEnabled: notifications?.enabled ?? true,
+            notificationsPerMinute: max(1, notifications?.perMinute ?? 5)
         )
     }
 
@@ -241,5 +260,9 @@ public struct Config: Codable, Equatable, Sendable {
         public var mlxModelsDirectory: String?
         /// Declared capability names per MLX model name.
         public var mlxModels: [String: [String]]
+        /// Whether notifications are posted.
+        public var notificationsEnabled: Bool = true
+        /// At most this many notifications a minute.
+        public var notificationsPerMinute: Int = 5
     }
 }
