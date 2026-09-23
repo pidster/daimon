@@ -17,7 +17,8 @@ and [ADR 0019](decisions/0019-model-backends.md).
 | `coreai:<name-or-path>` | Apple's Core AI framework, in wisp's process | on device |
 | `mlx:<name-or-path>` | MLX Swift, in wisp's process | on device; only in builds made with the `MLX` trait |
 
-`wisp models` lists what each backend can serve right now; `wisp doctor` checks the configured
+`wisp models` lists the models that can serve a conversation right now, and `--all` adds the rest with
+the reason each is excluded ([wisp.md](wisp.md)); `wisp doctor` checks the configured
 model resolves. A backend this build lacks is refused with the registered ones named.
 
 Every backend is the same above the model: the tool loop, the approval gate, the sandbox, transcripts,
@@ -39,7 +40,7 @@ before asking the framework and refuses with a sentence:
 model 'private-cloud' is unavailable: this binary lacks the com.apple.developer.private-cloud-compute entitlement, …
 ```
 
-`wisp models` shows the same line. Until wisp ships as a signed app with the entitlement, the
+`wisp models --all` shows the same line. Until wisp ships as a signed app with the entitlement, the
 spelling is accepted for that future and every run of it is refused before any data leaves the Mac.
 
 ## Capabilities are declared, never assumed
@@ -164,8 +165,9 @@ Capabilities come from the operator, because the bridge never infers them: decla
 ```
 
 Accepted capability names: `toolCalling`, `guidedGeneration`, `reasoning`, `vision`; another spelling is
-refused at resolve. `wisp models` lists the directories with architecture, quantisation, and the
-declaration.
+refused at resolve. `wisp models` lists the directories that resolve, with architecture, quantisation,
+and the declaration; `--all` shows the others with the reason, including every MLX model in a build
+without the trait.
 
 Verified on 2026-09-20 with `mlx-community/Qwen3-1.7B-4bit` (a Hugging Face cache snapshot, 938 MB)
 on an M4 Max, through the CLI built with `--traits MLX`: undeclared, a text-only reply in 2.5 s
