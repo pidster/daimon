@@ -37,8 +37,9 @@ not the differentiator. Items, in order of leverage:
 
 ## Terminal front end
 
-Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Next, in order: line editing and
-history in `wisp-tui`'s input (cursor keys, multi-line composition, paste); a `turn` event in the
+Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Input history shipped 2026-09-23
+(Up and Down recall, `/history` in chat). Next, in order: line editing in `wisp-tui`'s input (a cursor
+moved with Left and Right, multi-line composition, paste); a `turn` event in the
 protocol and a decision on raw versus pre-rendered events; a bordered approval dialog with the reasons inside
 it; Markdown-ish rendering of replies at commit time.
 
