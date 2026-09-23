@@ -136,6 +136,14 @@ fn run(
                         app.backspace();
                         Action::None
                     }
+                    (KeyCode::Up, _) => {
+                        app.recall_previous();
+                        Action::None
+                    }
+                    (KeyCode::Down, _) => {
+                        app.recall_next();
+                        Action::None
+                    }
                     (KeyCode::Char(c), _) => app.type_char(c),
                     _ => Action::None,
                 };

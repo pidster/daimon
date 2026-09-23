@@ -75,7 +75,9 @@ public struct ModelRiskClassifier: RiskClassifier {
     public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
         let model = SystemLanguageModel.default
         guard case .available = model.availability else {
-            return RiskAssessment(level: .moderate, reasons: ["model classifier unavailable"], sources: ["model"])
+            return RiskAssessment(
+                level: .moderate, reasons: ["model classifier unavailable"], sources: ["model"],
+                metadata: [RiskAssessment.failureKey: .string("unavailable")])
         }
         let session = LanguageModelSession(model: model, instructions: Self.instructions)
         do {
@@ -94,7 +96,9 @@ public struct ModelRiskClassifier: RiskClassifier {
             return RiskAssessment(level: verdict.risk, reasons: [verdict.reason], sources: ["model"])
         } catch {
             Diagnostics.policy.error("model classifier failed: \(error)")
-            return RiskAssessment(level: .moderate, reasons: ["model classifier failed: \(error)"], sources: ["model"])
+            return RiskAssessment(
+                level: .moderate, reasons: ["model classifier failed: \(error)"], sources: ["model"],
+                metadata: [RiskAssessment.failureKey: .string("\(error)")])
         }
     }
 }

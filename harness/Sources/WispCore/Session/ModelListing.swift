@@ -62,7 +62,37 @@ public enum ModelListing {
             }
         }
         for backend in listed.unreachable { lines.append("  (\(backend))") }
-        if lines.isEmpty { lines.append("no usable model; wisp models --all shows why") }
+        if lines.isEmpty { lines.append(noUsableModel) }
         return lines
     }
+
+    /// The chat's `/models`: the usable models as a `TextTable`, the current one marked `*`, then a line
+    /// per backend that did not answer. `lines` stays tab-separated for scripts reading `wisp models`.
+    public static func table(
+        config: Config.Resolved, home: Home, current: ModelSelection, tools: [any Tool]
+    ) async -> [String] {
+        let listed = await entries(config: config, home: home, tools: tools)
+        return table(listed.entries, unreachable: listed.unreachable, current: current)
+    }
+
+    /// Renders entries as the `/models` table.
+    static func table(_ entries: [Entry], unreachable: [String], current: ModelSelection) -> [String] {
+        let usable = entries.filter { $0.problem == nil }
+        var lines =
+            usable.isEmpty
+            ? [noUsableModel]
+            : TextTable.render(
+                header: ["  MODEL", "DETAILS", "CAPABILITIES"],
+                rows: usable.map { entry in
+                    [
+                        "\(entry.selection == current ? "*" : " ") \(entry.selection)", entry.detail,
+                        entry.capabilities.joined(separator: ", "),
+                    ]
+                })
+        lines += unreachable.map { "  (\($0))" }
+        return lines
+    }
+
+    /// The line shown when nothing can serve the conversation.
+    static let noUsableModel = "no usable model; wisp models --all shows why"
 }

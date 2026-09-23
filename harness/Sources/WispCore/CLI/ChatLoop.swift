@@ -52,6 +52,8 @@ public struct ChatLoop {
         public var models: (@Sendable (ModelSelection, [any Tool]) async -> [String])?
         /// Opens an agent on another model over a transcript, for `/model`; nil makes it unavailable.
         public var openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)?
+        /// The session's call store, for `/stats`; nil makes the command unavailable.
+        public var stats: CallStats?
 
         /// Creates a context.
         public init(
@@ -59,7 +61,7 @@ public struct ChatLoop {
             git: @escaping @Sendable (String) -> (branch: String?, dirty: Bool?) = { _ in (nil, nil) },
             inspect: (@Sendable (String) async -> String)? = nil, banner: String? = nil,
             models: (@Sendable (ModelSelection, [any Tool]) async -> [String])? = nil,
-            openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil
+            openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil, stats: CallStats? = nil
         ) {
             self.directory = directory
             self.approval = approval
@@ -68,6 +70,7 @@ public struct ChatLoop {
             self.banner = banner
             self.models = models
             self.openModel = openModel
+            self.stats = stats
         }
     }
 
@@ -81,6 +84,11 @@ public struct ChatLoop {
     public let tap: ChatEvents.Tap
     /// The styling in force.
     public let style: Style
+    /// The lines typed this session, oldest first, for `/history`: blank lines and a line repeating
+    /// the one before it are not added, and only the latest `historyLimit` are kept.
+    public private(set) var history: [String] = []
+    /// How many lines `history` keeps.
+    public static let historyLimit = 100
     private let context: Context
     private let io: IO
 
@@ -123,6 +131,14 @@ public struct ChatLoop {
             branch: git.branch, dirty: git.dirty, approval: context.approval, contextUsed: used)
     }
 
+    /// Adds a typed line to `history`, trimmed, unless it is blank or repeats the line before it.
+    private mutating func remember(_ line: String) {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != history.last else { return }
+        history.append(trimmed)
+        if history.count > Self.historyLimit { history.removeFirst(history.count - Self.historyLimit) }
+    }
+
     /// Runs until `/quit` or end of input, then saves the transcript under `saveName` if there is one.
     ///
     /// - Throws: Only the exit save can throw; everything inside the loop is reported as a note.
@@ -132,6 +148,7 @@ public struct ChatLoop {
         loop: while true {
             io.prompt(await status())
             guard let line = io.readLine() else { break loop }
+            remember(line)
             switch ChatInput(line: line) {
             case .quit:
                 break loop
@@ -157,6 +174,17 @@ public struct ChatLoop {
                     continue
                 }
                 for line in await models(agent.model.selection, agent.tools) { io.print(line) }
+            case .stats:
+                guard let stats = context.stats else {
+                    io.note("stats are not kept here")
+                    continue
+                }
+                for line in stats.report() { io.print(line) }
+            case .history:
+                let width = String(history.count).count
+                for (index, line) in history.enumerated() {
+                    io.print("\(String(repeating: " ", count: width - String(index + 1).count))\(index + 1)  \(line)")
+                }
             case .model(nil):
                 io.print("model: \(agent.model.selection) (\(agent.model.capabilityNames.joined(separator: ", ")))")
             case .model(let name?):

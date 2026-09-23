@@ -220,7 +220,8 @@ MCP client ──stdio──▶ WispServer ──respond(thread_id)──▶ Thr
 
 `wisp` mirrors `fm respond` where semantics match: positional prompt or stdin, `--instructions`,
 `--[no-]stream`, repeatable `--tool`. `wisp chat` is a line-oriented REPL with slash commands parsed by
-`ChatInput` (`/help`, `/tools`, `/tokens`, `/save`, `/new`, `/quit`), `--resume <name>`, and `--save <name>`.
+`ChatInput` (`/help`, `/tools`, `/tokens`, `/models`, `/model`, `/stats`, `/history`, `/save`, `/new`,
+`/quit`), `--resume <name>`, and `--save <name>`.
 `wisp tools` lists the registry. `wisp mcp` serves MCP on stdio. Instructions default to `config.json`.
 Exit codes follow swift-argument-parser conventions (64 for usage errors). The chat loop itself is
 `ChatLoop` in `WispCore`, with its input and output injected, so the executable only wires the
@@ -228,7 +229,13 @@ terminal to it and `ChatLoopTests` runs the whole loop over a scripted model. Ch
 live through `ChatEvents.Tap`, an `AuditSink` the conversation is opened with (`Session.openAgent(observer:)`
 tees it beside the log and the receipt collector), so the lines the user sees are rendered from the
 audited events; `ChatStatus` draws the status line above each prompt; `Style` applies colour only on a
-terminal. `wisp chat --json` is the same loop with its IO mapped onto a JSON Lines protocol
+terminal. `TextTable` pads chat output such as `/models` and `/stats` into columns, because tabs drift
+in a terminal and in the TUI. `/stats` reads `CallStats`, a fixed-size ring (`Mutex`, 256 calls) that
+`Session.begin` creates and every `Conversation` hands to its `Agent`, which records each turn's time,
+outcome, and reported prompt tokens; the classifier is wrapped in `TimedRiskClassifier` unless it is the
+rules alone, and a classifier's fallback verdict carries `RiskAssessment.failureKey` so it counts as a
+failure. `ChatLoop.history` keeps the latest 100 typed lines for `/history`; `wisp-tui` keeps its own
+list for Up and Down. `wisp chat --json` is the same loop with its IO mapped onto a JSON Lines protocol
 (`ChatProtocol`, `LineRouter`, `JSONApprover`), so a front end in another process, `tools/wisp-tui`,
 can own the screen while the session stays here.
 

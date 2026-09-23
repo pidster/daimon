@@ -4,6 +4,22 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `/stats` in chat: timings of the session's recent model turns and classifier calls (count, failures,
+  mean, P50, P95, maximum, prompt tokens where reported), then the latest calls. Kept in memory only, in a
+  ring of the latest 256 calls.
+- `/history` in chat lists the lines typed this session, and in `wisp-tui` Up and Down recall them, with
+  what was being typed kept as a draft.
+
+Changed:
+
+- `/models` in chat is a table with a header, so the columns line up in the terminal and in `wisp-tui`;
+  `wisp models` keeps its tab-separated lines for scripts.
+- A model classifier's fallback verdict records `classifier.failure` in its `classifier.verdict` metadata.
+
 ## 0.8.2
 
 Changed:

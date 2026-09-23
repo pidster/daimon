@@ -20,6 +20,10 @@ public enum ChatInput: Equatable, Sendable {
     case models
     /// Switch the conversation to a model, or show the current one when nil.
     case model(String?)
+    /// Show the recent model turns and classifier calls, with their timings.
+    case stats
+    /// List the lines typed this session, oldest first.
+    case history
     /// A message for the model.
     case message(String)
     /// A slash command that does not exist.
@@ -56,21 +60,25 @@ public enum ChatInput: Equatable, Sendable {
         case "last": self = .last
         case "models": self = .models
         case "model": self = .model(argument)
+        case "stats": self = .stats
+        case "history": self = .history
         default: self = .unknown(command)
         }
     }
 
     /// The text shown for `/help`.
     public static let helpText = """
-        /help          show this list
-        /tools         list the tools the model can call
-        /tokens        show how much of the context window the conversation uses
-        /inspect [what] show wisp's own config, status (default), approvals, or audit
-        /last          show the last tool result in full
-        /models        list the models this Mac can run
-        /model [name]  switch the conversation to a model, keeping the transcript; no name shows the current one
-        /save [name]   save the transcript to ~/.wisp/transcripts
-        /new           start a fresh conversation with the same instructions and tools
-        /quit          exit (also /exit, a bare exit or quit, Ctrl-D)
+        /help            show this list
+        /tools           list the tools the model can call
+        /tokens          show how much of the context window the conversation uses
+        /inspect [what]  show wisp's own config, status (default), approvals, or audit
+        /last            show the last tool result in full
+        /models          list the models this Mac can run for this conversation
+        /model [name]    switch the conversation to a model, keeping the transcript; no name shows the current one
+        /stats           show timings of recent model turns and classifier calls
+        /history         list what you have typed this session (Up and Down recall it in wisp-tui)
+        /save [name]     save the transcript to ~/.wisp/transcripts
+        /new             start a fresh conversation with the same instructions and tools
+        /quit            exit (also /exit, a bare exit or quit, Ctrl-D)
         """
 }

@@ -141,6 +141,8 @@ public struct Session: Sendable {
     let classifier: any RiskClassifier
     /// Posts notifications for every conversation, so the rate limit covers them all.
     public let notifier: Notifier
+    /// The recent model turns and classifier calls of every conversation of this session, for `/stats`.
+    public let stats: CallStats
 
     /// Which face this session is.
     public var entryPoint: EntryPoint { request.entryPoint }
@@ -224,6 +226,8 @@ public struct Session: Sendable {
         let sessionID = ShortID.make()
         let sink: any AuditSink = config.auditEnabled ? try dependencies.makeSink(home, config) : NullAuditSink()
         let audit = AuditLog(session: sessionID, sink: sink)
+        let stats = CallStats()
+        let classifier = dependencies.makeClassifier(config, home)
         audit.record(
             .sessionStart,
             details: AuditEvent.Details.sessionStart(
@@ -236,8 +240,11 @@ public struct Session: Sendable {
             request: request, home: home, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
             sessionApprovals: SessionApprovals(), notes: notes, toolNames: toolNames,
-            classifier: dependencies.makeClassifier(config, home),
-            notifier: Notifier(enabled: config.notificationsEnabled, perMinute: config.notificationsPerMinute))
+            // The rules answer in microseconds; only a configuration with a model classifier is timed.
+            classifier: config.approvalClassifier == .rules
+                ? classifier : TimedRiskClassifier(classifier, name: config.approvalClassifier.rawValue, stats: stats),
+            notifier: Notifier(enabled: config.notificationsEnabled, perMinute: config.notificationsPerMinute),
+            stats: stats)
     }
 
     /// Where `approval.coremlModel` points: absolute or `~` as given, anything else under
@@ -336,6 +343,8 @@ public struct Conversation: Sendable {
     let config: Config.Resolved
     /// wisp's home, for backends that keep assets under it.
     let home: Home
+    /// Where the agent records its turns: the session's store.
+    let stats: CallStats
 
     /// Builds the gate and the tool registry for one conversation of `session`.
     ///
@@ -359,7 +368,7 @@ public struct Conversation: Sendable {
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(
             gate: gate, tools: selection.tools.map { $0 }, audit: audit, receipts: receipts, prompting: prompting,
-            model: model, config: session.config, home: session.home)
+            model: model, config: session.config, home: session.home, stats: session.stats)
     }
 
     /// Resolves the model, refuses a request its declared capabilities cannot serve, records
@@ -377,11 +386,15 @@ public struct Conversation: Sendable {
                 model: resolved.selection, backend: resolved.selection.backend, asset: resolved.asset,
                 capabilities: resolved.capabilityNames, capabilitySource: resolved.capabilitySource,
                 tools: tools.map(\.name)))
-        if let transcript {
-            return Agent(transcript: transcript, tools: tools, model: resolved, audit: audit)
-        }
-        return Agent(
-            instructions: prompting.rendered(toolsAvailable: !tools.isEmpty), tools: tools, model: resolved,
-            audit: audit)
+        let agent =
+            if let transcript {
+                Agent(transcript: transcript, tools: tools, model: resolved, audit: audit)
+            } else {
+                Agent(
+                    instructions: prompting.rendered(toolsAvailable: !tools.isEmpty), tools: tools, model: resolved,
+                    audit: audit)
+            }
+        agent.stats = stats
+        return agent
     }
 }

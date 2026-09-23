@@ -124,6 +124,54 @@ import WispTestSupport
                 && bare.noted.contains("the model cannot be switched here"))
     }
 
+    @Test func statsReportTheTurnsAndHistoryListsWhatWasTyped() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let stats = CallStats()
+        // The first turn overflows with no condense policy and fails; the second answers.
+        let agent = Agent(
+            instructions: "x", tools: [],
+            model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [.say("done")], overflowOnce: true)),
+            contextPolicy: .failFast)
+        agent.stats = stats
+        var context = Self.context
+        context.stats = stats
+        let capture = Capture(lines: ["boom", "fine", "fine", "  ", "/stats", "/history", "/quit"])
+        var loop = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
+        try await loop.run()
+        #expect(stats.calls.count == 3)
+        #expect(stats.calls.map { $0.failure != nil } == [true, false, false])
+        #expect(stats.calls.allSatisfy { $0.kind == .turn && $0.model == "system" })
+        let out = capture.output
+        #expect(out.contains("3 calls this session"))
+        #expect(out.contains("recent, by start time"))
+        // A repeated line and a blank one are not added; /history lists itself last.
+        #expect(loop.history == ["boom", "fine", "/stats", "/history", "/quit"])
+        #expect(out.hasSuffix("1  boom\n2  fine\n3  /stats\n4  /history\n"))
+        // Without a store the command says so.
+        let bare = Capture(lines: ["/stats"])
+        var plain = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: Self.context, io: bare.io)
+        try await plain.run()
+        #expect(bare.noted.contains("stats are not kept here"))
+    }
+
+    @Test func historyKeepsTheLatestLinesAndNumbersThemToAlign() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let agent = Agent(
+            instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: ScriptedModel(steps: [])))
+        let lines = (0..<(ChatLoop.historyLimit + 5)).map { "/last \($0)" } + ["/history"]
+        let capture = Capture(lines: lines)
+        var loop = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: Self.context, io: capture.io)
+        try await loop.run()
+        #expect(loop.history.count == ChatLoop.historyLimit)
+        #expect(loop.history.first == "/last 6" && loop.history.last == "/history")
+        #expect(capture.output.contains("\n  1  /last 6\n") && capture.output.hasSuffix("100  /history\n"))
+    }
+
     @Test func endOfInputSavesUnderTheDefaultNameAndErrorsAreNotes() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(at: dir) }

@@ -179,7 +179,10 @@ public struct CoreMLRiskClassifier: RiskClassifier {
         case .failure(let failure):
             return RiskAssessment(
                 level: .moderate, reasons: ["core ml classifier unavailable: \(failure)"], sources: ["coreml"],
-                metadata: ["coreml.fallback": .string(failure.description)])
+                metadata: [
+                    "coreml.fallback": .string(failure.description),
+                    RiskAssessment.failureKey: .string(failure.description),
+                ])
         }
         var metadata: [String: JSONValue] = [
             "coreml.model": .string(prepared.name), "coreml.version": .string(prepared.version),
@@ -190,12 +193,14 @@ public struct CoreMLRiskClassifier: RiskClassifier {
             hypotheses = model.predictedLabelHypotheses(for: Contract.preprocess(command), maximumCount: 3)
         } catch {
             metadata["coreml.fallback"] = .string("inference failed: \(error)")
+            metadata[RiskAssessment.failureKey] = metadata["coreml.fallback"]
             return RiskAssessment(
                 level: .moderate, reasons: ["core ml classifier failed: \(error)"], sources: ["coreml"],
                 metadata: metadata)
         }
         guard let top = hypotheses.max(by: { $0.value < $1.value }) else {
             metadata["coreml.fallback"] = .string("no prediction")
+            metadata[RiskAssessment.failureKey] = metadata["coreml.fallback"]
             return RiskAssessment(
                 level: .moderate, reasons: ["core ml classifier gave no prediction"], sources: ["coreml"],
                 metadata: metadata)
@@ -204,6 +209,7 @@ public struct CoreMLRiskClassifier: RiskClassifier {
         metadata["coreml.confidence"] = .double(top.value)
         guard let level = RiskLevel(rawValue: top.key) else {
             metadata["coreml.fallback"] = .string("unknown label \(top.key)")
+            metadata[RiskAssessment.failureKey] = metadata["coreml.fallback"]
             return RiskAssessment(
                 level: .moderate, reasons: ["core ml classifier gave an unknown label '\(top.key)'"],
                 sources: ["coreml"], metadata: metadata)

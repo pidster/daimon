@@ -10,6 +10,12 @@ import Testing
         #expect(ChatInput.helpText.contains("/models") && ChatInput.helpText.contains("/model [name]"))
     }
 
+    @Test func parsesStatsAndHistory() {
+        #expect(ChatInput(line: "/stats") == .stats)
+        #expect(ChatInput(line: " /history ") == .history)
+        #expect(ChatInput.helpText.contains("/stats") && ChatInput.helpText.contains("/history"))
+    }
+
     @Test func parsesCommandsAndMessages() {
         #expect(ChatInput(line: "/quit") == .quit)
         #expect(ChatInput(line: " /exit ") == .quit)

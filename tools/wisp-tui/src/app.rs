@@ -22,6 +22,8 @@ pub const STATUS_ROW: u16 = 5;
 pub const MARGIN: u16 = 1;
 /// The input row's placeholder when nothing is typed.
 pub const PLACEHOLDER: &str = "Ask wisp to do anything";
+/// How many submitted lines Up and Down can recall; the same bound as the chat's `/history`.
+pub const RECALL_LIMIT: usize = 100;
 
 /// A line committed to scrollback, with its style.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +79,12 @@ pub struct App {
     pub busy: bool,
     /// Whether wisp said goodbye.
     pub exited: bool,
+    /// Lines submitted this session, oldest first, for Up and Down.
+    pub recall: Vec<String>,
+    /// The recalled line being shown, as an index into `recall`; `None` while editing a fresh line.
+    pub recall_at: Option<usize>,
+    /// What was typed before Up was first pressed, restored by Down past the newest line.
+    pub draft: String,
 }
 
 impl App {
@@ -197,8 +205,49 @@ impl App {
             return Action::None;
         }
         self.push(&format!("› {text}"), LineKind::User);
+        if self.recall.last() != Some(&text) {
+            self.recall.push(text.clone());
+            if self.recall.len() > RECALL_LIMIT {
+                self.recall.remove(0);
+            }
+        }
+        self.recall_at = None;
+        self.draft.clear();
         self.busy = true;
         Action::Send(Inbound::Message { text })
+    }
+
+    /// Up: replaces the input with the previous submitted line, keeping what was typed as the draft.
+    pub fn recall_previous(&mut self) {
+        if self.approval.is_some() || self.busy || self.recall.is_empty() {
+            return;
+        }
+        let index = match self.recall_at {
+            None => {
+                self.draft = std::mem::take(&mut self.input);
+                self.recall.len() - 1
+            }
+            Some(index) => index.saturating_sub(1),
+        };
+        self.recall_at = Some(index);
+        self.input.clone_from(&self.recall[index]);
+    }
+
+    /// Down: moves to the next submitted line, and past the newest back to the draft.
+    pub fn recall_next(&mut self) {
+        if self.approval.is_some() || self.busy {
+            return;
+        }
+        let Some(index) = self.recall_at else {
+            return;
+        };
+        if index + 1 < self.recall.len() {
+            self.recall_at = Some(index + 1);
+            self.input.clone_from(&self.recall[index + 1]);
+        } else {
+            self.recall_at = None;
+            self.input = std::mem::take(&mut self.draft);
+        }
     }
 
     /// Ctrl-C or Ctrl-D: cancel a dialog first, otherwise quit.
@@ -528,6 +577,67 @@ mod tests {
         );
         assert!(app.approval.is_none());
         assert_eq!(app.interrupt(), Action::Quit);
+    }
+
+    #[test]
+    fn up_and_down_recall_submitted_lines() {
+        let mut app = App {
+            status: Some(Status::default()),
+            ..Default::default()
+        };
+        // Nothing to recall yet: Up leaves the input alone.
+        app.recall_previous();
+        assert!(app.input.is_empty());
+        for line in ["first", "second", "second", "third"] {
+            app.input = line.into();
+            app.submit();
+            app.handle(Outbound::Status(Status::default()));
+        }
+        // A line repeating the one before it is kept once.
+        assert_eq!(app.recall, vec!["first", "second", "third"]);
+        app.input = "draft".into();
+        app.recall_previous();
+        assert_eq!(app.input, "third");
+        app.recall_previous();
+        app.recall_previous();
+        assert_eq!(app.input, "first");
+        // Up at the oldest stays there.
+        app.recall_previous();
+        assert_eq!(app.input, "first");
+        app.recall_next();
+        assert_eq!(app.input, "second");
+        app.recall_next();
+        app.recall_next();
+        // Down past the newest restores what was being typed.
+        assert_eq!(app.input, "draft");
+        assert_eq!(app.recall_at, None);
+        app.recall_next();
+        assert_eq!(app.input, "draft");
+        // A recalled line can be edited and sent; it joins the end of the list.
+        app.recall_previous();
+        app.type_char('!');
+        assert_eq!(
+            app.submit(),
+            Action::Send(Inbound::Message {
+                text: "third!".into()
+            })
+        );
+        assert_eq!(app.recall.last().map(String::as_str), Some("third!"));
+        // Busy or in a dialog, the keys do nothing.
+        app.recall_previous();
+        assert!(app.input.is_empty());
+    }
+
+    #[test]
+    fn recall_keeps_only_the_latest_lines() {
+        let mut app = App::default();
+        for index in 0..=RECALL_LIMIT {
+            app.input = format!("line {index}");
+            app.submit();
+            app.busy = false;
+        }
+        assert_eq!(app.recall.len(), RECALL_LIMIT);
+        assert_eq!(app.recall[0], "line 1");
     }
 
     #[test]

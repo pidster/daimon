@@ -37,6 +37,10 @@ hands the session to it: the conversation scrolls in the terminal's own scrollba
 with the reply in progress, an approval dialog, the input, and the status
 ([ADR 0029](decisions/0029-tui-front-end.md)). `--plain` keeps the line-based chat below; a piped
 session is always plain. `wisp-tui` takes the same arguments as `wisp chat` and can be run directly.
+In `wisp-tui`, Up and Down recall the lines submitted this session (the latest 100, a line repeating
+the one before it kept once): Up from a fresh line keeps what was typed as a draft, and Down past the
+newest line brings it back. The plain chat reads whole lines and has no recall; `/history` lists them
+in both.
 
 What a session shows, and where it goes:
 
@@ -76,12 +80,23 @@ What a session shows, and where it goes:
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
 | `/inspect [what]`, `/status` | wisp's own `config`, `status` (default), `approvals`, or `audit`, as the model's `inspect` tool shows them. |
 | `/last` | The last tool result in full; the live line shows only its first line. |
-| `/models` | The models this conversation could switch to: those that resolve and declare what its tools need, as `wisp models` decides; the current one marked `*`. |
+| `/models` | The models this conversation could switch to: those that resolve and declare what its tools need, as `wisp models` decides. A table with a header (model, details, capabilities) and the current one marked `*`; `wisp models` keeps its tab-separated lines for scripts. |
 | `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
+| `/stats` | Timings of this session's recent model turns and classifier calls: per kind and model, the count, failures, mean, P50, P95, and maximum seconds, and the mean prompt tokens where the runtime reports them (Ollama); then the latest eight calls by start time. Kept in memory only, the latest 256 calls; see below. |
+| `/history` | The lines typed this session, numbered, oldest first: the latest 100, blank lines and a line repeating the one before it left out. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, `/q`, a bare `exit`, `quit`, or `q`, Ctrl-D | Exit, saving if a name is set. |
 | `/help`, `/?`, a bare `help` | List commands. |
+
+`/stats` counts two kinds of call. A `turn` is one message through the conversation's model until the
+reply; the framework runs the tool loop inside it, so its time includes the tools the model called and
+any approval it waited for, and a turn that ends in an error counts as failed. A `classifier` call is one
+risk classification by the model classifier `approval.classifier` names (`system-model` or `coreml`);
+it fails when the classifier could not judge and fell back to `moderate`. The rules classifier is not
+timed: it answers in microseconds. The store is a fixed-size ring in the session's memory, shared by
+every conversation of the session including `/model` switches; nothing is written to disk, and the audit
+log (`seconds` on `response` and `classifier.verdict`) is the durable record.
 
 When the model wants to run a risky command, chat asks on stderr with a compact dialog: the level and
 command, the whole line when the command is one part of it, the directory, each reason on a line

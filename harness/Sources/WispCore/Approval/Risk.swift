@@ -1,3 +1,4 @@
+import Foundation
 import FoundationModels
 
 /// How risky an action is, from a human's point of view.
@@ -54,6 +55,13 @@ public struct RiskAssessment: Equatable, Sendable {
     }
 }
 
+extension RiskAssessment {
+    /// The metadata key a model classifier sets, with the reason, when its verdict is a fallback because
+    /// it could not judge (unavailable, failed, no usable answer). A low-confidence verdict is a judgement
+    /// and does not set it. `TimedRiskClassifier` counts these as failures in `/stats`.
+    public static let failureKey = "classifier.failure"
+}
+
 /// Something that judges the risk of running a shell command.
 public protocol RiskClassifier: Sendable {
     /// Assesses `command` as it would run in `workingDirectory`. Never throws: a
@@ -78,5 +86,37 @@ public struct CompositeRiskClassifier: RiskClassifier {
                 with: await classifier.classify(command: command, workingDirectory: workingDirectory))
         }
         return result
+    }
+}
+
+/// Times each classification by another classifier into a session's `CallStats`, as a `classifier`
+/// call; an assessment carrying `RiskAssessment.failureKey` is recorded as failed. The verdict passes
+/// through unchanged.
+public struct TimedRiskClassifier: RiskClassifier {
+    private let classifier: any RiskClassifier
+    private let name: String
+    private let stats: CallStats
+
+    /// Creates the wrapper.
+    ///
+    /// - Parameters:
+    ///   - classifier: The classifier to time.
+    ///   - name: What `/stats` calls it: the `approval.classifier` value.
+    ///   - stats: Where calls are recorded.
+    public init(_ classifier: any RiskClassifier, name: String, stats: CallStats) {
+        self.classifier = classifier
+        self.name = name
+        self.stats = stats
+    }
+
+    /// Classifies with the wrapped classifier and records how long it took.
+    public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+        let started = Date()
+        let assessment = await classifier.classify(command: command, workingDirectory: workingDirectory)
+        stats.record(
+            CallStats.Call(
+                kind: .classifier, model: name, started: started, seconds: Date().timeIntervalSince(started),
+                failure: assessment.metadata[RiskAssessment.failureKey]?.stringValue))
+        return assessment
     }
 }

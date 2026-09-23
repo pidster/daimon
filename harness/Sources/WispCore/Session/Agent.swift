@@ -37,6 +37,8 @@ public final class Agent {
     public let audit: AuditLog?
     /// The conversation's turn counter, advanced once per prompt; the approval gate reads it.
     public let turns: TurnClock
+    /// Where each turn's time and outcome are recorded for `/stats`; nil records nothing.
+    public var stats: CallStats?
 
     /// Creates an agent on a model.
     ///
@@ -259,6 +261,14 @@ public final class Agent {
         }
     }
 
+    /// Records one turn in `stats`, with the runtime's reported prompt tokens when there are any.
+    private func recordStats(started: Date, failure: String?) {
+        stats?.record(
+            CallStats.Call(
+                kind: .turn, model: model.selection.description, started: started,
+                seconds: Date().timeIntervalSince(started), failure: failure, inputTokens: model.reportedInputTokens()))
+    }
+
     /// Records the prompt, runs `operation` with overflow recovery, and records the response or error.
     nonisolated(nonsending) private func turn(
         _ prompt: String, schema: JSONValue? = nil, _ operation: () async throws -> String
@@ -271,12 +281,14 @@ public final class Agent {
         do {
             let text = try await withOverflowRecovery(operation)
             let reply = Reply(text: text, condensed: condensations > before)
+            recordStats(started: started, failure: nil)
             audit?.record(
                 .response,
                 details: AuditEvent.Details.response(
                     text: text, condensed: reply.condensed, seconds: Date().timeIntervalSince(started)))
             return reply
         } catch {
+            recordStats(started: started, failure: "\(error)")
             audit?.error(error, context: "turn")
             Diagnostics.agent.error("turn failed: \(error)")
             throw error

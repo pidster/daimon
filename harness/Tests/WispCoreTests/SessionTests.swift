@@ -107,6 +107,17 @@ import Testing
         #expect(Session.Dependencies.testing().makeClassifier(Config().resolved, home) is RuleRiskClassifier)
     }
 
+    @Test func aModelClassifierIsTimedIntoTheSessionsStatsAndTheRulesAreNot() throws {
+        let home = try temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let timed = try Session.begin(.init(entryPoint: .respond), home: home, dependencies: .testing())
+        #expect(timed.classifier is TimedRiskClassifier)
+        let rulesHome = try temporaryHome(config: #"{"approval":{"useModel":false}}"#)
+        defer { try? FileManager.default.removeItem(at: rulesHome.root) }
+        let rules = try Session.begin(.init(entryPoint: .respond), home: rulesHome, dependencies: .testing())
+        #expect(rules.classifier is RuleRiskClassifier)
+    }
+
     @Test func yesReplacesTheFacesApproverWithAutoApproval() async throws {
         let home = try temporaryHome()
         defer { try? FileManager.default.removeItem(at: home.root) }

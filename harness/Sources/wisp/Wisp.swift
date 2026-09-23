@@ -297,13 +297,13 @@ struct Chat: AsyncParsableCommand {
                 inspect: { what in await InspectTool(introspection: views).show(what) },
                 banner: banner,
                 models: { current, tools in
-                    await ModelListing.lines(config: session.config, home: Wisp.home, current: current, tools: tools)
+                    await ModelListing.table(config: session.config, home: Wisp.home, current: current, tools: tools)
                 },
                 openModel: { selection, transcript in
                     try session.openAgent(
                         approver: TerminalApprover(style: style), transcript: transcript, observer: tap,
                         model: selection)
-                }),
+                }, stats: session.stats),
             style: style,
             io: .init(
                 readLine: { readLine() },
@@ -356,11 +356,11 @@ struct Chat: AsyncParsableCommand {
                 inspect: { what in await InspectTool(introspection: views).show(what) },
                 banner: "wisp \(WispVersion.current) · \(agent.model.selection) · \(agent.tools.count) tools",
                 models: { current, tools in
-                    await ModelListing.lines(config: session.config, home: Wisp.home, current: current, tools: tools)
+                    await ModelListing.table(config: session.config, home: Wisp.home, current: current, tools: tools)
                 },
                 openModel: { selection, transcript in
                     try session.openAgent(approver: approver, transcript: transcript, observer: tap, model: selection)
-                }),
+                }, stats: session.stats),
             io: .init(
                 readLine: { router.nextMessage() },
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },

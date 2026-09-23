@@ -54,6 +54,26 @@ private struct ListingBackend: ModelBackend {
         #expect(!plain.contains { $0.contains("listing:embed") })
     }
 
+    @Test func chatShowsATableOfTheUsableModels() async {
+        let current = ModelSelection.local(backend: "listing", name: "tools")
+        let lines = await ModelListing.table(config: config, home: home, current: current, tools: [CurrentDateTool()])
+        #expect(lines.first?.hasPrefix("  MODEL") == true && lines.first?.contains("CAPABILITIES") == true)
+        let row = lines.first { $0.contains("listing:tools") } ?? ""
+        #expect(row.hasPrefix("* listing:tools"))
+        #expect(!lines.contains { $0.contains("\t") })
+        // Every row's capabilities start in the header's column.
+        let column = lines.first?.range(of: "CAPABILITIES").map {
+            lines[0].distance(from: lines[0].startIndex, to: $0.lowerBound)
+        }
+        let capabilities = row.range(of: "toolCalling").map { row.distance(from: row.startIndex, to: $0.lowerBound) }
+        #expect(column != nil && column == capabilities)
+        #expect(lines.contains { $0.hasPrefix("  (ollama: ") })
+        #expect(
+            ModelListing.table([], unreachable: ["x: down"], current: .system) == [
+                "no usable model; wisp models --all shows why", "  (x: down)",
+            ])
+    }
+
     @Test func allAddsTheExcludedWithTheirReasons() async {
         let lines = await ModelListing.lines(
             config: config, home: home, current: .system, tools: [CurrentDateTool()], all: true)
