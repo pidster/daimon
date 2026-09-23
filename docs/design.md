@@ -216,7 +216,9 @@ through the conversation's runner without the gate, and from `libproc` for proce
 will not run the setuid `ps` ([ADR 0034](decisions/0034-system-info.md)).
 `wisp watch` is `Watcher` in `WispCore/Session`: a loop over an `AsyncStream` of triggers (start,
 FSEvents changes from `FileWatcher`, an interval) whose running, triaging, notifying, and reporting are
-injected, so it is tested without time or the file system ([ADR 0033](decisions/0033-watch-mode.md)).
+injected, so it is tested without time or the file system; its command is cleared once through
+`CommandRunner.authorize`, which returns an `Authorized` line that reruns without the gate but with the
+policy, sandbox, and audit ([ADR 0033](decisions/0033-watch-mode.md)).
 `triage` and `summarise_diff` were the first condensing tools; `DiffSummary` chunks a diff at file
 boundaries and joins the model's summaries and flags onto the file list the diff itself gives. `triage` was the first: `Triage`
 in `WispCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,

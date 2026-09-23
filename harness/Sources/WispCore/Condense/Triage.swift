@@ -75,6 +75,17 @@ public struct Triage: Sendable {
         /// Whether leading bytes were dropped to fit `maxOutputBytes`.
         public var truncated: Bool
 
+        /// A command's outcome as a capture: standard output, then standard error on a line of its own.
+        public init(_ outcome: CommandRunner.Outcome) {
+            var text = outcome.stdout
+            if !outcome.stderr.isEmpty {
+                if !text.isEmpty, !text.hasSuffix("\n") { text += "\n" }
+                text += outcome.stderr
+            }
+            self.init(
+                text: text, exitStatus: outcome.exitStatus, timedOut: outcome.timedOut, truncated: outcome.truncated)
+        }
+
         /// Creates a capture.
         public init(text: String, exitStatus: Int32? = nil, timedOut: Bool = false, truncated: Bool = false) {
             self.text = text
@@ -301,14 +312,7 @@ public struct Triage: Sendable {
         case .command(let line, let directory):
             var runner = runner
             runner.options.maxOutputBytes = maxOutputBytes
-            let outcome = try await runner.run(line, in: directory)
-            var text = outcome.stdout
-            if !outcome.stderr.isEmpty {
-                if !text.isEmpty, !text.hasSuffix("\n") { text += "\n" }
-                text += outcome.stderr
-            }
-            return Captured(
-                text: text, exitStatus: outcome.exitStatus, timedOut: outcome.timedOut, truncated: outcome.truncated)
+            return Captured(try await runner.run(line, in: directory))
         case .path(let path):
             try await gate?.clear(readingFile: path, workingDirectory: FileManager.default.currentDirectoryPath)
             let data = try Data(contentsOf: URL(fileURLWithPath: path))

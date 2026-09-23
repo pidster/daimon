@@ -682,10 +682,14 @@ struct Watch: AsyncParsableCommand {
             id: "watch-" + ShortID.make(), approver: TerminalApprover(style: .plain), tools: .none)
         let directory = directory ?? FileManager.default.currentDirectoryPath
         let source = Triage.Source.command(command, workingDirectory: directory)
-        let runner = CommandRunner(
+        var runner = CommandRunner(
             options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+        runner.options.maxOutputBytes = Triage.Options().maxOutputBytes
         let schema = try OutputSchema(json: Triage.schemaJSON)
         let triage = Triage { prompt in try await conversation.openAgent().respond(to: prompt, schema: schema).text }
+        // The command line never changes, so it is classified and approved once, here; every run after
+        // still passes the policy and the sandbox and is audited.
+        let authorized = try await runner.authorize(command, in: directory)
         let (triggers, continuation) = AsyncStream.makeStream(
             of: Watcher.Trigger.self, bufferingPolicy: .bufferingNewest(1))
         continuation.yield(.start)
@@ -717,10 +721,7 @@ struct Watch: AsyncParsableCommand {
         try await Watcher(
             command: command,
             options: .init(notify: notify, triage: !noTriage, maxRuns: maxRuns),
-            execute: {
-                try await Triage.capture(
-                    source, runner: runner, gate: conversation.gate, maxOutputBytes: Triage.Options().maxOutputBytes)
-            },
+            execute: { Triage.Captured(try await authorized.run()) },
             triage: { captured in try await triage.run(captured, from: source).findings },
             notify: { message in _ = session.notifier.post(message, source: .watch, audit: conversation.audit) },
             report: { run in

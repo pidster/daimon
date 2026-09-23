@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import WispCore
@@ -67,6 +68,52 @@ import Testing
         let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-sb-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.path
+    }
+
+    /// Counts classifications and rates everything moderate, so the gate asks every time it is consulted.
+    final class CountingClassifier: RiskClassifier {
+        let count = Mutex(0)
+        func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+            count.withLock { $0 += 1 }
+            return RiskAssessment(level: .moderate, reasons: ["counted"], sources: ["test"])
+        }
+    }
+
+    @Test func anAuthorizedCommandIsClassifiedOnceAndStillAuditedOnEveryRun() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let classifier = CountingClassifier()
+        let sink = MemoryAuditSink()
+        let audit = AuditLog(session: "watch", sink: sink)
+        let gate = ApprovalGate(
+            classifier: classifier, approver: AutoApprover(), threshold: .level(.moderate), audit: audit)
+        let runner = CommandRunner(options: .init(writableRoot: dir), audit: audit, approval: gate)
+        let authorized = try await runner.authorize("echo hi", in: dir)
+        for _ in 0..<3 { #expect(try await authorized.run().stdout == "hi\n") }
+        #expect(classifier.count.withLock { $0 } == 1)
+        #expect(sink.events.filter { $0.kind == .approvalRequested }.count == 1)
+        #expect(sink.events.filter { $0.kind == .policyDecision && $0.details["verdict"] == "allowed" }.count == 3)
+        #expect(sink.events.filter { $0.kind == .commandOutcome }.count == 3)
+        #expect(authorized.command == "echo hi" && authorized.workingDirectory == dir)
+        // The runner it came from still consults the gate for anything it runs.
+        _ = try await runner.run("echo again", in: dir)
+        #expect(classifier.count.withLock { $0 } == 2)
+    }
+
+    @Test func authorizationAppliesThePolicyAndTheGate() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        await #expect(throws: CommandRunner.Failure.denied("command matches deny pattern secret")) {
+            try await CommandRunner(options: .init(policy: CommandPolicy(deny: ["secret"]))).authorize("echo secret")
+        }
+        let refusing = ApprovalGate(
+            classifier: CountingClassifier(), approver: DenyingApprover(reason: "no"), threshold: .level(.moderate))
+        await #expect(throws: CommandRunner.Failure.self) {
+            try await CommandRunner(approval: refusing).authorize("echo hi", in: dir)
+        }
+        await #expect(throws: CommandRunner.Failure.invalidWorkingDirectory("/nonexistent/x")) {
+            try await CommandRunner().authorize("echo hi", in: "/nonexistent/x")
+        }
     }
 
     @Test func deniedPatternNeverLaunches() async {

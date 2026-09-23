@@ -261,9 +261,9 @@ Runs a command at once, then again each time a file changes under the watched pa
 on an interval, and posts a notification when its outcome turns. A failing run is triaged by the model
 into its failures, shown under the run's line; a failure that repeats without a notification is not
 triaged again. Changes under `.git`, `.build`, `.swiftpm`, `target`, `node_modules`, `DerivedData`,
-`.venv`, `__pycache__`, `dist`, `.next`, and `.cache`, and editor scratch files, are ignored. The command
-runs under the policy, sandbox, and approval like any other; answer "session" to the first approval
-and the reruns are covered ([ADR 0033](decisions/0033-watch-mode.md)).
+`.venv`, `__pycache__`, `dist`, `.next`, and `.cache`, and editor scratch files, are ignored. The command is
+classified and, when risky, approved once, before the first run; every run still passes the policy and
+runs under the sandbox, and approving the watch covers its reruns ([ADR 0033](decisions/0033-watch-mode.md)).
 
 | Flag | Meaning |
 | --- | --- |

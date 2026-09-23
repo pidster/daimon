@@ -49,3 +49,15 @@ missing was the loop that ties them to the file system and to time.
 - Tests without the model or real time: the policy matrix, the messages, the loop over scripted triggers
   (notifying, triaging only new failures, the run cap, timeouts, triage errors, a refused command), the
   ignore rules, and one real FSEvents change in a temporary directory.
+
+## Amendment, 2026-09-23: approve once, not per run
+
+The first version cleared the command through the approval gate on every run, so each run paid the
+model classifier (1.3 to 1.7 s for a command that takes milliseconds) and, for a risky command, could ask
+again. The command line of a watch never changes, so its verdict cannot either. `CommandRunner.authorize`
+now checks the policy and clears the gate once, before the first run, and returns an `Authorized` value
+that runs only that exact line in that directory without the gate. Every run still checks the policy,
+runs under the sandbox, and records `policy.decision` and `command.outcome`; approving the watch once, at
+any scope, covers its reruns. Measured the same day: runs of `ls 2>&1 | wc -l` fell from 1.3 s to under
+0.1 s each, and the classifier ran once for four runs (`CommandRunnerPolicyTests` asserts one
+classification for three runs).

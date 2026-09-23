@@ -125,36 +125,99 @@ public struct CommandRunner: Sendable {
     /// - Returns: The exit status and bounded output.
     /// - Throws: `Failure` if the policy rejects the command or it cannot be started.
     public func run(_ command: String, in directory: String? = nil) async throws -> Outcome {
+        let workingDirectory = try Self.existingDirectory(directory)
+        try await admit(command, in: workingDirectory, gate: approval)
+        decide(.allowed, command: command, in: workingDirectory)
+        return try await execute(command, in: workingDirectory)
+    }
+
+    /// One command line cleared for repeated runs: the gate was consulted once, when it was authorised,
+    /// and is not consulted again. Every run still checks the policy, runs under the sandbox, and records
+    /// its `policy.decision` and `command.outcome`. Only the exact line and directory it was authorised
+    /// for can run, so the clearance cannot be reused for anything else.
+    public struct Authorized: Sendable {
+        /// The command line.
+        public let command: String
+        /// Where it runs.
+        public let workingDirectory: String
+        /// The runner, without its gate.
+        let runner: CommandRunner
+
+        /// Runs the command once more.
+        ///
+        /// - Returns: The exit status and bounded output.
+        /// - Throws: `Failure` if the policy now rejects it or it cannot be started.
+        public func run() async throws -> Outcome {
+            try await runner.run(command, in: workingDirectory)
+        }
+    }
+
+    /// Checks `command` against the policy and clears it through the approval gate once (classifying it
+    /// and asking when it is risky), for a caller that will run the same line repeatedly: `wisp watch`.
+    ///
+    /// - Parameters:
+    ///   - command: A POSIX shell command line.
+    ///   - directory: Where it will run; nil means the process's current directory.
+    /// - Returns: The authorised command, to run as often as needed.
+    /// - Throws: `Failure` if the policy rejects it, the gate refuses it, or the directory does not exist.
+    public func authorize(_ command: String, in directory: String? = nil) async throws -> Authorized {
+        let workingDirectory = try Self.existingDirectory(directory)
+        try await admit(command, in: workingDirectory, gate: approval)
+        var cleared = self
+        cleared.approval = nil
+        return Authorized(command: command, workingDirectory: workingDirectory, runner: cleared)
+    }
+
+    /// `directory`, or the current directory, when it is an existing directory.
+    ///
+    /// - Throws: `Failure.invalidWorkingDirectory` otherwise.
+    private static func existingDirectory(_ directory: String?) throws -> String {
         let workingDirectory = directory ?? FileManager.default.currentDirectoryPath
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue
         else { throw Failure.invalidWorkingDirectory(workingDirectory) }
-        let sandboxed = options.policy.sandbox.enabled && !Self.isNestedSandbox
-        func decided(_ verdict: AuditEvent.Details.PolicyVerdict, reason: String? = nil) {
-            audit?.record(
-                .policyDecision,
-                details: AuditEvent.Details.policyDecision(
-                    command: command, workingDirectory: workingDirectory, verdict: verdict, reason: reason,
-                    sandbox: sandboxed, network: options.policy.sandbox.allowNetwork,
-                    nested: options.policy.sandbox.enabled && Self.isNestedSandbox))
-        }
+        return workingDirectory
+    }
+
+    /// Whether commands run under Seatbelt here.
+    private var sandboxed: Bool { options.policy.sandbox.enabled && !Self.isNestedSandbox }
+
+    /// Records a `policy.decision`.
+    private func decide(
+        _ verdict: AuditEvent.Details.PolicyVerdict, reason: String? = nil, command: String, in workingDirectory: String
+    ) {
+        audit?.record(
+            .policyDecision,
+            details: AuditEvent.Details.policyDecision(
+                command: command, workingDirectory: workingDirectory, verdict: verdict, reason: reason,
+                sandbox: sandboxed, network: options.policy.sandbox.allowNetwork,
+                nested: options.policy.sandbox.enabled && Self.isNestedSandbox))
+    }
+
+    /// Checks the policy for the line and each simple command in it, then clears the line through `gate`;
+    /// records the denial or refusal when there is one.
+    ///
+    /// - Throws: `Failure.denied` or `Failure.disapproved`.
+    private func admit(_ command: String, in workingDirectory: String, gate: ApprovalGate?) async throws {
         let parts = CommandSplitter.split(command)
         let verdicts = ([command] + parts.map(\.text)).map(options.policy.check)
         if let denial = verdicts.first(where: { if case .denied = $0 { true } else { false } }),
             case .denied(let reason) = denial
         {
-            decided(.denied, reason: reason)
+            decide(.denied, reason: reason, command: command, in: workingDirectory)
             Diagnostics.policy.info("denied: \(reason): \(command)")
             throw Failure.denied(reason)
         }
         do {
-            try await approval?.clear(parts: parts, line: command, workingDirectory: workingDirectory)
+            try await gate?.clear(parts: parts, line: command, workingDirectory: workingDirectory)
         } catch ApprovalGate.Failure.refused(let reason) {
-            decided(.disapproved, reason: reason)
+            decide(.disapproved, reason: reason, command: command, in: workingDirectory)
             throw Failure.disapproved(reason)
         }
-        decided(.allowed)
+    }
 
+    /// Launches an admitted command and records its outcome.
+    private func execute(_ command: String, in workingDirectory: String) async throws -> Outcome {
         let started = Date()
         let outcome = try await launch(command, in: workingDirectory, sandboxed: sandboxed)
         audit?.record(
