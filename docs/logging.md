@@ -35,7 +35,7 @@ sensitive; it is why it is user-only.
 
 | Kind | Details | Written by |
 | --- | --- | --- |
-| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`, `notify`, `scan`, `redact`), `systemPromptExtension` and `instructions` (the operator's and the caller's layers, null when absent; wisp's own prompt is fixed per `version`), `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
+| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`, `notify`, `scan`, `redact`, `watch`), `systemPromptExtension` and `instructions` (the operator's and the caller's layers, null when absent; wisp's own prompt is fixed per `version`), `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
 | `session.end` | `reason`: `closed` (explicit, or a `triage-<id>` session finishing), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
 | `model.resolved` | `model` (the selection), `backend` (`system`, `private-cloud`, or a scheme), `asset` (what backs a local model, null for Apple's), `capabilities` (declared names), `capabilitySource` (`framework`, `runtime`, `configuration`, `undeclared`), `tools` the conversation opened with; recorded when a conversation opens, after the capability check | `Conversation` |
 | `prompt` | `text`; `schema` (the caller's JSON Schema) when the reply had to be shaped | `Agent` |
@@ -46,7 +46,8 @@ sensitive; it is why it is user-only.
 | `command.outcome` | `command`, `exitStatus`, `timedOut`, `truncated`, `stdout`, `stderr`, `seconds` | `CommandRunner` |
 | `secrets.scan` | `source` (`command` and `workingDirectory`, `path`, or `stdin`), `bytes`, `diff`, `thorough`, `findings` (a count), `kinds` (count per kind); never a value or a preview | `WispServer`, `wisp scan` |
 | `redaction` | `source`, `bytes`, `bytesOut`, `truncated`, `thorough`, `replaced` (occurrences per kind); never a value | `WispServer`, `wisp redact` |
-| `notification` | `title`, `body` (both as bounded for display), `source` (`model`, `user`), `outcome` (`posted`, `refused`), `reason` when refused; one per request from the `notify` tool or `wisp notify` | `Notifier` |
+| `watch.run` | `command`, `run` (from 1), `trigger` (`start`, `change`, `interval`), `exitStatus`, `timedOut`, `state` (`pass`, `fail`), `previous`, `changed`, `seconds`, `findings` (a count, or null when not triaged), `triageError`, `notified`; one per run of `wisp watch` | `wisp watch` |
+| `notification` | `title`, `body` (both as bounded for display), `source` (`model`, `user`, `watch`), `outcome` (`posted`, `refused`), `reason` when refused; one per request from the `notify` tool or `wisp notify` | `Notifier` |
 | `file.write` | `path`, `mode` (`write`, `append`, `replace`), `created`, `bytesBefore`, `bytesAfter`; recorded after an `edit_file` edit lands, the content being in the `tool.call` arguments | `EditFileTool` |
 | `context.condensation` | `turnsBefore`, `turnsAfter`, `contextSize`, `tokenCount`, `reason` (`overflow`: the model refused the prompt and the retry follows; `budget`: the last request's reported usage plus the new prompt would pass `contextBudget` of a known window, so the transcript was condensed first) | `Agent` |
 | `mcp.request` | `tool`, `arguments` | `WispServer` |

@@ -22,6 +22,10 @@ Added:
 - The MCP tool `json_shape`: the structure of a JSON or JSON Lines file without its data, with redacted
   string examples. No model.
 
+- `wisp watch <command>`: reruns a command when files change (build output and `.git` ignored) or on
+  an interval, triages a failing run with the model, and posts a notification when it starts or stops
+  failing (`--notify change|failure|always|never`).
+
 Fixed:
 
 - `summarise_diff`'s `secret` flag quoted the start of the added line, handing the credential to the

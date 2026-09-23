@@ -17,7 +17,7 @@ struct Wisp: AsyncParsableCommand {
         subcommands: [
             Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
             DoctorCommand.self,
-            Approvals.self, Notify.self, Scan.self, Redact.self,
+            Approvals.self, Notify.self, Scan.self, Redact.self, Watch.self,
         ],
         defaultSubcommand: Respond.self
     )
@@ -189,6 +189,31 @@ extension Wisp {
             tools: .none)
         let schema = try OutputSchema(json: ModelSweep.schemaJSON)
         return { prompt in try await conversation.openAgent().respond(to: prompt, schema: schema).text }
+    }
+
+    /// A line for the user on stderr.
+    static func note(_ text: String) {
+        FileHandle.standardError.write(Data((text + "\n").utf8))
+    }
+
+    /// Handles Ctrl-C: the first calls `finish` so the work in progress can end cleanly, the second exits
+    /// at once with status 130. Cancel the returned source to restore the default.
+    static func stopOnInterrupt(_ finish: @escaping @Sendable () -> Void) -> any DispatchSourceSignal {
+        signal(SIGINT, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+        let presses = Mutex(0)
+        source.setEventHandler {
+            let count = presses.withLock { count in
+                count += 1
+                return count
+            }
+            if count > 1 { Darwin.exit(130) }
+            note("stopping after the current run; Ctrl-C again to stop now")
+            finish()
+        }
+        source.setCancelHandler { signal(SIGINT, SIG_DFL) }
+        source.resume()
+        return source
     }
 
     /// Parses a `--model` value into a usage error on failure.
@@ -598,6 +623,115 @@ struct Redact: AsyncParsableCommand {
         session.audit.record(.redaction, details: AuditEvent.Details.redaction(report))
         print(report.text, terminator: "")
         FileHandle.standardError.write(Data((report.summary + "\n").utf8))
+    }
+}
+
+extension Watcher.NotifyPolicy: ExpressibleByArgument {}
+
+/// Reruns a command as files change or on an interval, and notifies when its outcome turns.
+struct Watch: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Rerun a command when files change, and notify when it starts or stops failing.",
+        discussion:
+            "Runs the command at once, then again after each change under the watched paths (build output and "
+            + ".git ignored) and, with --every, on an interval. A failing run is triaged by the model into its "
+            + "failures; when the outcome turns, a notification says so. The command runs under the policy, "
+            + "sandbox, and approval like any other. Ctrl-C stops after the current run; a second Ctrl-C at once.")
+
+    @Argument(help: "The command line to run, such as 'swift test 2>&1'.")
+    var command: String
+
+    @Option(name: [.customShort("C"), .long], help: "Directory to run the command in. Default: the current one.")
+    var directory: String?
+
+    @Option(name: .customLong("path"), help: "A directory to watch for changes (repeatable). Default: --directory.")
+    var paths: [String] = []
+
+    @Flag(name: .customLong("no-files"), help: "Do not watch files; run on the interval only.")
+    var noFiles = false
+
+    @Option(name: .long, help: "Also run every this many seconds.")
+    var every: Double?
+
+    @Option(name: .long, help: "When to notify: change (default), failure, always, never.")
+    var notify: Watcher.NotifyPolicy = .change
+
+    @Flag(name: .customLong("no-triage"), help: "Do not have the model triage a failing run.")
+    var noTriage = false
+
+    @Option(name: .long, help: "Stop after this many runs.")
+    var maxRuns: Int?
+
+    @Option(name: [.short, .customLong("model")], help: "Model for triage. Defaults to config.json.")
+    var model: String?
+
+    @Flag(name: [.short, .long], help: "Approve risky commands without asking.")
+    var yes = false
+
+    func validate() throws {
+        if noFiles && every == nil { throw ValidationError("--no-files needs --every, or nothing would rerun it") }
+        if let every, every < 1 { throw ValidationError("--every must be at least 1 second") }
+        if let maxRuns, maxRuns < 1 { throw ValidationError("--max-runs must be at least 1") }
+    }
+
+    func run() async throws {
+        let session = try Wisp.begin(
+            .init(entryPoint: .watch, model: try model.map(Wisp.parseModel), autoApprove: yes))
+        defer { session.end() }
+        let conversation = try session.conversation(
+            id: "watch-" + ShortID.make(), approver: TerminalApprover(style: .plain), tools: .none)
+        let directory = directory ?? FileManager.default.currentDirectoryPath
+        let source = Triage.Source.command(command, workingDirectory: directory)
+        let runner = CommandRunner(
+            options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+        let schema = try OutputSchema(json: Triage.schemaJSON)
+        let triage = Triage { prompt in try await conversation.openAgent().respond(to: prompt, schema: schema).text }
+        let (triggers, continuation) = AsyncStream.makeStream(
+            of: Watcher.Trigger.self, bufferingPolicy: .bufferingNewest(1))
+        continuation.yield(.start)
+        let watcher =
+            noFiles
+            ? nil
+            : FileWatcher(paths: paths.isEmpty ? [directory] : paths) {
+                continuation.yield(.change)
+            }
+        if !noFiles && watcher == nil { throw ValidationError("cannot watch \(paths.isEmpty ? [directory] : paths)") }
+        let interval = every.map { seconds in
+            Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    continuation.yield(.interval)
+                }
+            }
+        }
+        defer { interval?.cancel() }
+        let stop = Wisp.stopOnInterrupt { continuation.finish() }
+        defer { stop.cancel() }
+        let command = command
+        let clock = Date.FormatStyle(date: .omitted, time: .standard)
+        Wisp.note(
+            "watching \(watcher == nil ? "" : "\(paths.isEmpty ? directory : paths.joined(separator: ", ")) ")"
+                + "\(every.map { "every \($0) s " } ?? "")for: \(command)")
+        // The file watcher must outlive the loop; nothing else refers to it after this point.
+        defer { withExtendedLifetime(watcher) {} }
+        try await Watcher(
+            command: command,
+            options: .init(notify: notify, triage: !noTriage, maxRuns: maxRuns),
+            execute: {
+                try await Triage.capture(
+                    source, runner: runner, gate: conversation.gate, maxOutputBytes: Triage.Options().maxOutputBytes)
+            },
+            triage: { captured in try await triage.run(captured, from: source).findings },
+            notify: { message in _ = session.notifier.post(message, source: .watch, audit: conversation.audit) },
+            report: { run in
+                print("[\(Date().formatted(clock))] \(run.summary)")
+                for finding in run.findings ?? [] {
+                    print("  \(finding.kind)  \(finding.location ?? "-")  \(finding.message)")
+                }
+                fflush(stdout)
+                conversation.audit.record(.watchRun, details: AuditEvent.Details.watchRun(run, command: command))
+            }
+        ).run(triggers)
     }
 }
 

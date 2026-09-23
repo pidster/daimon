@@ -25,7 +25,7 @@ and can say so.
 | Rate | At most `notifications.perMinute` (default 5) in any minute, across every conversation of the process |
 | Off switch | `notifications.enabled: false` in `config.json`; every request is then refused |
 | Approval | None: a banner changes nothing on the Mac. Leave the tool out of a conversation with `--tool` or `tools` if it should not notify |
-| Audit | Every request, posted or refused, is a `notification` event with the title, body, source (`model` or `user`), and outcome ([logging.md](../logging.md)) |
+| Audit | Every request, posted or refused, is a `notification` event with the title, body, source (`model`, `user`, or `watch` for `wisp watch`), and outcome ([logging.md](../logging.md)) |
 
 ## How it is posted
 

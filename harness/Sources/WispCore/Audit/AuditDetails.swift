@@ -154,6 +154,18 @@ extension AuditEvent {
             ]
         }
 
+        /// `watch.run`: one run of a watched command, how it ended, and whether it turned and notified.
+        public static func watchRun(_ run: Watcher.Run, command: String) -> [String: JSONValue] {
+            [
+                "command": .string(command), "run": .int(run.number), "trigger": .string(run.trigger.rawValue),
+                "exitStatus": run.exitStatus.map { .int(Int($0)) } ?? .null, "timedOut": .bool(run.timedOut),
+                "state": .string(run.state.rawValue), "previous": run.previous.map { .string($0.rawValue) } ?? .null,
+                "changed": .bool(run.changed), "seconds": .double(run.seconds),
+                "findings": run.findings.map { .int($0.count) } ?? .null,
+                "triageError": run.triageError.map { .string($0) } ?? .null, "notified": .bool(run.notified),
+            ]
+        }
+
         /// `redaction`: where, how much, and how many values of each kind were replaced.
         public static func redaction(_ report: Redaction.Report) -> [String: JSONValue] {
             [
@@ -257,6 +269,11 @@ extension AuditEvent {
         case .notification: ["title", "body", "source", "outcome", "reason"]
         case .secretScan: ["source", "bytes", "diff", "thorough", "findings", "kinds"]
         case .redaction: ["source", "bytes", "bytesOut", "truncated", "thorough", "replaced"]
+        case .watchRun:
+            [
+                "command", "run", "trigger", "exitStatus", "timedOut", "state", "previous", "changed", "seconds",
+                "findings", "triageError", "notified",
+            ]
         case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount", "reason"]
         case .mcpRequest: ["tool", "arguments"]
         case .mcpResult: ["tool", "isError", "text", "seconds"]

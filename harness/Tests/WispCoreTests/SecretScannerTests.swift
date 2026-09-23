@@ -165,6 +165,30 @@ import Testing
         #expect(capped.more && capped.findings.count == 1 && capped.rendered.hasPrefix("1+ finding"))
     }
 
+    @Test func aThoroughDiffScanLocatesModelFindingsOnAddedLinesOnly() async throws {
+        let diff = """
+            diff --git a/notes.md b/notes.md
+            --- a/notes.md
+            +++ b/notes.md
+            @@ -3,2 +3,2 @@
+            -Owner: Old Name
+            +Owner: Jane Doe
+             Reviewed by Sam Park
+            """
+        // The model names a value on an added line, one only on a context line, and one of an unwanted kind.
+        let answer = #"{"items":[{"text":"Jane Doe","kind":"name"},{"text":"Sam Park","kind":"name"}]}"#
+        let report = try await SecretScan(
+            options: .init(categories: [.secret, .personal], thorough: true), judge: { _ in answer }
+        ).run(diff, from: .command("git diff", workingDirectory: nil))
+        #expect(report.diff && report.findings.map(\.location) == ["notes.md:3"], "\(report.findings)")
+        let secretsOnly = try await SecretScan(options: .init(thorough: true), judge: { _ in answer }).run(
+            diff, from: nil)
+        #expect(secretsOnly.findings.isEmpty)
+        #expect(SecretScan.locate("absent", in: "text", diff: false, source: nil) == nil)
+        #expect(Condensing.label(nil) == "text read from standard input")
+        #expect(Condensing.json(.command("ls", workingDirectory: "/r")) == ["command": "ls", "workingDirectory": "/r"])
+    }
+
     @Test func aRedactionReplacesByRuleThenByModelAndCapsItsOutput() async throws {
         let text = "Jane Doe <jane@acme.co> used \(Self.github)\n"
         let rules = try await Redaction().run(text, from: nil)

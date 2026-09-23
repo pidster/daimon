@@ -15,6 +15,8 @@ public enum EntryPoint: String, Sendable, Codable, CaseIterable {
     case scan
     /// `wisp redact`, text redacted on its way somewhere else.
     case redact
+    /// `wisp watch`, a command rerun as files change.
+    case watch
 
     /// The entry point of a further conversation opened under this one.
     public var thread: EntryPoint {

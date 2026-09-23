@@ -36,6 +36,8 @@ public final class Notifier: Sendable {
         case model
         /// A person, through `wisp notify`.
         case user
+        /// `wisp watch`, when a watched command's outcome turns.
+        case watch
     }
 
     /// What happened to one request.

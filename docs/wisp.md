@@ -255,6 +255,37 @@ wisp redact --thorough support-ticket.txt > ticket-clean.txt
 
 Audited as `redaction` with the counts replaced per kind.
 
+### `wisp watch <command>`
+
+Runs a command at once, then again each time a file changes under the watched paths and, with `--every`,
+on an interval, and posts a notification when its outcome turns. A failing run is triaged by the model
+into its failures, shown under the run's line; a failure that repeats without a notification is not
+triaged again. Changes under `.git`, `.build`, `.swiftpm`, `target`, `node_modules`, `DerivedData`,
+`.venv`, `__pycache__`, `dist`, `.next`, and `.cache`, and editor scratch files, are ignored. The command
+runs under the policy, sandbox, and approval like any other; answer "session" to the first approval
+and the reruns are covered ([ADR 0033](decisions/0033-watch-mode.md)).
+
+| Flag | Meaning |
+| --- | --- |
+| `-C, --directory <dir>` | Where the command runs. Default: the current directory. |
+| `--path <dir>` (repeatable) | Directories to watch. Default: `--directory`. |
+| `--no-files` | Do not watch files; needs `--every`. |
+| `--every <seconds>` | Also run on this interval (at least 1). |
+| `--notify <when>` | `change` (default: when it starts or stops failing, and on a first run that fails), `failure`, `always`, `never`. |
+| `--no-triage` | Do not triage failing output. |
+| `--max-runs <n>` | Stop after this many runs. |
+| `-m, --model <model>` | The model for triage. Defaults to `config.json`. |
+| `-y, --yes` | Approve risky commands without asking. |
+
+```
+wisp watch 'swift test 2>&1'                   # rerun the tests on every save
+wisp watch --no-files --every 300 'make check'  # every five minutes
+```
+
+Each run prints a line (`[22:15:34] run 2 (change): pass, exit 0, 1.3 s; was fail`) and is audited as
+`watch.run`; notifications are audited as `notification` with source `watch`. Ctrl-C stops after the
+current run; a second Ctrl-C stops at once.
+
 ### `wisp approvals`
 
 `wisp approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, pattern
