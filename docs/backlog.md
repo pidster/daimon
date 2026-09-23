@@ -23,7 +23,10 @@ not the differentiator. Items, in order of leverage:
 - **Condensing tools.** Purpose-built MCP tools that keep raw content on the device and return small
   results ([ADR 0023](decisions/0023-condensing-tools.md)). Done 2026-09-20: `triage`, build or test
   output into a failure list. Done 2026-09-21: `summarise_diff`, a diff into per-file lines and review
-  flags. Next: summarise a file, answer a question over a set of files, extract fields to a schema. A deterministic pre-pass for known output formats
+  flags. Done 2026-09-23: `scan_secrets` and `redact` ([ADR 0031](decisions/0031-secret-scanning-and-redaction.md));
+  `condense_log` and `json_shape`, deterministic ([ADR 0032](decisions/0032-log-and-json-condensers.md)).
+  Next, from the same list: dependency audit output (`npm audit`, `cargo audit`) reduced to what needs
+  action, profiler exports reduced to hot paths, and a flaky test found by comparing runs. Then: summarise a file, answer a question over a set of files, extract fields to a schema. A deterministic pre-pass for known output formats
   (`file:line:col: error:`, `error[E…] --> file:line`, `FAILED path::test`) would make those cases exact
   and leave the model the rest; measure it against the eval fixtures first.
 - Done 2026-09-20: a measured task catalogue. `scripts/check eval` records a `Measurement` per task

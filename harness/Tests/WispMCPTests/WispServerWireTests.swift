@@ -55,7 +55,11 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
     @Test func listsToolsAndResourcesOverTheProtocol() async throws {
         let pair = try await connected()
         let tools = try await pair.client.listTools().tools
-        #expect(tools.map(\.name) == ["respond", "triage", "summarise_diff", "scan_secrets", "redact", "close_thread"])
+        #expect(
+            tools.map(\.name) == [
+                "respond", "triage", "summarise_diff", "scan_secrets", "redact", "condense_log", "json_shape",
+                "close_thread",
+            ])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
         let resources = try await pair.client.listResources().resources
         #expect(
@@ -360,6 +364,44 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
             events.first { $0.kind == .redaction }?.details["replaced"] == ["email": 1, "github-token": 1, "name": 1])
         #expect(!events.contains { $0.kind != .commandOutcome && "\($0.details)".contains(token) })
         await #expect(throws: MCPError.self) { _ = try await call(pair.client, "redact", [:]) }
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func condenseLogAndJSONShapeReadFilesWithoutAModelOverTheProtocol() async throws {
+        let pair = try await connected()
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-wire-log-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let log = dir.appending(path: "app.log")
+        let lines = (1...50).map { "2026-09-23T10:00:\(String(format: "%02d", $0 % 60))Z request \($0) ok" }
+        try Data((lines + ["2026-09-23T10:01:00Z error: disk full"]).joined(separator: "\n").utf8).write(to: log)
+        let digest = try await call(pair.client, "condense_log", ["path": .string(log.path)])
+        #expect(digest.isError == false, "\(digest)")
+        let structured = digest.structuredContent?.objectValue
+        #expect(structured?["kind"] == "log" && structured?["lines"] == .int(51) && structured?["templates"] == .int(2))
+        #expect(structured?["truncated"] == false)
+        let first = structured?["groups"]?.arrayValue?.first?.objectValue
+        #expect(first?["severity"] == "error" && first?["template"] == "error: disk full")
+        let crash = dir.appending(path: "Demo.ips")
+        try Data((#"{"bug_type":"309","app_name":"Demo"}"# + "\n" + #"{"exception":{"type":"EXC_CRASH"}}"#).utf8)
+            .write(to: crash)
+        let parsed = try await call(pair.client, "condense_log", ["path": .string(crash.path)])
+        #expect(parsed.structuredContent?.objectValue?["kind"] == "crash")
+        #expect(parsed.structuredContent?.objectValue?["exception"] == "EXC_CRASH")
+        let json = dir.appending(path: "items.json")
+        try Data(#"{"items":[{"id":1},{"id":2,"tag":"x"}]}"#.utf8).write(to: json)
+        let shape = try await call(pair.client, "json_shape", ["path": .string(json.path)])
+        #expect(shape.isError == false, "\(shape)")
+        #expect(
+            shape.structuredContent?.objectValue?["outline"]?.arrayValue?.contains("    tag?: string e.g. \"x\"")
+                == true)
+        let broken = try await call(pair.client, "json_shape", ["path": .string(log.path)])
+        #expect(broken.isError == true)
+        // Each is its own audited session, and neither opened a model.
+        #expect(pair.sink.events.contains { $0.session.hasPrefix("log-") && $0.kind == .sessionStart })
+        #expect(pair.sink.events.contains { $0.session.hasPrefix("shape-") && $0.kind == .sessionEnd })
+        #expect(!pair.sink.events.contains { $0.session.hasPrefix("log-") && $0.kind == .prompt })
         await pair.client.disconnect()
         await pair.server.stop()
     }

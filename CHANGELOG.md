@@ -16,6 +16,12 @@ Added:
   markers such as `[REDACTED:email#1]`. `--thorough` adds the on-device model for names, addresses, and
   identifiers, over text the rules have already redacted.
 
+- The MCP tool `condense_log`: a log (an app's log, CI output, `log show`) as its distinct messages,
+  grouped by template and ranked by severity and count, or a macOS crash report as the process,
+  exception, and faulting thread's frames. No model; a megabyte takes about a second.
+- The MCP tool `json_shape`: the structure of a JSON or JSON Lines file without its data, with redacted
+  string examples. No model.
+
 Fixed:
 
 - `summarise_diff`'s `secret` flag quoted the start of the added line, handing the credential to the

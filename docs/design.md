@@ -207,6 +207,10 @@ declares it, and the reply's JSON is parsed into `structuredContent.output`
 ([ADR 0022](decisions/0022-structured-output.md)). `scan_secrets` and `redact` share `SecretScanner` (the rules), `Redactor` (numbered markers), and
 `ModelSweep` (the opt-in model pass over rule-redacted text, keeping only values that occur exactly)
 with `wisp scan` and `wisp redact` ([ADR 0031](decisions/0031-secret-scanning-and-redaction.md)).
+`condense_log` (`LogDigest`, `CrashReport`) and `json_shape` (`JSONShape`) are deterministic: templates
+and ranking for logs, a parsed `.ips` for crashes, a merged outline for JSON
+([ADR 0032](decisions/0032-log-and-json-condensers.md)). The server's `condense` helper gives every
+condensing tool its conversation, runner, gate, and capture.
 `triage` and `summarise_diff` were the first condensing tools; `DiffSummary` chunks a diff at file
 boundaries and joins the model's summaries and flags onto the file list the diff itself gives. `triage` was the first: `Triage`
 in `WispCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,

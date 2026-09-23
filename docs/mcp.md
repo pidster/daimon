@@ -333,6 +333,69 @@ Result content is a summary line, a blank line, and the redacted text; `structur
 redaction is its own audited session (`redact-<id>`); the `redaction` event records the counts only.
 The measured result of the thorough pass is in [measurements.md](measurements.md).
 
+### `condense_log`
+
+Condense a log on this Mac (an app's log, CI output, `/usr/bin/log show`) to its distinct messages,
+without a model ([ADR 0032](decisions/0032-log-and-json-condensers.md)). Each line becomes a template:
+the leading timestamp is removed and numbers, hex, UUIDs, long ids, and `log show`'s `[pid:thread]` are
+replaced by `<n>`, `<hex>`, `<uuid>`, `<id>`, `[<pid>]`. Lines with the same template form a group,
+ranked by severity (`fault`, `error`, `warning`, `info`) and then count. Severity is the log's own type
+where it states one (`log show`'s `Error` and `Fault`, or `E` and `F` in its compact style), otherwise
+it comes from words such as "failed" or "panic". A line without a timestamp in a log whose lines have
+them continues the line before and takes its severity. A macOS crash report (`.ips`) is recognised
+instead and returned as the process, version, OS, exception, termination, and the faulting thread's top
+12 frames. Up to 8 MiB is read, the tail beyond.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | Shell command line whose output to condense, run as for `triage`, such as `/usr/bin/log show --last 10m --predicate 'process == "MyApp"'`. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+| `path` | string | one of | Absolute path of a log or `.ips` file; the read clears the gate as `read_file` does. |
+| `max_groups` | integer | no | Groups to return at most (default 30); `more` is true when some were dropped. |
+
+For a log, `structuredContent` is `{ "kind": "log", "lines", "templates", "more", "truncated",
+"severities": { "fault": 3, … }, "groups": [{ "severity", "count", "template", "example", "firstLine",
+"lastLine", "firstSeen", "lastSeen" }] }`; `example` is the first line of the group as printed, with
+credentials redacted. For a crash report it is `{ "kind": "crash", "process", "version", "os",
+"timestamp", "bugType", "exception", "termination", "faultingThread", "frames": [{ "image", "symbol",
+"offset" }] }`. Measured on 2026-09-23: two minutes of `log show` (14,333 lines, 2.8 MB) reduced to 1,972
+templates in 1.2 s, the top 30 in about 10 KB.
+
+### `json_shape`
+
+Describe the structure of a JSON document or a JSON Lines file on this Mac, or a command's JSON output,
+without its data and without a model ([ADR 0032](decisions/0032-log-and-json-condensers.md)): one outline
+line per place, indented by depth, giving the types seen there (`integer 1…42`, `array[0…5] of string`,
+`null | object`), `?` on a key some objects lack, and a 40-character string example with credentials
+and personal data redacted. The elements of an array merge into one outline, so a thousand records read
+as one. Up to 16 MiB; larger input is refused rather than cut, since a document without its head does
+not parse.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | Shell command line whose JSON output to outline, run as for `triage`. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+| `path` | string | one of | Absolute path of a `.json` or JSON Lines file; the read clears the gate as `read_file` does. |
+| `max_depth` | integer | no | Levels of nesting to describe (default 8). |
+| `examples` | boolean | no | Show string examples (default true). |
+
+`structuredContent` is `{ "format": "json" | "jsonl", "records", "bytes", "more", "outline": [ … ] }`.
+The start of the outline of 1,000 events of wisp's own audit log (471 KB), on 2026-09-23:
+
+```
+(root): array[1000] of object
+  kind: string e.g. "approval.requested"
+  pid: integer 1827…96284
+  schema: integer 1
+  session: string e.g. "release-git"
+  time: string e.g. "2026-09-22T08:13:05.621Z"
+  turn?: integer 1…22
+  version: string e.g. "0.4.0"
+  call?: string e.g. "9bdf339e"
+  details: object
+    command?: string e.g. "git merge --ff-only main"
+```
+
 ### `close_thread`
 
 Free a thread's model session.

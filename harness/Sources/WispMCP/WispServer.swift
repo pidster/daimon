@@ -137,6 +137,12 @@ public struct WispServer: Sendable {
             case ToolCatalog.redact.name:
                 let request = try RedactRequest(arguments: params.arguments)
                 result = await redact(request)
+            case ToolCatalog.condenseLog.name:
+                let request = try CondenseLogRequest(arguments: params.arguments)
+                result = await condenseLog(request)
+            case ToolCatalog.jsonShape.name:
+                let request = try JSONShapeRequest(arguments: params.arguments)
+                result = await jsonShape(request)
             case ToolCatalog.closeThread.name:
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
@@ -316,7 +322,8 @@ public struct WispServer: Sendable {
     /// Captures the output on a conversation of its own, scans it, and returns the findings masked; the
     /// conversation records `secrets.scan` with the kinds found and never a value.
     private func scanSecrets(_ request: ScanSecretsRequest) async -> CallTool.Result {
-        await condense(prefix: "scan", source: request.source, model: request.model) { conversation, text in
+        await condense(prefix: "scan", source: request.source, model: request.model) { conversation, captured in
+            let text = captured.text
             let judge = request.options.thorough ? self.judge(on: conversation, schema: ModelSweep.schemaJSON) : nil
             let report = try await SecretScan(options: request.options, judge: judge).run(text, from: request.source)
             conversation.audit.record(.secretScan, details: AuditEvent.Details.secretScan(report))
@@ -327,7 +334,8 @@ public struct WispServer: Sendable {
     /// Captures the output on a conversation of its own and returns it redacted; the conversation records
     /// `redaction` with the counts replaced.
     private func redact(_ request: RedactRequest) async -> CallTool.Result {
-        await condense(prefix: "redact", source: request.source, model: request.model) { conversation, text in
+        await condense(prefix: "redact", source: request.source, model: request.model) { conversation, captured in
+            let text = captured.text
             let judge = request.options.thorough ? self.judge(on: conversation, schema: ModelSweep.schemaJSON) : nil
             let report = try await Redaction(options: request.options, judge: judge).run(text, from: request.source)
             conversation.audit.record(.redaction, details: AuditEvent.Details.redaction(report))
@@ -335,11 +343,40 @@ public struct WispServer: Sendable {
         }
     }
 
+    /// Digests a log, or reads a crash report, without a model.
+    private func condenseLog(_ request: CondenseLogRequest) async -> CallTool.Result {
+        await condense(
+            prefix: "log", source: request.source, model: nil, maxBytes: CondenseLogRequest.maxBytes
+        ) { _, captured in
+            if let crash = CrashReport(captured.text) { return (crash.rendered, crash.json) }
+            let report = LogDigest(options: .init(maxGroups: request.maxGroups)).run(captured.text)
+            var fields = report.json.objectValue ?? [:]
+            fields["truncated"] = .bool(captured.truncated)
+            let note = captured.truncated ? "\n(input cut to its last \(CondenseLogRequest.maxBytes) bytes)" : ""
+            return (report.rendered + note, .object(fields))
+        }
+    }
+
+    /// Outlines a JSON document or JSON Lines without a model; input cut to fit is refused, since a
+    /// document without its head does not parse.
+    private func jsonShape(_ request: JSONShapeRequest) async -> CallTool.Result {
+        await condense(
+            prefix: "shape", source: request.source, model: nil, maxBytes: JSONShapeRequest.maxBytes
+        ) { _, captured in
+            guard !captured.truncated else {
+                throw JSONShape.Failure.notJSON("larger than \(JSONShapeRequest.maxBytes) bytes; narrow it first")
+            }
+            let report = try JSONShape(options: request.options).run(captured.text)
+            return (report.rendered, report.json)
+        }
+    }
+
     /// Opens a conversation `<prefix>-<id>` with no tools, captures `source` through its runner and gate,
-    /// and hands the text to `body`, which returns the text and structured content of the result.
+    /// and hands the capture to `body`, which returns the text and structured content of the result.
     private func condense(
         prefix: String, source: Triage.Source, model: ModelSelection?,
-        _ body: (Conversation, String) async throws -> (text: String, json: JSONValue)
+        maxBytes: Int = Triage.Options().maxOutputBytes,
+        _ body: (Conversation, Triage.Captured) async throws -> (text: String, json: JSONValue)
     ) async -> CallTool.Result {
         do {
             let conversation = try session.conversation(
@@ -348,8 +385,8 @@ public struct WispServer: Sendable {
             let runner = CommandRunner(
                 options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
             let captured = try await Triage.capture(
-                source, runner: runner, gate: conversation.gate, maxOutputBytes: Triage.Options().maxOutputBytes)
-            let result = try await body(conversation, captured.text)
+                source, runner: runner, gate: conversation.gate, maxOutputBytes: maxBytes)
+            let result = try await body(conversation, captured)
             let structured: Value? = Value(json: result.json)
             return .init(
                 content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,

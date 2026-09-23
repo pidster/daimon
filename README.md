@@ -61,7 +61,8 @@ To let another harness use it, register it as an MCP server. For Claude Code, in
 It exposes `respond` (run a task on the on-device model, with wisp's tools; pass back the returned
 `thread_id` to continue a conversation), `triage` (run or read build and test output and get back only
 the failures), `summarise_diff` (a diff as per-file lines and review flags), `scan_secrets` (credentials
-and personal data found, masked), `redact` (text with them replaced), and `close_thread`. The raw output
+and personal data found, masked), `redact` (text with them replaced), `condense_log` (a log as its distinct messages, or a crash report as
+what explains it), `json_shape` (a JSON file's structure without its data), and `close_thread`. The raw output
 behind the condensing tools never leaves the Mac. wisp's own tools are used by the
 model, not called directly.
 

@@ -9,7 +9,8 @@ import WispCore
     @Test func advertisesRespondAndRunCommand() {
         #expect(
             ToolCatalog.all.map(\.name) == [
-                "respond", "triage", "summarise_diff", "scan_secrets", "redact", "close_thread",
+                "respond", "triage", "summarise_diff", "scan_secrets", "redact", "condense_log", "json_shape",
+                "close_thread",
             ])
     }
 
@@ -149,5 +150,19 @@ import WispCore
         ])
         #expect(narrow.options.categories == [.secret] && narrow.options.maxOutputBytes == 100)
         #expect(throws: MCPError.self) { try RedactRequest(arguments: ["path": .string("/x"), "max_bytes": .int(0)]) }
+    }
+
+    @Test func condenseLogAndJSONShapeArgumentsDecode() throws {
+        #expect(try CondenseLogRequest(arguments: ["path": .string("/x")]).maxGroups == 30)
+        #expect(try CondenseLogRequest(arguments: ["path": .string("/x"), "max_groups": .int(5)]).maxGroups == 5)
+        #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: [:]) }
+        let shape = try JSONShapeRequest(arguments: [
+            "path": .string("/x"), "max_depth": .int(3), "examples": .bool(false),
+        ])
+        #expect(shape.options == JSONShape.Options(maxDepth: 3, examples: false))
+        #expect(try JSONShapeRequest(arguments: ["command": .string("cat x")]).options == JSONShape.Options())
+        #expect(throws: MCPError.self) {
+            try JSONShapeRequest(arguments: ["path": .string("/x"), "examples": .int(1)])
+        }
     }
 }

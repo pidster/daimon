@@ -244,6 +244,81 @@ public enum ToolCatalog {
         annotations: .init(title: "Redact secrets and personal data", readOnlyHint: false, openWorldHint: false)
     )
 
+    /// Condenses a log or a crash report on this Mac to its distinct messages, without a model.
+    public static let condenseLog = Tool(
+        name: "condense_log",
+        description:
+            "Condense a log on this Mac (an app log, CI output, or /usr/bin/log show output) to its distinct "
+            + "messages: lines grouped by template with timestamps and ids removed, ranked by severity then count, "
+            + "with line ranges and first and last timestamps. A macOS crash report (.ips) comes back as the "
+            + "process, exception, and faulting thread's frames. No model; up to 8 MiB. Give exactly one of command "
+            + "or path.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Shell command line whose output to read, run with /bin/sh -c under wisp's policy, sandbox, "
+                            + "and approval, such as: tail -20000 app.log"),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory to run the command in. Default: wisp's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of a file on this Mac to read instead."),
+                ]),
+                "max_groups": .object([
+                    "type": .string("integer"),
+                    "description": .string("Message groups to return at most (default 30); more is flagged."),
+                ]),
+            ]),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Condense a log", readOnlyHint: false, openWorldHint: false)
+    )
+
+    /// Outlines a JSON document or JSON Lines on this Mac without its data.
+    public static let jsonShape = Tool(
+        name: "json_shape",
+        description:
+            "Describe the structure of a JSON document or JSON Lines file on this Mac, or a command's JSON output, "
+            + "without its data: each key's types, optional keys, array lengths, number ranges, and short string "
+            + "examples with secrets and personal data redacted. Arrays of records merge into one outline. No model; "
+            + "up to 16 MiB. Give exactly one of command or path.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Shell command line whose output to read, run with /bin/sh -c under wisp's policy, sandbox, "
+                            + "and approval, such as: curl -s https://api.example.com/items"),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory to run the command in. Default: wisp's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of a file on this Mac to read instead."),
+                ]),
+                "max_depth": .object([
+                    "type": .string("integer"),
+                    "description": .string("Levels of nesting to describe (default 8)."),
+                ]),
+                "examples": .object([
+                    "type": .string("boolean"),
+                    "description": .string("Show a short, redacted example for strings. Default true."),
+                ]),
+            ]),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Outline JSON", readOnlyHint: false, openWorldHint: false)
+    )
+
     /// Ends a conversation thread and frees its model session.
     public static let closeThread = Tool(
         name: "close_thread",
@@ -262,7 +337,9 @@ public enum ToolCatalog {
     )
 
     /// Every tool, in the order clients see them.
-    public static var all: [Tool] { [respond, triage, summariseDiff, scanSecrets, redact, closeThread] }
+    public static var all: [Tool] {
+        [respond, triage, summariseDiff, scanSecrets, redact, condenseLog, jsonShape, closeThread]
+    }
 
     /// URI of the JSON resource describing the model's tools.
     public static let toolsResourceURI = "wisp://tools"
@@ -549,6 +626,46 @@ public struct RedactRequest: Equatable, Sendable {
             thorough: try CondensingRequest.flag(arguments, "thorough", fallback: false),
             maxOutputBytes: try CondensingRequest.count(
                 arguments, "max_bytes", fallback: Redaction.Options().maxOutputBytes))
+    }
+}
+
+/// Decoded arguments for the `condense_log` tool.
+public struct CondenseLogRequest: Equatable, Sendable {
+    /// Bytes of log read; only the tail beyond this.
+    static let maxBytes = 8 << 20
+    /// What to condense.
+    public var source: Triage.Source
+    /// Groups to return at most.
+    public var maxGroups: Int
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad `max_groups`.
+    public init(arguments: [String: Value]?) throws {
+        source = try CondensingRequest(arguments: arguments).source
+        maxGroups = try CondensingRequest.count(arguments, "max_groups", fallback: LogDigest.Options().maxGroups)
+    }
+}
+
+/// Decoded arguments for the `json_shape` tool.
+public struct JSONShapeRequest: Equatable, Sendable {
+    /// Bytes of JSON read; more is refused.
+    static let maxBytes = 16 << 20
+    /// What to outline.
+    public var source: Triage.Source
+    /// Depth and examples.
+    public var options: JSONShape.Options
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad `max_depth` or `examples`.
+    public init(arguments: [String: Value]?) throws {
+        source = try CondensingRequest(arguments: arguments).source
+        options = JSONShape.Options(
+            maxDepth: try CondensingRequest.count(arguments, "max_depth", fallback: JSONShape.Options().maxDepth),
+            examples: try CondensingRequest.flag(arguments, "examples", fallback: true))
     }
 }
 
