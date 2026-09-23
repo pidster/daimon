@@ -76,6 +76,28 @@ condenses the transcript ahead of the window when the last request plus the new 
 of it (`docs/context-management.md`). `/tokens` in `wisp chat` shows that reported usage for these
 models.
 
+Models tried on 2026-09-23 on an M4 Max with 48 GB, Ollama 0.33.3, wisp 0.8.1, through `wisp respond`
+with the default `contextLength`. Each ran five prompts three times: the git-thread instruction from
+`AGENTS.md` with `git log --oneline -3`; the same with a quoted, piped command
+(`git log --format='%h %s' -2 | tail -1`), to check that the command is not rewritten; a task in which the
+model chooses the command (count the `.swift` files under a directory); the `current_date` loop; and a
+text-only question. Every model passed all fifteen, and the audit log showed the quoted command run as
+given every time. Times are warm, per turn, and include wisp's classifier and sandbox; the first turn
+after a model loads is slower (the cold column).
+
+| Model | Size | Declares | git | verbatim | task | date | text | cold |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `qwen3-coder` | 30.5B, 18.6 GB | tools | 3 s | 4 s | 3.4 s | 0.4 s | 0.2 s | 13 s |
+| `granite4.1:8b` | 8.8B, 5.4 GB | tools | 3.4 s | 4.1 s | 3.8 s | 0.6 s | 0.2 s | 8 s |
+| `ornith:9b` | 9.0B, 5.6 GB | tools, reasoning | 5.8 s | 7.4 s | 6 s | 1.7 s | 3 s | 24 s |
+| `qwen3.8:27b` | 27.3B, 17.7 GB | tools, reasoning, vision | 12 s | 14 s | 13.5 s | 6 s | 2 s | 17 s |
+
+The reasoning models are slower because wisp does not send Ollama's `think` option, so they think in full
+on every turn. `granite4.1:8b` matched `qwen3-coder` at under a third of the memory. `ornith:9b` once
+named the wrong weekday for the date; `current_date` returns an ISO timestamp without one. Five prompts
+are a smoke test, not an evaluation: they show that these models drive wisp's tools, not how well they
+handle longer tasks.
+
 ## Core AI
 
 Apple's Core AI framework runs models exported to `.aimodel` bundles, through the `CoreAILanguageModel`

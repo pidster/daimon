@@ -48,7 +48,7 @@ struct SessionOptions: ParsableArguments {
 
     @Option(
         name: [.short, .customLong("model")],
-        help: "Model: system (on device) or private-cloud. Defaults to config.json.")
+        help: "Model: system, private-cloud, or <backend>:<name> (see wisp models). Defaults to config.json.")
     var model: String?
 
     /// The session request these flags describe.

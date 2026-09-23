@@ -4,6 +4,15 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Changed:
+
+- `--model` help mentions `<backend>:<name>` spellings and points to `wisp models`, not only `system`
+  and `private-cloud`.
+- `docs/backends.md` records four Ollama models tried with wisp on 2026-09-23 (`qwen3-coder`,
+  `granite4.1:8b`, `ornith:9b`, `qwen3.8:27b`): all drove the tools correctly, with timings.
+
 ## 0.8.1
 
 Changed:
