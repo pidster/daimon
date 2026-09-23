@@ -287,15 +287,14 @@ public struct DiffSummary: Sendable {
                     break
                 }
             }
+            // The note names the kind and a masked preview: quoting the line would hand the credential to
+            // the caller the tool exists to keep it from.
             for line in section.split(separator: "\n") where line.hasPrefix("+") && !line.hasPrefix("+++") {
-                let added = String(line.dropFirst())
-                if secretPatterns.contains(where: {
-                    added.range(of: $0, options: [.regularExpression, .caseInsensitive]) != nil
-                }) {
+                if let match = SecretScanner.scan(String(line.dropFirst()), categories: [.secret]).first {
                     flags.append(
                         Flag(
                             kind: "secret", path: path,
-                            note: "credential literal added: \(added.trimmingCharacters(in: .whitespaces).prefix(60))"))
+                            note: "credential added (\(match.kind)): \(SecretScanner.mask(match.value))"))
                     break
                 }
             }
@@ -308,14 +307,6 @@ public struct DiffSummary: Sendable {
         ".disabled(", "@Test(.disabled", "XCTSkip", "xit(", "xdescribe(", "it.skip(", "describe.skip(",
         "@pytest.mark.skip",
         "@unittest.skip", "#[ignore]", "t.Skip(",
-    ]
-
-    /// Credential shapes on one line: known key prefixes, private key blocks, or a secret-named
-    /// assignment of a long literal.
-    static let secretPatterns = [
-        #"\b(sk-[a-z]+-|sk-|AKIA|ghp_|gho_|xox[bpa]-|AIza)[A-Za-z0-9_\-]{12,}"#,
-        #"-----BEGIN [A-Z ]*PRIVATE KEY-----"#,
-        #"(api[_-]?key|secret|token|password|passwd|credential)\w*\s*[:=]\s*["'][^"']{12,}["']"#,
     ]
 
     /// The prompt for one chunk.

@@ -141,7 +141,9 @@ import WispTestSupport
             """
         let found = DiffSummary.ruleFlags(in: secrets)
         #expect(found.map(\.kind) == ["secret", "deleted-test", "binary"])
-        #expect(found[0].path == "Sources/Client.swift" && found[0].note.contains("sk-live"))
+        #expect(found[0].path == "Sources/Client.swift" && found[0].note.hasPrefix("credential added ("))
+        // The note masks the value rather than quoting the line.
+        #expect(!found[0].note.contains("4f9a2b7c1d8e0f3a6b5c9d2e1f4a7b8c") && found[0].note.contains("…("))
         #expect(found[1].path == "Tests/GateTests.swift" && found[1].note.contains(".disabled"))
         #expect(found[2].path == "logo.png")
     }

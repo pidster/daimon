@@ -143,6 +143,107 @@ public enum ToolCatalog {
         annotations: .init(title: "Summarise a diff", readOnlyHint: false, openWorldHint: false)
     )
 
+    /// Scans command output or a file on this Mac for credentials and personal data, reporting them masked.
+    public static let scanSecrets = Tool(
+        name: "scan_secrets",
+        description:
+            "Scan a command's output (such as git diff --cached before a commit) or a file on this Mac for "
+            + "credentials, and optionally personal data, by rule. Returns kind, location (path:line for a diff's "
+            + "added lines), and a masked preview; values never leave this Mac. Give exactly one of command or path.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Shell command line whose output to scan, run with /bin/sh -c under wisp's policy, sandbox, "
+                            + "and approval, such as: git diff --cached"),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory to run the command in. Default: wisp's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of a file on this Mac to scan instead."),
+                ]),
+                "model": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Model for the thorough pass; as for respond. Default: the configured one."),
+                ]),
+                "thorough": .object([
+                    "type": .string("boolean"),
+                    "description": .string(
+                        "Also have the on-device model look for what rules cannot recognise: names, addresses, "
+                            + "customer numbers, unusual credentials. Slower: about 2 s per 4 KiB. Default false."),
+                ]),
+                "personal": .object([
+                    "type": .string("boolean"),
+                    "description": .string(
+                        "Report personal data too: emails, phone and card numbers, IPs. Default false."),
+                ]),
+                "max_findings": .object([
+                    "type": .string("integer"),
+                    "description": .string("Findings to return at most (default 50); more is flagged."),
+                ]),
+            ]),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Scan for secrets", readOnlyHint: false, openWorldHint: false)
+    )
+
+    /// Returns command output or a file with credentials and personal data replaced by markers.
+    public static let redact = Tool(
+        name: "redact",
+        description:
+            "Return a command's output or a file on this Mac with credentials and personal data replaced by "
+            + "numbered markers such as [REDACTED:email#1], so you can read a log, crash report, or data file "
+            + "without its secrets. Rules always run; thorough adds the on-device model. Give exactly one of "
+            + "command or path.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Shell command line whose output to redact, run with /bin/sh -c under wisp's policy, sandbox, "
+                            + "and approval, such as: tail -500 app.log"),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory to run the command in. Default: wisp's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of a file on this Mac to redact instead."),
+                ]),
+                "model": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Model for the thorough pass; as for respond. Default: the configured one."),
+                ]),
+                "thorough": .object([
+                    "type": .string("boolean"),
+                    "description": .string(
+                        "Also have the on-device model look for what rules cannot recognise: names, addresses, "
+                            + "customer numbers, unusual credentials. Slower: about 2 s per 4 KiB. Default false."),
+                ]),
+                "secrets_only": .object([
+                    "type": .string("boolean"),
+                    "description": .string("Replace credentials only and keep personal data. Default false."),
+                ]),
+                "max_bytes": .object([
+                    "type": .string("integer"),
+                    "description": .string(
+                        "Bytes of redacted text to return at most (default 32768); more is flagged."),
+                ]),
+            ]),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Redact secrets and personal data", readOnlyHint: false, openWorldHint: false)
+    )
+
     /// Ends a conversation thread and frees its model session.
     public static let closeThread = Tool(
         name: "close_thread",
@@ -161,7 +262,7 @@ public enum ToolCatalog {
     )
 
     /// Every tool, in the order clients see them.
-    public static var all: [Tool] { [respond, triage, summariseDiff, closeThread] }
+    public static var all: [Tool] { [respond, triage, summariseDiff, scanSecrets, redact, closeThread] }
 
     /// URI of the JSON resource describing the model's tools.
     public static let toolsResourceURI = "wisp://tools"
@@ -336,6 +437,15 @@ public struct CondensingRequest: Equatable, Sendable {
         }
     }
 
+    /// A boolean argument, or `fallback` when absent.
+    ///
+    /// - Throws: `MCPError.invalidParams` when present and not a boolean.
+    static func flag(_ arguments: [String: Value]?, _ name: String, fallback: Bool) throws -> Bool {
+        guard let raw = arguments?[name] else { return fallback }
+        guard let flag = raw.boolValue else { throw MCPError.invalidParams("'\(name)' must be a boolean") }
+        return flag
+    }
+
     /// A positive integer argument, or `fallback` when absent.
     ///
     /// - Throws: `MCPError.invalidParams` when present and not a positive integer.
@@ -387,6 +497,58 @@ public struct SummariseDiffRequest: Equatable, Sendable {
         source = shared.source
         model = shared.model
         maxFiles = try CondensingRequest.count(arguments, "max_files", fallback: DiffSummary.Options().maxFiles)
+    }
+}
+
+/// Decoded arguments for the `scan_secrets` tool.
+public struct ScanSecretsRequest: Equatable, Sendable {
+    /// What to scan.
+    public var source: Triage.Source
+    /// Model for the thorough pass; nil means the server default.
+    public var model: ModelSelection?
+    /// Categories, the model pass, and the cap.
+    public var options: SecretScan.Options
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad flag or count.
+    public init(arguments: [String: Value]?) throws {
+        let shared = try CondensingRequest(arguments: arguments)
+        source = shared.source
+        model = shared.model
+        options = SecretScan.Options(
+            categories: try CondensingRequest.flag(arguments, "personal", fallback: false)
+                ? [.secret, .personal] : [.secret],
+            thorough: try CondensingRequest.flag(arguments, "thorough", fallback: false),
+            maxFindings: try CondensingRequest.count(
+                arguments, "max_findings", fallback: SecretScan.Options().maxFindings))
+    }
+}
+
+/// Decoded arguments for the `redact` tool.
+public struct RedactRequest: Equatable, Sendable {
+    /// What to redact.
+    public var source: Triage.Source
+    /// Model for the thorough pass; nil means the server default.
+    public var model: ModelSelection?
+    /// Categories, the model pass, and the output cap.
+    public var options: Redaction.Options
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad flag or count.
+    public init(arguments: [String: Value]?) throws {
+        let shared = try CondensingRequest(arguments: arguments)
+        source = shared.source
+        model = shared.model
+        options = Redaction.Options(
+            categories: try CondensingRequest.flag(arguments, "secrets_only", fallback: false)
+                ? [.secret] : [.secret, .personal],
+            thorough: try CondensingRequest.flag(arguments, "thorough", fallback: false),
+            maxOutputBytes: try CondensingRequest.count(
+                arguments, "max_bytes", fallback: Redaction.Options().maxOutputBytes))
     }
 }
 

@@ -17,7 +17,7 @@ struct Wisp: AsyncParsableCommand {
         subcommands: [
             Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
             DoctorCommand.self,
-            Approvals.self, Notify.self,
+            Approvals.self, Notify.self, Scan.self, Redact.self,
         ],
         defaultSubcommand: Respond.self
     )
@@ -161,6 +161,34 @@ extension Wisp {
             FileHandle.standardError.write(Data((note + "\n").utf8))
         }
         return session
+    }
+
+    /// The files given, read whole, or standard input when there are none.
+    ///
+    /// - Throws: A usage error for a file that cannot be read.
+    static func inputs(_ paths: [String]) throws -> [(source: Triage.Source?, text: String)] {
+        guard !paths.isEmpty else {
+            return [(nil, String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self))]
+        }
+        return try paths.map { path in
+            do {
+                return (.path(path), String(decoding: try Data(contentsOf: URL(filePath: path)), as: UTF8.self))
+            } catch {
+                throw ValidationError("cannot read \(path): \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// A judge for a condensing command's model pass: each chunk in a fresh tool-less turn on a
+    /// conversation `<prefix>-<id>` of `session`, shaped by the model sweep's schema.
+    ///
+    /// - Throws: `Session.Failure` if the conversation cannot be set up.
+    static func judge(session: Session, prefix: String) throws -> Triage.Judge {
+        let conversation = try session.conversation(
+            id: "\(prefix)-" + ShortID.make(), approver: DenyingApprover(reason: "no commands run here"),
+            tools: .none)
+        let schema = try OutputSchema(json: ModelSweep.schemaJSON)
+        return { prompt in try await conversation.openAgent().respond(to: prompt, schema: schema).text }
     }
 
     /// Parses a `--model` value into a usage error on failure.
@@ -496,6 +524,80 @@ struct Notify: ParsableCommand {
         let outcome = session.notifier.post(
             .init(title: title, body: message, subtitle: subtitle, sound: sound), source: .user, audit: session.audit)
         if case .refused(let reason) = outcome { throw ValidationError("notification not shown: \(reason)") }
+    }
+}
+
+/// Reports credentials and personal data in files or standard input, masked; exits 1 when it finds any.
+struct Scan: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Scan text for credentials and personal data.",
+        discussion:
+            "Reads the files given, or standard input. A unified diff is scanned by its added lines, so "
+            + "'git diff --cached | wisp scan' checks a commit before it is made. Values are shown masked. "
+            + "Exits 1 when anything is found.")
+
+    @Argument(help: "Files to scan. Standard input when omitted.")
+    var paths: [String] = []
+
+    @Flag(name: .long, help: "Report personal data too: emails, phone and card numbers, public IPs, user names.")
+    var personal = false
+
+    @Flag(name: .long, help: "Also have the model look for what rules cannot recognise. About 2 s per 4 KiB.")
+    var thorough = false
+
+    @Option(name: [.short, .customLong("model")], help: "Model for --thorough. Defaults to config.json.")
+    var model: String?
+
+    @Flag(name: .long, help: "Print the reports as JSON, one per line.")
+    var json = false
+
+    func run() async throws {
+        let session = try Wisp.begin(.init(entryPoint: .scan, model: try model.map(Wisp.parseModel)))
+        defer { session.end() }
+        let options = SecretScan.Options(categories: personal ? [.secret, .personal] : [.secret], thorough: thorough)
+        var found = false
+        for input in try Wisp.inputs(paths) {
+            let judge = thorough ? try Wisp.judge(session: session, prefix: "scan") : nil
+            let report = try await SecretScan(options: options, judge: judge).run(input.text, from: input.source)
+            session.audit.record(.secretScan, details: AuditEvent.Details.secretScan(report))
+            print(json ? ChatProtocol.encode("scan", report.json.objectValue ?? [:]) : report.rendered)
+            found = found || !report.findings.isEmpty
+        }
+        if found { throw ExitCode.failure }
+    }
+}
+
+/// Prints a file or standard input with credentials and personal data replaced by numbered markers.
+struct Redact: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Redact credentials and personal data from text.",
+        discussion:
+            "Reads a file, or standard input, and prints it with each value replaced by a marker such as "
+            + "[REDACTED:email#1]; the same value gets the same marker. A summary goes to stderr.")
+
+    @Argument(help: "The file to redact. Standard input when omitted.")
+    var path: String?
+
+    @Flag(name: .long, help: "Replace credentials only and keep personal data.")
+    var secretsOnly = false
+
+    @Flag(name: .long, help: "Also have the model find names, addresses, and identifiers. About 2 s per 4 KiB.")
+    var thorough = false
+
+    @Option(name: [.short, .customLong("model")], help: "Model for --thorough. Defaults to config.json.")
+    var model: String?
+
+    func run() async throws {
+        let session = try Wisp.begin(.init(entryPoint: .redact, model: try model.map(Wisp.parseModel)))
+        defer { session.end() }
+        guard let input = try Wisp.inputs(path.map { [$0] } ?? []).first else { return }
+        let options = Redaction.Options(
+            categories: secretsOnly ? [.secret] : [.secret, .personal], thorough: thorough, maxOutputBytes: .max)
+        let judge = thorough ? try Wisp.judge(session: session, prefix: "redact") : nil
+        let report = try await Redaction(options: options, judge: judge).run(input.text, from: input.source)
+        session.audit.record(.redaction, details: AuditEvent.Details.redaction(report))
+        print(report.text, terminator: "")
+        FileHandle.standardError.write(Data((report.summary + "\n").utf8))
     }
 }
 

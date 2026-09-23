@@ -131,6 +131,12 @@ public struct WispServer: Sendable {
             case ToolCatalog.summariseDiff.name:
                 let request = try SummariseDiffRequest(arguments: params.arguments)
                 result = await summariseDiff(request)
+            case ToolCatalog.scanSecrets.name:
+                let request = try ScanSecretsRequest(arguments: params.arguments)
+                result = await scanSecrets(request)
+            case ToolCatalog.redact.name:
+                let request = try RedactRequest(arguments: params.arguments)
+                result = await redact(request)
             case ToolCatalog.closeThread.name:
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
@@ -304,6 +310,60 @@ public struct WispServer: Sendable {
                 isError: false)
         } catch {
             return failure(String(describing: error))
+        }
+    }
+
+    /// Captures the output on a conversation of its own, scans it, and returns the findings masked; the
+    /// conversation records `secrets.scan` with the kinds found and never a value.
+    private func scanSecrets(_ request: ScanSecretsRequest) async -> CallTool.Result {
+        await condense(prefix: "scan", source: request.source, model: request.model) { conversation, text in
+            let judge = request.options.thorough ? self.judge(on: conversation, schema: ModelSweep.schemaJSON) : nil
+            let report = try await SecretScan(options: request.options, judge: judge).run(text, from: request.source)
+            conversation.audit.record(.secretScan, details: AuditEvent.Details.secretScan(report))
+            return (report.rendered, report.json)
+        }
+    }
+
+    /// Captures the output on a conversation of its own and returns it redacted; the conversation records
+    /// `redaction` with the counts replaced.
+    private func redact(_ request: RedactRequest) async -> CallTool.Result {
+        await condense(prefix: "redact", source: request.source, model: request.model) { conversation, text in
+            let judge = request.options.thorough ? self.judge(on: conversation, schema: ModelSweep.schemaJSON) : nil
+            let report = try await Redaction(options: request.options, judge: judge).run(text, from: request.source)
+            conversation.audit.record(.redaction, details: AuditEvent.Details.redaction(report))
+            return (report.summary + "\n\n" + report.text, report.json)
+        }
+    }
+
+    /// Opens a conversation `<prefix>-<id>` with no tools, captures `source` through its runner and gate,
+    /// and hands the text to `body`, which returns the text and structured content of the result.
+    private func condense(
+        prefix: String, source: Triage.Source, model: ModelSelection?,
+        _ body: (Conversation, String) async throws -> (text: String, json: JSONValue)
+    ) async -> CallTool.Result {
+        do {
+            let conversation = try session.conversation(
+                id: "\(prefix)-" + ShortID.make(), approver: approver, tools: .none, model: model)
+            defer { conversation.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed")) }
+            let runner = CommandRunner(
+                options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+            let captured = try await Triage.capture(
+                source, runner: runner, gate: conversation.gate, maxOutputBytes: Triage.Options().maxOutputBytes)
+            let result = try await body(conversation, captured.text)
+            let structured: Value? = Value(json: result.json)
+            return .init(
+                content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,
+                isError: false)
+        } catch {
+            return failure(String(describing: error))
+        }
+    }
+
+    /// A judge that answers each prompt in a fresh turn on `conversation`, shaped by `schema`.
+    private func judge(on conversation: Conversation, schema: JSONValue) -> Triage.Judge {
+        let makeAgent = makeTriageAgent
+        return { prompt in
+            try await makeAgent(conversation).respond(to: prompt, schema: try OutputSchema(json: schema)).text
         }
     }
 

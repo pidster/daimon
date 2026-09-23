@@ -214,6 +214,47 @@ audited as `notification` with source `user`. Exits non-zero with the reason whe
 make test && wisp notify "Tests pass" --title "Build" --sound
 ```
 
+### `wisp scan [<file>…]`
+
+Scans files, or standard input, for credentials and prints each finding's location, kind, and a masked
+preview; the value is never printed. A unified diff is scanned by its added lines and located as
+`path:line`, so a pre-commit hook can check a commit before it is made. Exits 1 when anything is
+found, 0 otherwise. The rules are in [ADR 0031](decisions/0031-secret-scanning-and-redaction.md); they
+are a best effort, not a guarantee.
+
+| Flag | Meaning |
+| --- | --- |
+| `--personal` | Report personal data too: emails, phone and card numbers, public IPs, addresses, private hostnames, user names. |
+| `--thorough` | Add the model's pass over the rule-redacted text, for names, customer numbers, and unusual credentials. Up to three turns per 4 KiB. |
+| `-m, --model <model>` | The model for `--thorough`. Defaults to `config.json`. |
+| `--json` | One JSON object per input, the shape `scan_secrets` returns ([mcp.md](mcp.md)). |
+
+```
+git diff --cached | wisp scan        # in .git/hooks/pre-commit: a finding fails the commit
+wisp scan --personal export.csv
+```
+
+Each input is audited as `secrets.scan` with the kinds found, never the values.
+
+### `wisp redact [<file>]`
+
+Prints a file, or standard input, with credentials and personal data replaced by numbered markers
+(`[REDACTED:email#1]`; the same value gets the same number) and a one-line summary on stderr. For text on
+its way to an issue, a chat, or a cloud model.
+
+| Flag | Meaning |
+| --- | --- |
+| `--secrets-only` | Replace credentials only and keep personal data. |
+| `--thorough` | Add the model's pass for names, addresses, and identifiers the rules cannot see. |
+| `-m, --model <model>` | The model for `--thorough`. Defaults to `config.json`. |
+
+```
+wisp redact crash.log | pbcopy
+wisp redact --thorough support-ticket.txt > ticket-clean.txt
+```
+
+Audited as `redaction` with the counts replaced per kind.
+
 ### `wisp approvals`
 
 `wisp approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, pattern

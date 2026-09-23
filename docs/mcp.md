@@ -241,7 +241,8 @@ gives ([ADR 0023](decisions/0023-condensing-tools.md)). Paths, change kinds, and
 from the diff headers and hunks, never from the model, and so are the flags the text proves: a deleted
 test file, a test disabled on an added line (`.disabled(`, `XCTSkip`, `@pytest.mark.skip`, `#[ignore]`
 and the like), a credential literal on an added line (known key prefixes, a private key block, or a
-secret-named assignment of a long string), and binary content. The model adds the headline, one line
+secret-named assignment of a long string, as `scan_secrets` finds them; the flag's note gives the kind
+and a masked preview, never the value), and binary content. The model adds the headline, one line
 per file, and any flag the rules miss; anything it says about a file the diff does not contain is
 dropped. Rules never remove a flag.
 
@@ -274,6 +275,63 @@ nothing about. Flag kinds: `deleted-test` (a test removed or disabled), `secret`
 `large`; a flag the model leaves pathless lands on the chunk's only file when it had one. Each summary is its own audited session (`summarise-<id>`), so
 `wisp://audit/summarise-<id>` shows what the model saw. The measured result is in
 [measurements.md](measurements.md).
+
+### `scan_secrets`
+
+Scan a command's output or a file on this Mac for credentials, and optionally personal data, and get
+back where they are with the values masked. Rules find shapes that are credentials by construction
+(provider key prefixes, private key blocks, a password in a URL, secret-named assignments with a real
+looking value); `thorough` adds the on-device model's pass over the rule-redacted text for what rules
+cannot recognise ([ADR 0031](decisions/0031-secret-scanning-and-redaction.md)). A unified diff is
+scanned by its added lines and located as `path:line` in the new file, so `git diff --cached` checks a
+commit before it is made. A best effort, not a guarantee.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | Shell command line whose output to scan, run as for `triage`. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+| `path` | string | one of | Absolute path of a file on this Mac; the read clears the gate as `read_file` does. |
+| `personal` | boolean | no | Report personal data too (emails, phone and card numbers, public IPs, addresses, private hostnames, user names). Default false. |
+| `thorough` | boolean | no | Add the model's pass: names, customer numbers, unusual credentials. Up to three turns per 4 KiB, about 2 s each. Default false. |
+| `model` | string | no | The model for the thorough pass, as for `respond`. |
+| `max_findings` | integer | no | Findings to return at most (default 50); `more` is true when some were dropped. |
+
+Result content is a headline and one `location  kind  preview` line per finding; `structuredContent`:
+
+```json
+{
+  "source": { "command": "git diff --cached", "workingDirectory": "/repo" }, "bytes": 2210, "diff": true,
+  "thorough": false, "chunks": null, "more": false,
+  "findings": [{ "kind": "github-token", "category": "secret", "location": "Sources/Client.swift:14",
+                 "preview": "ghp_…(40 chars)", "detector": "rule" }]
+}
+```
+
+`detector` is `rule` or `model`. The value itself is in neither the result nor the `secrets.scan` audit
+event. Each scan is its own audited session (`scan-<id>`).
+
+### `redact`
+
+Get a command's output or a file on this Mac back with credentials and personal data replaced by
+numbered markers such as `[REDACTED:email#1]` (the same value, the same number), so a log, crash report,
+or data file can be read without its secrets. Rules always run; `thorough` adds the model's pass, whose
+answers are only kept when they occur exactly in the text, and replacing them is done by wisp, never by
+the model ([ADR 0031](decisions/0031-secret-scanning-and-redaction.md)).
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | Shell command line whose output to redact, run as for `triage`; narrow it yourself (`tail -500 app.log`). |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+| `path` | string | one of | Absolute path of a file on this Mac; the read clears the gate as `read_file` does. |
+| `secrets_only` | boolean | no | Replace credentials and keep personal data. Default false. |
+| `thorough` | boolean | no | Add the model's pass for names, addresses, and identifiers. Default false. |
+| `model` | string | no | The model for the thorough pass, as for `respond`. |
+| `max_bytes` | integer | no | Bytes of redacted text to return at most (default 32768); `truncated` is true when it was cut. |
+
+Result content is a summary line, a blank line, and the redacted text; `structuredContent` has `source`,
+`bytes`, `text`, `truncated`, `thorough`, `chunks`, and `replaced` (occurrences per kind). Each
+redaction is its own audited session (`redact-<id>`); the `redaction` event records the counts only.
+The measured result of the thorough pass is in [measurements.md](measurements.md).
 
 ### `close_thread`
 

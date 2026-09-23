@@ -7,7 +7,10 @@ import WispCore
 
 @Suite struct ToolCatalogTests {
     @Test func advertisesRespondAndRunCommand() {
-        #expect(ToolCatalog.all.map(\.name) == ["respond", "triage", "summarise_diff", "close_thread"])
+        #expect(
+            ToolCatalog.all.map(\.name) == [
+                "respond", "triage", "summarise_diff", "scan_secrets", "redact", "close_thread",
+            ])
     }
 
     @Test func everyToolHasAnObjectSchemaWithRequiredFields() {
@@ -126,5 +129,25 @@ import WispCore
         ] {
             #expect(throws: MCPError.self, "\(bad)") { try TriageRequest(arguments: bad) }
         }
+    }
+
+    @Test func scanAndRedactArgumentsDecodeWithDefaults() throws {
+        let scan = try ScanSecretsRequest(arguments: ["command": .string("git diff --cached")])
+        #expect(scan.options == SecretScan.Options())
+        let full = try ScanSecretsRequest(arguments: [
+            "path": .string("/tmp/x"), "personal": .bool(true), "thorough": .bool(true), "max_findings": .int(5),
+        ])
+        #expect(full.options == SecretScan.Options(categories: [.secret, .personal], thorough: true, maxFindings: 5))
+        #expect(throws: MCPError.self) {
+            try ScanSecretsRequest(arguments: ["path": .string("/x"), "personal": .string("y")])
+        }
+        #expect(throws: MCPError.self) { try ScanSecretsRequest(arguments: [:]) }
+        let redact = try RedactRequest(arguments: ["path": .string("/tmp/x")])
+        #expect(redact.options == Redaction.Options())
+        let narrow = try RedactRequest(arguments: [
+            "path": .string("/tmp/x"), "secrets_only": .bool(true), "max_bytes": .int(100),
+        ])
+        #expect(narrow.options.categories == [.secret] && narrow.options.maxOutputBytes == 100)
+        #expect(throws: MCPError.self) { try RedactRequest(arguments: ["path": .string("/x"), "max_bytes": .int(0)]) }
     }
 }

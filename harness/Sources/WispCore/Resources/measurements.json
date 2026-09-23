@@ -17,6 +17,14 @@
     "total" : 30
   },
   {
+    "date" : "2026-09-23",
+    "model" : "system",
+    "notes" : "thorough redaction (rules, then the model) of a ticket, a log, and a note holding names, an account number, a user id, an address, and a private hostname, plus build output and a stack trace that must come through intact; a pass is every value replaced and every kept phrase unchanged",
+    "passed" : 5,
+    "task" : "redact.thorough",
+    "total" : 5
+  },
+  {
     "date" : "2026-09-22",
     "model" : "system",
     "notes" : "classify a code snippet into an enum through a schema; a pass parses and names the language",

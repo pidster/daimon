@@ -55,7 +55,7 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
     @Test func listsToolsAndResourcesOverTheProtocol() async throws {
         let pair = try await connected()
         let tools = try await pair.client.listTools().tools
-        #expect(tools.map(\.name) == ["respond", "triage", "summarise_diff", "close_thread"])
+        #expect(tools.map(\.name) == ["respond", "triage", "summarise_diff", "scan_secrets", "redact", "close_thread"])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
         let resources = try await pair.client.listResources().resources
         #expect(
@@ -325,6 +325,41 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         let session = pair.sink.events.filter { $0.session.hasPrefix("summarise-") }
         #expect(session.first?.kind == .sessionStart && session.last?.kind == .sessionEnd)
         await #expect(throws: MCPError.self) { _ = try await call(pair.client, "summarise_diff", [:]) }
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func scanSecretsAndRedactReportMaskedAndReplaceOverTheProtocol() async throws {
+        // Two model turns: the thorough redaction's sweep finds a name the rules cannot, then, asked again
+        // with the name hidden, nothing more.
+        let pair = try await connected(triageSteps: [
+            .say(#"{"items":[{"text":"Jane Doe","kind":"name"}]}"#), .say(#"{"items":[]}"#),
+        ])
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-wire-scan-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let token = "ghp_" + String(repeating: "aB3", count: 12)
+        let log = dir.appending(path: "app.log")
+        try Data("Jane Doe <jane@acme.co>\ntoken=\(token)\n".utf8).write(to: log)
+        let scan = try await call(pair.client, "scan_secrets", ["path": .string(log.path)])
+        #expect(scan.isError == false, "\(scan)")
+        let finding = scan.structuredContent?.objectValue?["findings"]?.arrayValue?.first?.objectValue
+        #expect(finding?["kind"] == .string("github-token") && finding?["location"] == .string("\(log.path):2"))
+        guard case .text(let scanText, _, _)? = scan.content.first else { Issue.record("no text"); return }
+        #expect(!scanText.contains(token) && scanText.hasPrefix("1 finding in "))
+        let recorded = pair.sink.events.first { $0.kind == .secretScan }
+        #expect(recorded?.details["kinds"] == ["github-token": 1] && recorded?.session.hasPrefix("scan-") == true)
+        let redacted = try await call(pair.client, "redact", ["path": .string(log.path), "thorough": .bool(true)])
+        #expect(redacted.isError == false, "\(redacted)")
+        let text = redacted.structuredContent?.objectValue?["text"]?.stringValue ?? ""
+        #expect(text == "[REDACTED:name#1] <[REDACTED:email#1]>\ntoken=[REDACTED:github-token#1]\n", "\(text)")
+        #expect(redacted.structuredContent?.objectValue?["chunks"] == .int(1))
+        // Neither the results nor the audit records of either call carry the token.
+        let events = pair.sink.events.filter { $0.session.hasPrefix("scan-") || $0.session.hasPrefix("redact-") }
+        #expect(
+            events.first { $0.kind == .redaction }?.details["replaced"] == ["email": 1, "github-token": 1, "name": 1])
+        #expect(!events.contains { $0.kind != .commandOutcome && "\($0.details)".contains(token) })
+        await #expect(throws: MCPError.self) { _ = try await call(pair.client, "redact", [:]) }
         await pair.client.disconnect()
         await pair.server.stop()
     }

@@ -4,6 +4,23 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `wisp scan` and the MCP tool `scan_secrets`: find credentials, and with `--personal` personal data, in
+  files, standard input, or a command's output, reported with masked previews. A diff is scanned by its
+  added lines as `path:line`, so `git diff --cached | wisp scan` works as a pre-commit check; exits 1 on
+  a finding.
+- `wisp redact` and the MCP tool `redact`: text with credentials and personal data replaced by numbered
+  markers such as `[REDACTED:email#1]`. `--thorough` adds the on-device model for names, addresses, and
+  identifiers, over text the rules have already redacted.
+
+Fixed:
+
+- `summarise_diff`'s `secret` flag quoted the start of the added line, handing the credential to the
+  caller; it now gives the kind and a masked preview.
+
 ## 0.8.3
 
 Added:

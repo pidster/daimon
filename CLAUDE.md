@@ -14,8 +14,8 @@ Claude Code-only guidance below the import, and harness-neutral guidance to `AGE
   diagnostics for both languages. The binaries are not installed by the plugin: `sourcekit-lsp` comes
   with Xcode (`xcrun --find sourcekit-lsp`) and `rust-analyzer` from `rustup component add rust-analyzer`
   or Homebrew. A fresh clone needs both on `PATH` and a restart of Claude Code; `/plugin` shows errors.
-- wisp's tools are `mcp__wisp__respond`, `mcp__wisp__triage`, `mcp__wisp__summarise_diff`, and
-  `mcp__wisp__close_thread`; its resources are read with the MCP resource tools. If the session starts with the `wisp` server failed to connect, follow the
+- wisp's tools are `mcp__wisp__respond`, `mcp__wisp__triage`, `mcp__wisp__summarise_diff`,
+  `mcp__wisp__scan_secrets`, `mcp__wisp__redact`, and `mcp__wisp__close_thread`; its resources are read with the MCP resource tools. If the session starts with the `wisp` server failed to connect, follow the
   release-build note in `AGENTS.md` and then `/mcp`.
 - `/mcp reconnect wisp` clears a stuck approval dialog; retry the turn afterwards.
 - Use `AskUserQuestion` when a decision is the user's to make. It is Claude Code's dialog; wisp's own

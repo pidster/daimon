@@ -145,6 +145,24 @@ extension AuditEvent {
             ["tool": .string(tool), "isError": .bool(isError), "text": .string(text), "seconds": .double(seconds)]
         }
 
+        /// `secrets.scan`: where, how much, and what kinds were found, never a value or a preview.
+        public static func secretScan(_ report: SecretScan.Report) -> [String: JSONValue] {
+            [
+                "source": Condensing.json(report.source), "bytes": .int(report.bytes), "diff": .bool(report.diff),
+                "thorough": .bool(report.chunks != nil), "findings": .int(report.findings.count),
+                "kinds": .object(report.kinds.mapValues { .int($0) }),
+            ]
+        }
+
+        /// `redaction`: where, how much, and how many values of each kind were replaced.
+        public static func redaction(_ report: Redaction.Report) -> [String: JSONValue] {
+            [
+                "source": Condensing.json(report.source), "bytes": .int(report.bytes),
+                "bytesOut": .int(report.text.utf8.count), "truncated": .bool(report.truncated),
+                "thorough": .bool(report.chunks != nil), "replaced": .object(report.counts.mapValues { .int($0) }),
+            ]
+        }
+
         /// `notification`: what was asked to be shown, by whom, and whether it was.
         public static func notification(
             title: String, body: String, source: String, outcome: Notifier.Outcome
@@ -237,6 +255,8 @@ extension AuditEvent {
         case .commandOutcome: ["command", "exitStatus", "timedOut", "truncated", "stdout", "stderr", "seconds"]
         case .fileWrite: ["path", "mode", "created", "bytesBefore", "bytesAfter"]
         case .notification: ["title", "body", "source", "outcome", "reason"]
+        case .secretScan: ["source", "bytes", "diff", "thorough", "findings", "kinds"]
+        case .redaction: ["source", "bytes", "bytesOut", "truncated", "thorough", "replaced"]
         case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount", "reason"]
         case .mcpRequest: ["tool", "arguments"]
         case .mcpResult: ["tool", "isError", "text", "seconds"]

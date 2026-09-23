@@ -11,6 +11,10 @@ public enum EntryPoint: String, Sendable, Codable, CaseIterable {
     case mcpThread = "mcp-thread"
     /// `wisp notify`, a person posting a notification.
     case notify
+    /// `wisp scan`, a scan for credentials and personal data.
+    case scan
+    /// `wisp redact`, text redacted on its way somewhere else.
+    case redact
 
     /// The entry point of a further conversation opened under this one.
     public var thread: EntryPoint {
