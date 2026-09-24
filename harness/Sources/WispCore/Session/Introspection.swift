@@ -65,6 +65,20 @@ public struct Introspection: Sendable {
                 "keepFiles": .int(config.auditLimits.keepFiles),
             ]),
             "maxThreads": .int(config.maxThreads),
+            "notifications": .object([
+                "enabled": .bool(config.notificationsEnabled), "perMinute": .int(config.notificationsPerMinute),
+            ]),
+            "tools": .object([
+                "disabled": .array(config.disabledTools.sorted().map { .string($0) }),
+                "custom": .array(
+                    config.customTools.map { tool in
+                        .object([
+                            "name": .string(tool.name), "command": .string(tool.command),
+                            "arguments": .array(tool.argumentNames.map { .string($0) }),
+                        ])
+                    }),
+            ]),
+            "routing": .object(["ladder": .array(config.routingLadder.map { .string($0.description) })]),
             "backends": .object(
                 Dictionary(
                     uniqueKeysWithValues: ModelBackends.all.map { ($0.scheme, $0.settings(in: config, home: home)) })),

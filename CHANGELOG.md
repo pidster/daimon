@@ -4,6 +4,13 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Fixed:
+
+- `wisp config` and the MCP resource `wisp://config` left out the `notifications`, `tools`, and
+  `routing` settings; they now show every setting.
+
 ## 0.10.0
 
 Added:

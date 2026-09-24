@@ -17,7 +17,15 @@ import Testing
         defer { try? FileManager.default.removeItem(at: home.root) }
         let config = Config(
             systemPromptExtension: "be terse", model: .ollama("q"), commandTimeoutSeconds: 5,
-            approval: .init(threshold: .never, useModel: false, timeoutSeconds: 0)
+            approval: .init(threshold: .never, useModel: false, timeoutSeconds: 0),
+            tools: .init(
+                disabled: ["notify"],
+                custom: [
+                    .init(
+                        name: "issue", description: "Shows an issue.", arguments: ["number": .init(type: "integer")],
+                        command: "gh issue view {number}")
+                ]),
+            routing: .init(ladder: [.system, .ollama("big")])
         ).resolved
         let views = Introspection(home: home, config: config)
         guard case .object(let top) = views.configuration else { Issue.record("shape"); return }
@@ -32,6 +40,10 @@ import Testing
         #expect(top["approval"]?.objectValue?["timeoutSeconds"] == 0)
         #expect(top["approval"]?.objectValue?["persistDays"] == 30)
         #expect(top["runCommand"]?.objectValue?["policy"]?.objectValue?["sandbox"]?.objectValue?["enabled"] == true)
+        #expect(top["notifications"]?.objectValue?["perMinute"] == 5)
+        #expect(top["tools"]?.objectValue?["disabled"] == ["notify"])
+        #expect(top["tools"]?.objectValue?["custom"]?.arrayValue?.first?.objectValue?["arguments"] == ["number"])
+        #expect(top["routing"]?.objectValue?["ladder"] == ["system", "ollama:big"])
         let text = Introspection.render(views.configuration)
         #expect(text.hasPrefix("{\n"))
         #expect(text.contains("\"deny\" : ["))
