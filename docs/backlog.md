@@ -50,6 +50,12 @@ for after them:
 - **Offline work.** wisp as the agent when there is no network: on a plane, or on a network that cannot
   reach a remote model. Mostly a matter of documenting and testing what already works without one.
 
+## Tools
+
+- Done 2026-09-24: custom tools, command templates declared in `~/.wisp/config.json`, and
+  `tools.disabled` for built-ins ([ADR 0036](decisions/0036-custom-tools.md)). Later, by decision:
+  tools from other MCP servers.
+
 ## Terminal front end
 
 Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Input history shipped 2026-09-23
@@ -74,6 +80,11 @@ Two things wait on a Developer ID or App Store signature rather than on code.
   signed App Store apps only ([backends.md](backends.md), "Private Cloud Compute").
 
 ## Models
+
+- Done 2026-09-24: routing by input size. A task with measured size bands picks the first model on the
+  configured `routing.ladder` trusted with an input that large; piloted on `draft_change`
+  ([ADR 0037](decisions/0037-routing-by-input-size.md)). Next: size bands for `triage` and the redaction
+  pass, and more cases per band.
 
 - Done 2026-09-19: `ollama:<name>` models through a wisp-supplied executor
   ([ADR 0016](decisions/0016-local-runtimes-through-an-executor.md)).
