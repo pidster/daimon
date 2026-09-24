@@ -57,7 +57,8 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         let tools = try await pair.client.listTools().tools
         #expect(
             tools.map(\.name) == [
-                "respond", "triage", "summarise_diff", "scan_secrets", "redact", "condense_log", "json_shape",
+                "respond", "triage", "summarise_diff", "draft_change", "scan_secrets", "redact", "condense_log",
+                "json_shape",
                 "close_thread",
             ])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
@@ -416,6 +417,35 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(pair.sink.events.contains { $0.session.hasPrefix("log-") && $0.kind == .sessionStart })
         #expect(pair.sink.events.contains { $0.session.hasPrefix("shape-") && $0.kind == .sessionEnd })
         #expect(!pair.sink.events.contains { $0.session.hasPrefix("log-") && $0.kind == .prompt })
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func draftChangeSummarisesThenWritesOverTheProtocol() async throws {
+        let pair = try await connected(triageSteps: [
+            .say(
+                #"{"headline":"Adds retry","files":[{"path":"Sources/Upload.swift","summary":"retries"}],"flags":[]}"#),
+            .say(#"{"subject":"retry failed uploads.","points":["Calls retry twice"]}"#),
+        ])
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-wire-draft-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let diff = dir.appending(path: "change.diff")
+        try Data(
+            "diff --git a/Sources/Upload.swift b/Sources/Upload.swift\n--- a/Sources/Upload.swift\n+++ b/Sources/Upload.swift\n@@ -1 +1,2 @@\n func upload() {\n+    retry(2)\n"
+                .utf8
+        ).write(to: diff)
+        let result = try await call(
+            pair.client, "draft_change", ["kind": .string("commit"), "path": .string(diff.path)])
+        #expect(result.isError == false, "\(result)")
+        #expect(result.structuredContent?.objectValue?["subject"] == "Retry failed uploads")
+        guard case .text(let text, _, _)? = result.content.first else { Issue.record("no text"); return }
+        #expect(text.hasPrefix("Retry failed uploads\n\n- Calls retry twice"))
+        #expect(pair.sink.events.filter { $0.session.hasPrefix("draft-") && $0.kind == .prompt }.count == 2)
+        let empty = dir.appending(path: "empty.diff")
+        try Data().write(to: empty)
+        let nothing = try await call(pair.client, "draft_change", ["kind": .string("pr"), "path": .string(empty.path)])
+        #expect(nothing.isError == true)
         await pair.client.disconnect()
         await pair.server.stop()
     }

@@ -1,9 +1,9 @@
 # wisp as an MCP server
 
 `wisp mcp` speaks the Model Context Protocol over stdio, so other agent harnesses can delegate work to the
-on-device model. It advertises `respond`; six condensing tools that keep raw material on the Mac and
-return a small result (`triage`, `summarise_diff`, `scan_secrets`, `redact`, `condense_log`,
-`json_shape`); and `close_thread`. wisp's own tools (`run_command`, `read_file`, `system_info`, and the
+on-device model. It advertises `respond`; seven condensing tools that keep raw material on the Mac and
+return a small result (`triage`, `summarise_diff`, `draft_change`, `scan_secrets`, `redact`,
+`condense_log`, `json_shape`); and `close_thread`. wisp's own tools (`run_command`, `read_file`, `system_info`, and the
 rest) are not exposed directly; they are reachable only by asking `respond` to use them, so every command runs under the model's policy, sandbox, and approval with the audit trail of a
 turn ([ADR 0006](decisions/0006-mcp-server-over-stdio.md), amended). Stdout is the protocol channel; diagnostics go to stderr. The
 server runs until the client closes stdin.
@@ -276,6 +276,27 @@ nothing about. Flag kinds: `deleted-test` (a test removed or disabled), `secret`
 `large`; a flag the model leaves pathless lands on the chunk's only file when it had one. Each summary is its own audited session (`summarise-<id>`), so
 `wisp://audit/summarise-<id>` shows what the model saw. The measured result is in
 [measurements.md](measurements.md).
+
+### `draft_change`
+
+Draft a commit message, a pull request description, or a changelog line from a diff on this Mac. The
+diff is summarised per file as for `summarise_diff`, then written from that summary in one more turn;
+the subject is kept to 72 characters, capitalised, without a trailing period, and a commit body ends
+with `Why: <…>` for the reason, which a diff cannot give ([ADR 0035](decisions/0035-change-drafts.md)).
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `kind` | string | yes | `commit`, `pr`, or `changelog`. |
+| `command` | string | no | A command that prints the diff, run as for `triage`. Default: `git diff --cached`. |
+| `working_directory` | string | no | The repository. Default: wisp's. |
+| `path` | string | no | A diff file on this Mac, instead of a command. |
+| `model` | string | no | The model, as for `respond`. |
+
+Result content is the draft as it would be pasted; `structuredContent` is `{ "kind", "subject", "body":
+[…], "flags": […], "text" }`, plus `exitStatus` for a command. An empty diff is an error. The system
+model drafts small changes well and large ones poorly; for a change of many files pass a larger local
+model, such as `model: ollama:qwen3.8:27b`. The measured
+result is in [measurements.md](measurements.md).
 
 ### `scan_secrets`
 

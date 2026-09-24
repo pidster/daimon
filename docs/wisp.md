@@ -255,6 +255,21 @@ wisp redact --thorough support-ticket.txt > ticket-clean.txt
 
 Audited as `redaction` with the counts replaced per kind.
 
+### `wisp draft [commit|pr|changelog]`
+
+Drafts a commit message (the default), a pull request description, or a changelog line from a diff piped
+to it, or from `git diff --cached` run here under the policy, sandbox, and approval. The model summarises
+the diff per file and writes from the summary; the subject is kept to 72 characters, and a commit body
+ends with `Why: <…>` for you to replace ([ADR 0035](decisions/0035-change-drafts.md)). `-m, --model`
+chooses the model: the system model drafts small changes well, and a larger local model such as
+`ollama:qwen3.8:27b` does much better on a change of many files. `-y, --yes` approves running `git diff`
+without asking. An empty diff is refused.
+
+```
+wisp draft > /tmp/msg && $EDITOR /tmp/msg && git commit -F /tmp/msg
+git diff main... | wisp draft pr
+```
+
 ### `wisp watch <command>`
 
 Runs a command at once, then again each time a file changes under the watched paths and, with `--every`,

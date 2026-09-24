@@ -188,7 +188,7 @@ than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 
 `WispMCP.WispServer` serves stdio MCP (`wisp mcp`) through `CompatibilityTransport`, which
 normalises messages the SDK cannot decode although the protocol allows them (see `docs/mcp.md`). It advertises `respond`, the condensing tools (`triage`,
-`summarise_diff`, `scan_secrets`, `redact`, `condense_log`, `json_shape`), and `close_thread` from `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; wisp's own tools
+`summarise_diff`, `draft_change`, `scan_secrets`, `redact`, `condense_log`, `json_shape`), and `close_thread` from `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; wisp's own tools
 are reachable only through `respond`, and are described to clients by the `wisp://tools` resources,
 generated from `ToolRegistry.descriptions` (schema from each tool's `GenerationSchema`, limits and example
 prompt from the tool's own `WispTool` conformance, so a changed default shows up in the catalogue).
@@ -211,6 +211,8 @@ with `wisp scan` and `wisp redact` ([ADR 0031](decisions/0031-secret-scanning-an
 and ranking for logs, a parsed `.ips` for crashes, a merged outline for JSON
 ([ADR 0032](decisions/0032-log-and-json-condensers.md)). The server's `condense` helper gives every
 condensing tool its conversation, runner, gate, and capture.
+`draft_change` and `wisp draft` are `ChangeDraft`: a `DiffSummary` report, then one schema-shaped turn,
+with the subject and body shape applied in code ([ADR 0035](decisions/0035-change-drafts.md)).
 `system_info` (`SystemInfo`, `ProcessTable`) answers questions about the Mac from fixed read-only probes
 through the conversation's runner without the gate, and from `libproc` for processes, since Seatbelt
 will not run the setuid `ps` ([ADR 0034](decisions/0034-system-info.md)).

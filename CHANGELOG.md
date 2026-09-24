@@ -8,6 +8,9 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- `wisp draft [commit|pr|changelog]` and the MCP tool `draft_change`: a commit message, a pull request
+  description, or a changelog line drafted from a diff (the staged one by default), with the subject kept
+  under 72 characters and a `Why:` line left for the reason.
 - `condense_log` reads this Mac's unified log with `last` (such as `10m`), optionally for one `process`
   or `subsystem`, in wisp's own process: `/usr/bin/log` refuses to run in any sandbox.
 

@@ -333,6 +333,46 @@ public enum ToolCatalog {
         annotations: .init(title: "Outline JSON", readOnlyHint: false, openWorldHint: false)
     )
 
+    /// Drafts a commit message, a pull request description, or a changelog line from a diff.
+    public static let draftChange = Tool(
+        name: "draft_change",
+        description:
+            "Draft a commit message, a pull request description, or a changelog line from a diff on this Mac "
+            + "(default: git diff --cached). The on-device model summarises the diff per file, then writes from "
+            + "that summary; the subject is kept under 72 characters and the commit body ends with a line for the "
+            + "reason, which a diff cannot give. Review and edit before use.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object([
+                "kind": .object([
+                    "type": .string("string"),
+                    "enum": .array([.string("commit"), .string("pr"), .string("changelog")]),
+                    "description": .string("What to draft."),
+                ]),
+                "command": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Command that prints the diff, run under wisp's policy, sandbox, and approval. Default: "
+                            + "git diff --cached."),
+                ]),
+                "working_directory": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute directory of the repository. Default: wisp's."),
+                ]),
+                "path": .object([
+                    "type": .string("string"),
+                    "description": .string("Absolute path of a diff file on this Mac to use instead."),
+                ]),
+                "model": .object([
+                    "type": .string("string"),
+                    "description": .string("Model to write with; as for respond. Default: the configured one."),
+                ]),
+            ]),
+            "required": .array([.string("kind")]),
+        ]),
+        annotations: .init(title: "Draft a commit message or PR", readOnlyHint: false, openWorldHint: false)
+    )
+
     /// Ends a conversation thread and frees its model session.
     public static let closeThread = Tool(
         name: "close_thread",
@@ -352,7 +392,7 @@ public enum ToolCatalog {
 
     /// Every tool, in the order clients see them.
     public static var all: [Tool] {
-        [respond, triage, summariseDiff, scanSecrets, redact, condenseLog, jsonShape, closeThread]
+        [respond, triage, summariseDiff, draftChange, scanSecrets, redact, condenseLog, jsonShape, closeThread]
     }
 
     /// URI of the JSON resource describing the model's tools.
@@ -705,6 +745,36 @@ public struct JSONShapeRequest: Equatable, Sendable {
         options = JSONShape.Options(
             maxDepth: try CondensingRequest.count(arguments, "max_depth", fallback: JSONShape.Options().maxDepth),
             examples: try CondensingRequest.flag(arguments, "examples", fallback: true))
+    }
+}
+
+/// Decoded arguments for the `draft_change` tool.
+public struct DraftChangeRequest: Equatable, Sendable {
+    /// What to draft.
+    public var kind: ChangeDraft.Kind
+    /// Where the diff comes from; `git diff --cached` when the call names neither a command nor a path.
+    public var source: Triage.Source
+    /// Model for the summarising and writing turns; nil means the server default.
+    public var model: ModelSelection?
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` for a missing or unknown `kind`, or as `CondensingRequest`.
+    public init(arguments: [String: Value]?) throws {
+        guard let text = arguments?["kind"]?.stringValue, let kind = ChangeDraft.Kind(rawValue: text) else {
+            throw MCPError.invalidParams("'kind' is required: commit, pr, or changelog")
+        }
+        self.kind = kind
+        if arguments?["command"] == nil, arguments?["path"] == nil {
+            var defaulted = arguments ?? [:]
+            defaulted["command"] = .string("git diff --cached")
+            let shared = try CondensingRequest(arguments: defaulted)
+            (source, model) = (shared.source, shared.model)
+        } else {
+            let shared = try CondensingRequest(arguments: arguments)
+            (source, model) = (shared.source, shared.model)
+        }
     }
 }
 

@@ -131,6 +131,9 @@ public struct WispServer: Sendable {
             case ToolCatalog.summariseDiff.name:
                 let request = try SummariseDiffRequest(arguments: params.arguments)
                 result = await summariseDiff(request)
+            case ToolCatalog.draftChange.name:
+                let request = try DraftChangeRequest(arguments: params.arguments)
+                result = await draftChange(request)
             case ToolCatalog.scanSecrets.name:
                 let request = try ScanSecretsRequest(arguments: params.arguments)
                 result = await scanSecrets(request)
@@ -340,6 +343,17 @@ public struct WispServer: Sendable {
             let report = try await Redaction(options: request.options, judge: judge).run(text, from: request.source)
             conversation.audit.record(.redaction, details: AuditEvent.Details.redaction(report))
             return (report.summary + "\n\n" + report.text, report.json)
+        }
+    }
+
+    /// Summarises the diff per file, then drafts from the summary, on one conversation `draft-<id>`.
+    private func draftChange(_ request: DraftChangeRequest) async -> CallTool.Result {
+        await condense(prefix: "draft", source: request.source, model: request.model) { conversation, captured in
+            let draft = try await ChangeDraft.draft(
+                request.kind, from: captured, source: request.source,
+                summarise: judge(on: conversation, schema: DiffSummary.schemaJSON),
+                write: judge(on: conversation, schema: ChangeDraft.schemaJSON))
+            return (draft.text, draft.json)
         }
     }
 

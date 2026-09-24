@@ -8,6 +8,14 @@
     "total" : 47
   },
   {
+    "date" : "2026-09-24",
+    "model" : "system",
+    "notes" : "commit subjects for five small diffs (a retry loop, a default changed, a new flag, an off-by-one fix, a docs addition), twice each; a pass is a subject naming what the change is about",
+    "passed" : 9,
+    "task" : "draft_change.commit",
+    "total" : 10
+  },
+  {
     "date" : "2026-09-22",
     "model" : "system",
     "notes" : "read a small file with read_file, then rewrite one numbered line with edit_file, ten files attempted three times each; a pass is the file ending up exactly as intended",

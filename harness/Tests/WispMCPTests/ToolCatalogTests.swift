@@ -9,7 +9,8 @@ import WispCore
     @Test func advertisesRespondAndRunCommand() {
         #expect(
             ToolCatalog.all.map(\.name) == [
-                "respond", "triage", "summarise_diff", "scan_secrets", "redact", "condense_log", "json_shape",
+                "respond", "triage", "summarise_diff", "draft_change", "scan_secrets", "redact", "condense_log",
+                "json_shape",
                 "close_thread",
             ])
     }
@@ -171,5 +172,14 @@ import WispCore
         #expect(throws: MCPError.self) {
             try JSONShapeRequest(arguments: ["path": .string("/x"), "examples": .int(1)])
         }
+    }
+
+    @Test func draftChangeDefaultsToTheStagedDiff() throws {
+        let staged = try DraftChangeRequest(arguments: ["kind": .string("commit"), "working_directory": .string("/r")])
+        #expect(staged.kind == .commit && staged.source == .command("git diff --cached", workingDirectory: "/r"))
+        let file = try DraftChangeRequest(arguments: ["kind": .string("pr"), "path": .string("/x.diff")])
+        #expect(file.source == .path("/x.diff"))
+        #expect(throws: MCPError.self) { try DraftChangeRequest(arguments: ["kind": .string("poem")]) }
+        #expect(throws: MCPError.self) { try DraftChangeRequest(arguments: [:]) }
     }
 }

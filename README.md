@@ -17,7 +17,7 @@ It has two faces:
   above a pinned input and status line.
 - **An MCP server.** Other agent harnesses such as Claude Code or Codex can hand it self-contained work to do
   locally: run a build and return only its failures, condense a log or a large JSON file, scan or redact
-  text, summarise a diff, classify some text.
+  text, summarise a diff or draft its commit message, classify some text.
 
 It is deliberately a *microharness*: the smallest correct agent loop, not a framework. What makes it worth
 using is the care around that loop. Every command the model wants to run passes a deny list, runs inside a

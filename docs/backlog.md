@@ -45,8 +45,8 @@ for after them:
 
 - **Bulk classification.** Label hundreds of commits, issues, or log lines into categories with
   structured output (ADR 0022): too cheap a job for a remote model, and measurable with the eval harness.
-- **Git chores.** Commit message drafts, PR descriptions, and changelog lines from a diff;
-  `summarise_diff` already produces most of what they need.
+- Done 2026-09-24: **git chores.** `draft_change` and `wisp draft`: commit messages, PR descriptions,
+  and changelog lines from a diff ([ADR 0035](decisions/0035-change-drafts.md)).
 - **Offline work.** wisp as the agent when there is no network: on a plane, or on a network that cannot
   reach a remote model. Mostly a matter of documenting and testing what already works without one.
 

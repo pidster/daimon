@@ -17,7 +17,7 @@ struct Wisp: AsyncParsableCommand {
         subcommands: [
             Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
             DoctorCommand.self,
-            Approvals.self, Notify.self, Scan.self, Redact.self, Watch.self,
+            Approvals.self, Notify.self, Scan.self, Redact.self, Watch.self, Draft.self,
         ],
         defaultSubcommand: Respond.self
     )
@@ -627,6 +627,58 @@ struct Redact: AsyncParsableCommand {
 }
 
 extension Watcher.NotifyPolicy: ExpressibleByArgument {}
+extension ChangeDraft.Kind: ExpressibleByArgument {}
+
+/// Drafts a commit message, PR description, or changelog line from the staged diff or a piped one.
+struct Draft: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Draft a commit message, a PR description, or a changelog line from a diff.",
+        discussion:
+            "Reads a diff piped to it, or runs git diff --cached here. The model summarises it per file, then "
+            + "writes from the summary. Review the draft; a commit body ends with a line for the reason to replace. For example: "
+            + "wisp draft > /tmp/msg && $EDITOR /tmp/msg && git commit -F /tmp/msg")
+
+    @Argument(help: "commit (default), pr, or changelog.")
+    var kind: ChangeDraft.Kind = .commit
+
+    @Option(name: [.short, .customLong("model")], help: "Model to write with. Defaults to config.json.")
+    var model: String?
+
+    @Flag(name: [.short, .long], help: "Approve running git diff without asking.")
+    var yes = false
+
+    func run() async throws {
+        let session = try Wisp.begin(
+            .init(entryPoint: .draft, model: try model.map(Wisp.parseModel), autoApprove: yes))
+        defer { session.end() }
+        let conversation = try session.conversation(
+            id: "draft-" + ShortID.make(), approver: TerminalApprover(style: .plain), tools: .none)
+        let directory = FileManager.default.currentDirectoryPath
+        let source: Triage.Source
+        let captured: Triage.Captured
+        if isatty(STDIN_FILENO) == 0 {
+            source = .path("standard input")
+            captured = Triage.Captured(
+                text: String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self))
+        } else {
+            source = .command("git diff --cached", workingDirectory: directory)
+            let runner = CommandRunner(
+                options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+            captured = Triage.Captured(try await runner.run("git diff --cached", in: directory))
+        }
+        let summarySchema = try OutputSchema(json: DiffSummary.schemaJSON)
+        let draftSchema = try OutputSchema(json: ChangeDraft.schemaJSON)
+        do {
+            let draft = try await ChangeDraft.draft(
+                kind, from: captured, source: source,
+                summarise: { try await conversation.openAgent().respond(to: $0, schema: summarySchema).text },
+                write: { try await conversation.openAgent().respond(to: $0, schema: draftSchema).text })
+            print(draft.text)
+        } catch let failure as ChangeDraft.Failure {
+            throw ValidationError("\(failure)")
+        }
+    }
+}
 
 /// Reruns a command as files change or on an interval, and notifies when its outcome turns.
 struct Watch: AsyncParsableCommand {
