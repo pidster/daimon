@@ -336,7 +336,7 @@ The measured result of the thorough pass is in [measurements.md](measurements.md
 
 ### `condense_log`
 
-Condense a log on this Mac (an app's log, CI output, `/usr/bin/log show`) to its distinct messages,
+Condense a log on this Mac (an app's log, CI output, the unified log) to its distinct messages,
 without a model ([ADR 0032](decisions/0032-log-and-json-condensers.md)). Each line becomes a template:
 the leading timestamp is removed and numbers, hex, UUIDs, long ids, and `log show`'s `[pid:thread]` are
 replaced by `<n>`, `<hex>`, `<uuid>`, `<id>`, `[<pid>]`. Lines with the same template form a group,
@@ -349,9 +349,12 @@ instead and returned as the process, version, OS, exception, termination, and th
 
 | Argument | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `command` | string | one of | Shell command line whose output to condense, run as for `triage`, such as `/usr/bin/log show --last 10m --predicate 'process == "MyApp"'`. |
+| `command` | string | one of | Shell command line whose output to condense, run as for `triage`, such as `tail -20000 app.log`. Not `/usr/bin/log`: it refuses to run in any sandbox; use `last`. |
 | `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
 | `path` | string | one of | Absolute path of a log or `.ips` file; the read clears the gate as `read_file` does. |
+| `last` | string | one of | Read this Mac's unified log for this long back, in wisp's own process through `OSLogStore`: `90s`, `10m`, `2h`, at most `24h`. |
+| `process` | string | no | With `last`: only this process, by name (case-insensitive). |
+| `subsystem` | string | no | With `last`: only subsystems starting with this, such as `com.apple.network`. |
 | `max_groups` | integer | no | Groups to return at most (default 30); `more` is true when some were dropped. |
 
 For a log, `structuredContent` is `{ "kind": "log", "lines", "templates", "more", "truncated",
@@ -360,7 +363,12 @@ For a log, `structuredContent` is `{ "kind": "log", "lines", "templates", "more"
 credentials redacted. For a crash report it is `{ "kind": "crash", "process", "version", "os",
 "timestamp", "bugType", "exception", "termination", "faultingThread", "frames": [{ "image", "symbol",
 "offset" }] }`. Measured on 2026-09-23: two minutes of `log show` (14,333 lines, 2.8 MB) reduced to 1,972
-templates in 1.2 s, the top 30 in about 10 KB.
+templates in 1.2 s, the top 30 in about 10 KB (that output was captured outside wisp, since `log` will
+not run as a wisp command).
+
+Every condensing tool given a `command` returns its `exitStatus` and `timedOut` in `structuredContent`.
+When the command failed or timed out, the text starts with `warning: the command exited N` and the first
+line of its output, since a failing command's output is usually its error message.
 
 ### `json_shape`
 

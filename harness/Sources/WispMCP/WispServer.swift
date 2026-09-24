@@ -343,17 +343,38 @@ public struct WispServer: Sendable {
         }
     }
 
-    /// Digests a log, or reads a crash report, without a model.
+    /// Digests a log, or reads a crash report, without a model: a command's output or a file through the
+    /// usual capture, or the unified log read in process.
     private func condenseLog(_ request: CondenseLogRequest) async -> CallTool.Result {
-        await condense(
-            prefix: "log", source: request.source, model: nil, maxBytes: CondenseLogRequest.maxBytes
-        ) { _, captured in
+        let digest: @Sendable (Triage.Captured) -> (text: String, json: JSONValue) = { captured in
             if let crash = CrashReport(captured.text) { return (crash.rendered, crash.json) }
             let report = LogDigest(options: .init(maxGroups: request.maxGroups)).run(captured.text)
             var fields = report.json.objectValue ?? [:]
             fields["truncated"] = .bool(captured.truncated)
             let note = captured.truncated ? "\n(input cut to its last \(CondenseLogRequest.maxBytes) bytes)" : ""
             return (report.rendered + note, .object(fields))
+        }
+        switch request.origin {
+        case .captured(let source):
+            return await condense(prefix: "log", source: source, model: nil, maxBytes: CondenseLogRequest.maxBytes) {
+                _, captured in digest(captured)
+            }
+        case .unified(let query):
+            do {
+                let conversation = try session.conversation(
+                    id: "log-" + ShortID.make(), approver: approver, tools: .none)
+                defer {
+                    conversation.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed"))
+                }
+                let read = try UnifiedLog.read(query, maxBytes: CondenseLogRequest.maxBytes)
+                let result = digest(Triage.Captured(text: read.text, truncated: read.truncated))
+                let structured: Value? = Value(json: result.json)
+                return .init(
+                    content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,
+                    isError: false)
+            } catch {
+                return failure(String(describing: error))
+            }
         }
     }
 
@@ -386,7 +407,7 @@ public struct WispServer: Sendable {
                 options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
             let captured = try await Triage.capture(
                 source, runner: runner, gate: conversation.gate, maxOutputBytes: maxBytes)
-            let result = try await body(conversation, captured)
+            let result = Self.withExitStatus(try await body(conversation, captured), of: captured)
             let structured: Value? = Value(json: result.json)
             return .init(
                 content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,
@@ -394,6 +415,25 @@ public struct WispServer: Sendable {
         } catch {
             return failure(String(describing: error))
         }
+    }
+
+    /// A condensing result with the command's exit status and timeout added, and a warning ahead of the
+    /// text when the command failed: a failing command's output is usually its error message, which a
+    /// condenser would otherwise report as an empty diff or a one-line log.
+    static func withExitStatus(
+        _ result: (text: String, json: JSONValue), of captured: Triage.Captured
+    ) -> (text: String, json: JSONValue) {
+        guard let status = captured.exitStatus else { return result }
+        var fields = result.json.objectValue ?? [:]
+        fields["exitStatus"] = .int(Int(status))
+        fields["timedOut"] = .bool(captured.timedOut)
+        guard status != 0 || captured.timedOut else { return (result.text, .object(fields)) }
+        let why = captured.timedOut ? "timed out" : "exited \(status)"
+        let head = captured.text.split(separator: "\n").first.map { ": \($0.prefix(200))" } ?? ""
+        return (
+            "warning: the command \(why), so this may describe its error rather than its output\(head)\n\n"
+                + result.text, .object(fields)
+        )
     }
 
     /// A judge that answers each prompt in a fresh turn on `conversation`, shaped by `schema`.

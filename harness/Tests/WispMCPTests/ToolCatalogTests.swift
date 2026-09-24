@@ -156,6 +156,13 @@ import WispCore
         #expect(try CondenseLogRequest(arguments: ["path": .string("/x")]).maxGroups == 30)
         #expect(try CondenseLogRequest(arguments: ["path": .string("/x"), "max_groups": .int(5)]).maxGroups == 5)
         #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: [:]) }
+        let unified = try CondenseLogRequest(arguments: ["last": .string("10m"), "process": .string("Safari")])
+        #expect(unified.origin == .unified(.init(seconds: 600, process: "Safari")))
+        #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: ["last": .string("3d")]) }
+        #expect(throws: MCPError.self) {
+            try CondenseLogRequest(arguments: ["last": .string("1m"), "path": .string("/x")])
+        }
+        #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: ["last": .int(5)]) }
         let shape = try JSONShapeRequest(arguments: [
             "path": .string("/x"), "max_depth": .int(3), "examples": .bool(false),
         ])

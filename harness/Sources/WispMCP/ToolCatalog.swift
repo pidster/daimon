@@ -248,11 +248,12 @@ public enum ToolCatalog {
     public static let condenseLog = Tool(
         name: "condense_log",
         description:
-            "Condense a log on this Mac (an app log, CI output, or /usr/bin/log show output) to its distinct "
-            + "messages: lines grouped by template with timestamps and ids removed, ranked by severity then count, "
-            + "with line ranges and first and last timestamps. A macOS crash report (.ips) comes back as the "
-            + "process, exception, and faulting thread's frames. No model; up to 8 MiB. Give exactly one of command "
-            + "or path.",
+            "Condense a log on this Mac (an app log, CI output, or the unified log) to its distinct messages: lines "
+            + "grouped by template with timestamps and ids removed, ranked by severity then count, with line ranges "
+            + "and first and last timestamps. For the unified log give last (such as 10m), optionally with process "
+            + "or subsystem; /usr/bin/log refuses to run in the sandbox. A macOS crash report (.ips) comes back as "
+            + "the process, exception, and faulting thread's frames. No model; up to 8 MiB. Give exactly one of "
+            + "command, path, or last.",
         inputSchema: .object([
             "type": .string("object"),
             "properties": .object([
@@ -269,6 +270,19 @@ public enum ToolCatalog {
                 "path": .object([
                     "type": .string("string"),
                     "description": .string("Absolute path of a file on this Mac to read instead."),
+                ]),
+                "last": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "Read this Mac's unified log for this long back instead: 90s, 10m, 2h (at most 24h)."),
+                ]),
+                "process": .object([
+                    "type": .string("string"),
+                    "description": .string("With last: only this process, by name, such as Safari."),
+                ]),
+                "subsystem": .object([
+                    "type": .string("string"),
+                    "description": .string("With last: only subsystems starting with this, such as com.apple.network."),
                 ]),
                 "max_groups": .object([
                     "type": .string("integer"),
@@ -633,17 +647,42 @@ public struct RedactRequest: Equatable, Sendable {
 public struct CondenseLogRequest: Equatable, Sendable {
     /// Bytes of log read; only the tail beyond this.
     static let maxBytes = 8 << 20
+    /// Where the log comes from.
+    public enum Origin: Equatable, Sendable {
+        /// A command's output or a file.
+        case captured(Triage.Source)
+        /// This Mac's unified log, read in process.
+        case unified(UnifiedLog.Query)
+    }
     /// What to condense.
-    public var source: Triage.Source
+    public var origin: Origin
     /// Groups to return at most.
     public var maxGroups: Int
 
     /// Decodes and validates MCP call arguments.
     ///
     /// - Parameter arguments: The raw `tools/call` arguments.
-    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad `max_groups`.
+    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, for `last` beside a command or path, a bad
+    ///   duration, or a bad `max_groups`.
     public init(arguments: [String: Value]?) throws {
-        source = try CondensingRequest(arguments: arguments).source
+        if let raw = arguments?["last"] {
+            guard arguments?["command"] == nil, arguments?["path"] == nil else {
+                throw MCPError.invalidParams("give exactly one of 'command', 'path', or 'last'")
+            }
+            guard let text = raw.stringValue else { throw MCPError.invalidParams("'last' must be a string") }
+            let seconds: Int
+            do {
+                seconds = try UnifiedLog.seconds(in: text)
+            } catch {
+                throw MCPError.invalidParams("'last': \(error)")
+            }
+            origin = .unified(
+                .init(
+                    seconds: seconds, process: arguments?["process"]?.stringValue,
+                    subsystem: arguments?["subsystem"]?.stringValue))
+        } else {
+            origin = .captured(try CondensingRequest(arguments: arguments).source)
+        }
         maxGroups = try CondensingRequest.count(arguments, "max_groups", fallback: LogDigest.Options().maxGroups)
     }
 }

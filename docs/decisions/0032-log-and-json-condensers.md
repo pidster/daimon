@@ -47,3 +47,20 @@ of which the process, exception, termination, and faulting thread's frames are w
   name, a path) forms one group per value. The example and line range still point to the lines.
 - Other condensers named with these (dependency audit output, profiler exports, flaky tests across
   runs) are left for later; `docs/backlog.md` lists them.
+
+## Amendment, 2026-09-24: the unified log is read in process, and a failing command is flagged
+
+Using `condense_log` from Claude Code showed two gaps. `/usr/bin/log show` cannot run as a wisp command:
+it checks whether it is sandboxed and exits with `log: Cannot run while sandboxed`, even under a
+Seatbelt profile that allows everything, so no change to wisp's profile could help. The measurement
+above was of `log show` output captured outside wisp. `condense_log` now takes `last` (such as `10m`,
+at most a day) with optional `process` and `subsystem` filters and reads the unified log in wisp's own
+process through `OSLogStore.local()`, which an unsigned binary may open (probed the same day: 26,566
+entries from one minute in about a second). The entries are written as `log show` compact-style lines
+so their declared type decides severity.
+
+The same session showed the condensers ignoring the command's exit status: `log show`'s one-line refusal
+came back as a one-line `info` log, and a failing `git diff` would have read as a clean scan. Every
+condensing tool with a command source now returns `exitStatus` and `timedOut`, and its text starts with a
+warning and the first line of output when the command failed or timed out.
+

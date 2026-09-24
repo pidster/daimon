@@ -155,3 +155,51 @@ import Testing
         #expect(JSONShape.Node.format(2.5) == "2.5" && JSONShape.Node.format(3) == "3")
     }
 }
+
+@Suite struct UnifiedLogTests {
+    @Test func durationsAreSecondsMinutesOrHoursUpToADay() throws {
+        #expect(try UnifiedLog.seconds(in: "90s") == 90)
+        #expect(try UnifiedLog.seconds(in: " 10M ") == 600)
+        #expect(try UnifiedLog.seconds(in: "2h") == 7200)
+        #expect(try UnifiedLog.seconds(in: "45") == 45)
+        for bad in ["0m", "25h", "ten", "-5s", ""] {
+            #expect(throws: UnifiedLog.Failure.self, "\(bad)") { try UnifiedLog.seconds(in: bad) }
+        }
+    }
+
+    @Test func linesAreCompactStyleSoTheDigestReadsTheirType() throws {
+        let utc = try #require(TimeZone(identifier: "UTC"))
+        let line = UnifiedLog.line(
+            date: Date(timeIntervalSince1970: 1_790_000_000.25), level: UnifiedLog.code(.error), process: "Safari",
+            pid: 412, thread: 0x1a2b, subsystem: "com.apple.WebKit", category: "Loading",
+            message: "load failed\nsecond line", timeZone: utc)
+        #expect(
+            line == "2026-09-21T14:13:20.250Z E  Safari[412:1a2b] [com.apple.WebKit:Loading] load failed second line")
+        let parsed = LogDigest.parse(line)
+        #expect(parsed.declared == .error && parsed.template.hasPrefix("Safari[<pid>] [com.apple.WebKit:Loading]"))
+        #expect(UnifiedLog.code(.fault) == "F" && UnifiedLog.code(.info) == "I" && UnifiedLog.code(.debug) == "Db")
+        #expect(UnifiedLog.code(.notice) == "Df")
+        let bare = UnifiedLog.line(
+            date: Date(), level: "Df", process: "p", pid: 1, thread: 1, subsystem: "", category: "", message: "m")
+        #expect(bare.hasSuffix(" Df p[1:1] m"))
+        #expect(LogDigest.parse(bare).declared == .info)
+    }
+
+    @Test func predicatesAndTailsAreBuiltFromTheQuery() {
+        #expect(UnifiedLog.predicate(.init(seconds: 60)) == nil)
+        let both = UnifiedLog.predicate(.init(seconds: 60, process: "Safari", subsystem: "com.apple"))
+        #expect(
+            both?.predicateFormat.contains("process") == true && both?.predicateFormat.contains("subsystem") == true)
+        let tail = UnifiedLog.tail(["aaaa", "bbbb", "cccc"], maxBytes: 10)
+        #expect(tail.lines == ["bbbb", "cccc"] && tail.bytes == 10)
+        #expect(UnifiedLog.tail(["toolongline"], maxBytes: 4).lines.isEmpty)
+    }
+
+    @Test(.enabled(if: !CommandRunner.isNestedSandbox)) func theLocalStoreCanBeReadInProcess() throws {
+        let read = try UnifiedLog.read(.init(seconds: 5), maxBytes: 1 << 20)
+        #expect(!read.text.isEmpty, "no entries in the last five seconds")
+        let small = try UnifiedLog.read(.init(seconds: 30), maxBytes: 2048)
+        #expect(small.text.utf8.count <= 2048)
+        #expect(UnifiedLog.Failure.badDuration("x").description.contains("such as 90s"))
+    }
+}

@@ -4,6 +4,19 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `condense_log` reads this Mac's unified log with `last` (such as `10m`), optionally for one `process`
+  or `subsystem`, in wisp's own process: `/usr/bin/log` refuses to run in any sandbox.
+
+Fixed:
+
+- The condensing tools ignored a command's exit status, so a failing command's error message was
+  condensed as though it were the output. They now return `exitStatus` and `timedOut` and start their
+  text with a warning when the command failed.
+
 ## 0.9.0
 
 Added:

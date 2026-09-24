@@ -398,6 +398,20 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
                 == true)
         let broken = try await call(pair.client, "json_shape", ["path": .string(log.path)])
         #expect(broken.isError == true)
+        // A command that fails is flagged rather than digested as though its error were the log.
+        let failing = try await call(
+            pair.client, "condense_log",
+            ["command": .string("ls /nonexistent-wisp-dir"), "working_directory": .string(dir.path)])
+        #expect(failing.structuredContent?.objectValue?["exitStatus"] == .int(1))
+        guard case .text(let warned, _, _)? = failing.content.first else { Issue.record("no text"); return }
+        #expect(warned.hasPrefix("warning: the command exited 1"), "\(warned)")
+        let passing = try await call(
+            pair.client, "condense_log", ["command": .string("echo ok"), "working_directory": .string(dir.path)])
+        #expect(passing.structuredContent?.objectValue?["exitStatus"] == .int(0))
+        if !CommandRunner.isNestedSandbox {
+            let unified = try await call(pair.client, "condense_log", ["last": .string("5s")])
+            #expect(unified.isError == false && unified.structuredContent?.objectValue?["kind"] == "log", "\(unified)")
+        }
         // Each is its own audited session, and neither opened a model.
         #expect(pair.sink.events.contains { $0.session.hasPrefix("log-") && $0.kind == .sessionStart })
         #expect(pair.sink.events.contains { $0.session.hasPrefix("shape-") && $0.kind == .sessionEnd })
