@@ -99,31 +99,55 @@ public enum UnifiedLog {
             throw Failure.unreadable("\(error)")
         }
         let start = store.position(date: Date().addingTimeInterval(-Double(query.seconds)))
-        var lines: [String] = []
-        var bytes = 0
-        var truncated = false
+        var collector = Collector(maxBytes: maxBytes)
         do {
             for entry in try store.getEntries(at: start, matching: predicate(query)) {
                 guard let log = entry as? OSLogEntryLog else { continue }
-                let text = line(
-                    date: log.date, level: code(log.level), process: log.process, pid: log.processIdentifier,
-                    thread: log.threadIdentifier, subsystem: log.subsystem, category: log.category,
-                    message: log.composedMessage)
-                lines.append(text)
-                bytes += text.utf8.count + 1
-                // Keep the newest: drop from the front once over the cap, in batches to stay linear.
-                if bytes > maxBytes * 2 {
-                    let (kept, size) = tail(lines, maxBytes: maxBytes)
-                    lines = kept
-                    bytes = size
-                    truncated = true
-                }
+                collector.add(
+                    line(
+                        date: log.date, level: code(log.level), process: log.process, pid: log.processIdentifier,
+                        thread: log.threadIdentifier, subsystem: log.subsystem, category: log.category,
+                        message: log.composedMessage))
             }
         } catch {
             throw Failure.unreadable("\(error)")
         }
-        let (kept, size) = tail(lines, maxBytes: maxBytes)
-        return (kept.joined(separator: "\n"), truncated || size < bytes)
+        return collector.result
+    }
+
+    /// Keeps the newest lines that fit in a byte budget as they arrive, dropping from the front in batches
+    /// (once twice the budget is held) so a busy log costs linear time. Separate from `read` so the trimming
+    /// is tested with chosen lines rather than whatever the live log holds.
+    struct Collector {
+        /// Bytes kept at most.
+        let maxBytes: Int
+        /// The lines held.
+        private(set) var lines: [String] = []
+        /// Their size, with a newline each.
+        private(set) var bytes = 0
+        /// Whether any line was dropped.
+        private(set) var truncated = false
+
+        /// Creates a collector.
+        init(maxBytes: Int) {
+            self.maxBytes = maxBytes
+        }
+
+        /// Adds one line, trimming the oldest once twice the budget is held.
+        mutating func add(_ line: String) {
+            lines.append(line)
+            bytes += line.utf8.count + 1
+            if bytes > maxBytes * 2 {
+                (lines, bytes) = UnifiedLog.tail(lines, maxBytes: maxBytes)
+                truncated = true
+            }
+        }
+
+        /// The kept lines joined, and whether any were dropped.
+        var result: (text: String, truncated: Bool) {
+            let (kept, size) = UnifiedLog.tail(lines, maxBytes: maxBytes)
+            return (kept.joined(separator: "\n"), truncated || size < bytes)
+        }
     }
 
     /// The latest lines that fit in `maxBytes`, and their size.

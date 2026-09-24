@@ -195,6 +195,20 @@ import Testing
         #expect(UnifiedLog.tail(["toolongline"], maxBytes: 4).lines.isEmpty)
     }
 
+    @Test func theCollectorKeepsTheNewestLinesWithinTheBudget() {
+        var roomy = UnifiedLog.Collector(maxBytes: 100)
+        for line in ["one", "two"] { roomy.add(line) }
+        #expect(roomy.result.text == "one\ntwo" && roomy.result.truncated == false)
+        var tight = UnifiedLog.Collector(maxBytes: 10)
+        for index in 0..<20 { tight.add("line \(index)") }
+        #expect(tight.truncated && tight.result.truncated)
+        #expect(tight.result.text.hasSuffix("line 19") && tight.result.text.utf8.count <= 10)
+        // Just over the budget without reaching twice it: trimmed only when the result is taken.
+        var edge = UnifiedLog.Collector(maxBytes: 8)
+        for line in ["abcd", "efgh"] { edge.add(line) }
+        #expect(!edge.truncated && edge.result.text == "efgh" && edge.result.truncated)
+    }
+
     @Test(.enabled(if: !CommandRunner.isNestedSandbox)) func theLocalStoreCanBeReadInProcess() throws {
         let read = try UnifiedLog.read(.init(seconds: 5), maxBytes: 1 << 20)
         #expect(!read.text.isEmpty, "no entries in the last five seconds")
