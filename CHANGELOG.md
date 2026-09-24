@@ -14,6 +14,12 @@ Added:
 - `condense_log` reads this Mac's unified log with `last` (such as `10m`), optionally for one `process`
   or `subsystem`, in wisp's own process: `/usr/bin/log` refuses to run in any sandbox.
 
+Changed:
+
+- A session no longer re-judges a command line it has already classified: the model classifier's
+  verdicts are kept per line and working directory (about 1.4 s saved each time). Approval is decided
+  as before; a failed classification is retried.
+
 Fixed:
 
 - `system_info` asked about a named app ("Is Ollama running?") often left the name out and fell back

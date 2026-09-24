@@ -41,6 +41,17 @@ those paths are. Before the instruction rewrite of 2026-09-19 the model scored 2
 between runs. The eval suite asserts only the hard requirement (no dangerous command below moderate),
 prints every miss with the model's reason, and is the place to add any command the model gets wrong.
 
+A session keeps its classifiers' verdicts (`CachingRiskClassifier`, up to 256), keyed by the exact
+command line and working directory, so a line judged once in a session is not judged again: the model
+costs about 1.4 s a call and a coding loop reruns the same build and test lines. This is sound because
+the verdict depends only on that key (greedy sampling, fixed rules and instructions for the session's
+life). Only the classification is reused: the gate decides and asks by the level exactly as before, so a
+moderate command still asks each turn unless an approval covers it. A fallback verdict from an
+unavailable or failing classifier is never kept, so it is retried. A reused verdict is still recorded as
+`classifier.verdict`, with `classifier.cached: true` in its metadata. With `approval.classifier:
+rules` nothing is cached, since the rules answer in microseconds. `wisp watch` goes further and clears
+its one command once ([ADR 0033](decisions/0033-watch-mode.md)).
+
 ## The gate
 
 `ApprovalGate` (one per conversation) classifies, audits the verdict, and if the level is at or above the

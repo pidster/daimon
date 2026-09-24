@@ -111,7 +111,7 @@ import Testing
         let home = try temporaryHome()
         defer { try? FileManager.default.removeItem(at: home.root) }
         let timed = try Session.begin(.init(entryPoint: .respond), home: home, dependencies: .testing())
-        #expect(timed.classifier is TimedRiskClassifier)
+        #expect(timed.classifier is CachingRiskClassifier)
         let rulesHome = try temporaryHome(config: #"{"approval":{"useModel":false}}"#)
         defer { try? FileManager.default.removeItem(at: rulesHome.root) }
         let rules = try Session.begin(.init(entryPoint: .respond), home: rulesHome, dependencies: .testing())

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import WispCore
@@ -87,5 +88,66 @@ import Testing
         #expect(stats.calls.map(\.kind) == [.classifier, .classifier])
         #expect(stats.calls.map(\.failure) == [nil, "unavailable"])
         #expect(stats.calls.allSatisfy { $0.model == "system-model" })
+    }
+
+    @Test func aSessionKeepsVerdictsPerLineAndDirectoryButNotFallbacks() async {
+        final class Counted: RiskClassifier {
+            let calls = Mutex(0)
+            func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+                calls.withLock { $0 += 1 }
+                if command == "flaky" {
+                    return RiskAssessment(
+                        level: .moderate, reasons: ["failed"], sources: ["model"],
+                        metadata: [RiskAssessment.failureKey: "busy"])
+                }
+                return RiskAssessment(level: .safe, reasons: ["reads"], sources: ["model"])
+            }
+        }
+        let inner = Counted()
+        let cache = CachingRiskClassifier(inner, capacity: 2)
+        let first = await cache.classify(command: "ls", workingDirectory: "/a")
+        let again = await cache.classify(command: "ls", workingDirectory: "/a")
+        #expect(
+            first.metadata[CachingRiskClassifier.cachedKey] == nil
+                && again.metadata[CachingRiskClassifier.cachedKey] == true)
+        #expect(again.level == .safe && again.reasons == ["reads"] && inner.calls.withLock { $0 } == 1)
+        _ = await cache.classify(command: "ls", workingDirectory: "/b")
+        #expect(inner.calls.withLock { $0 } == 2)
+        // A fallback is retried rather than kept.
+        _ = await cache.classify(command: "flaky", workingDirectory: "/a")
+        _ = await cache.classify(command: "flaky", workingDirectory: "/a")
+        #expect(inner.calls.withLock { $0 } == 4 && cache.count == 2)
+        // The oldest goes once the cache is full.
+        _ = await cache.classify(command: "pwd", workingDirectory: "/a")
+        #expect(cache.count == 2)
+        _ = await cache.classify(command: "ls", workingDirectory: "/a")
+        #expect(inner.calls.withLock { $0 } == 6)
+    }
+
+    @Test func theGateStillAsksForACachedVerdict() async throws {
+        final class Moderate: RiskClassifier {
+            let calls = Mutex(0)
+            func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+                calls.withLock { $0 += 1 }
+                return RiskAssessment(level: .moderate, reasons: ["writes"], sources: ["model"])
+            }
+        }
+        let inner = Moderate()
+        let sink = MemoryAuditSink()
+        let audit = AuditLog(session: "cache", sink: sink)
+        let gate = ApprovalGate(
+            classifier: CachingRiskClassifier(inner), approver: AutoApprover(), threshold: .level(.moderate),
+            audit: audit)
+        let dir = FileManager.default.temporaryDirectory.path
+        for _ in 0..<2 {
+            audit.turns.advance()
+            try await gate.clear(parts: CommandSplitter.split("touch x"), line: "touch x", workingDirectory: dir)
+        }
+        #expect(inner.calls.withLock { $0 } == 1)
+        #expect(sink.events.filter { $0.kind == .approvalRequested }.count == 2)
+        let verdicts = sink.events.filter { $0.kind == .classifierVerdict }
+        #expect(
+            verdicts.count == 2
+                && verdicts.last?.details["metadata"]?.objectValue?[CachingRiskClassifier.cachedKey] == true)
     }
 }

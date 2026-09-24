@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import Synchronization
 
 /// How risky an action is, from a human's point of view.
 @Generable
@@ -119,4 +120,55 @@ public struct TimedRiskClassifier: RiskClassifier {
                 failure: assessment.metadata[RiskAssessment.failureKey]?.stringValue))
         return assessment
     }
+}
+
+/// Remembers a session's verdicts per command line and working directory, so a line the model has
+/// judged is not judged again: the model classifier costs about 1.4 s a call and its verdicts are
+/// repeatable (greedy sampling; the rules are fixed). Only the classification is reused; the gate still
+/// decides and asks by the level as before. A fallback verdict (`RiskAssessment.failureKey`) is never
+/// kept, so a transient failure is retried. Bounded: the oldest entry goes first once `capacity` is
+/// reached. A reused verdict carries `classifier.cached` in its metadata.
+public final class CachingRiskClassifier: RiskClassifier {
+    /// The metadata key a reused verdict carries.
+    public static let cachedKey = "classifier.cached"
+
+    private struct State {
+        var verdicts: [String: RiskAssessment] = [:]
+        var order: [String] = []
+    }
+
+    private let classifier: any RiskClassifier
+    private let capacity: Int
+    private let state = Mutex(State())
+
+    /// Creates the cache.
+    ///
+    /// - Parameters:
+    ///   - classifier: The classifier whose verdicts are kept.
+    ///   - capacity: Verdicts kept; at least one.
+    public init(_ classifier: any RiskClassifier, capacity: Int = 256) {
+        self.classifier = classifier
+        self.capacity = max(1, capacity)
+    }
+
+    /// The kept verdict for this line and directory, or a fresh one, kept unless it is a fallback.
+    public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
+        let key = command + "\u{0}" + workingDirectory
+        if var kept = state.withLock({ $0.verdicts[key] }) {
+            kept.metadata[Self.cachedKey] = true
+            return kept
+        }
+        let assessment = await classifier.classify(command: command, workingDirectory: workingDirectory)
+        guard assessment.metadata[RiskAssessment.failureKey] == nil else { return assessment }
+        let capacity = capacity
+        state.withLock { state in
+            if state.verdicts[key] == nil { state.order.append(key) }
+            state.verdicts[key] = assessment
+            while state.order.count > capacity { state.verdicts[state.order.removeFirst()] = nil }
+        }
+        return assessment
+    }
+
+    /// Verdicts kept now.
+    var count: Int { state.withLock { $0.verdicts.count } }
 }

@@ -240,9 +240,12 @@ public struct Session: Sendable {
             request: request, home: home, config: config, audit: audit,
             store: ApprovalStore(url: home.approvalsFile, lifetime: config.approvalLifetime),
             sessionApprovals: SessionApprovals(), notes: notes, toolNames: toolNames,
-            // The rules answer in microseconds; only a configuration with a model classifier is timed.
+            // The rules answer in microseconds; only a configuration with a model classifier is timed, and
+            // cached so a command line the session has judged is not judged again.
             classifier: config.approvalClassifier == .rules
-                ? classifier : TimedRiskClassifier(classifier, name: config.approvalClassifier.rawValue, stats: stats),
+                ? classifier
+                : CachingRiskClassifier(
+                    TimedRiskClassifier(classifier, name: config.approvalClassifier.rawValue, stats: stats)),
             notifier: Notifier(enabled: config.notificationsEnabled, perMinute: config.notificationsPerMinute),
             stats: stats)
     }
