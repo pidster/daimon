@@ -153,8 +153,11 @@ Use run_command with working directory <repo> to run exactly the command line be
 Report the exit status and output verbatim, nothing else.
 ```
 
-Put commit messages in a file and commit with `git commit -q -F <path> 2>&1 | tail -1` so the hook's
-test output does not fill the reply; push with `git push origin main 2>&1 | tail -1`. Expect an approval
+Put commit messages in a file and commit with `set -o pipefail; git commit -q -F <path> 2>&1 | tail -3`
+so the hook's test output does not fill the reply; push with `set -o pipefail; git push origin main 2>&1 |
+tail -3`. Keep `set -o pipefail` whenever output is piped: without it the exit status is `tail`'s, so a
+failed push or a failing hook reports 0 (a push refused on 2026-09-23 came back as exit 0 with only the
+last line of git's error). Expect an approval
 dialog for commands that change repository state; choose "This session" for repeated shapes. The
 pre-commit hook then runs inside wisp's sandbox, which `scripts/check` detects. If wisp is not
 connected, say so and ask the user to reconnect it rather than falling back to your own shell.
