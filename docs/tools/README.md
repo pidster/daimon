@@ -11,6 +11,7 @@ result format) and the limits that protect the context window. `wisp tools` prin
 | [edit_file](edit_file.md) | Write, append to, or replace text in a file, inside the sandbox's writable set. |
 | [inspect](inspect.md) | wisp's own config, status, approvals, and recent audit events; read-only. |
 | [notify](notify.md) | Show the user a macOS notification; bounded, rate-limited, audited, no approval. |
+| [custom tools](custom.md) | Your own tools: command templates with typed arguments, declared in `~/.wisp/config.json`. |
 | [system_info](system_info.md) | Ports, free space, folder sizes, busy processes, memory, one process, battery, macOS, network; read-only. |
 
 Select tools per session with `--tool <name>` on the CLI or the `tools` argument of MCP `respond`. Every
@@ -21,6 +22,9 @@ limits and example prompt for each come from the tool itself (`WispTool.limits`,
 options, and `WispTool.examplePrompt`). See [../mcp.md](../mcp.md).
 
 ## Adding a tool
+
+To give the model a command you use often, declare a custom tool in your config; no build is needed
+([custom.md](custom.md)). To add a built-in tool to wisp itself:
 
 1. Add a `struct` conforming to `WispTool` under `harness/Sources/WispCore/Tools/`, with an
    `@Generable` `Arguments` type, `@Guide` descriptions on each property, `limits` rendered from its

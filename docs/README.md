@@ -39,6 +39,7 @@
 | [decisions/0033-watch-mode.md](decisions/0033-watch-mode.md) | Watch mode reruns a command on file changes and notifies when its outcome turns, triaging new failures |
 | [decisions/0034-system-info.md](decisions/0034-system-info.md) | `system_info` answers questions about the Mac with fixed read-only probes and `libproc`, without the approval gate |
 | [decisions/0035-change-drafts.md](decisions/0035-change-drafts.md) | Change drafts are written from the diff summary, with the subject and body shape enforced in code |
+| [decisions/0036-custom-tools.md](decisions/0036-custom-tools.md) | Custom tools are command templates in the user's own config, run through `run_command`'s gate |
 | [decisions/0029-tui-front-end.md](decisions/0029-tui-front-end.md) | The terminal chat is a Rust front end (`wisp-tui`, ratatui) over a headless `wisp chat --json`; one palette for both faces |
 | [decisions/0028-rename-to-wisp.md](decisions/0028-rename-to-wisp.md) | The project is wisp; one mechanical rename, no compatibility layer, a new Homebrew tap |
 | [decisions/0027-verb-patterns.md](decisions/0027-verb-patterns.md) | Approval patterns include the verb for programs like git and cargo, from an embedded list; old patterns still count |

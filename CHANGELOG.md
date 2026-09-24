@@ -8,6 +8,9 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- Custom tools: declare your own tools for the model in `~/.wisp/config.json` (`tools.custom`), each a
+  command with `{placeholders}` and typed arguments, run through `run_command`'s policy, approval, and
+  sandbox; `tools.disabled` leaves built-in tools out. See `docs/tools/custom.md`.
 - `wisp draft [commit|pr|changelog]` and the MCP tool `draft_change`: a commit message, a pull request
   description, or a changelog line drafted from a diff (the staged one by default), with the subject kept
   under 72 characters and a `Why:` line left for the reason.

@@ -137,7 +137,8 @@ struct Tools: ParsableCommand {
     var markdown = false
 
     func run() throws {
-        let registry = ToolRegistry()
+        let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
+        let registry = ToolRegistry(runner: config.runner, disabled: config.disabledTools, custom: config.customTools)
         if json {
             print(registry.descriptionsJSON)
         } else if markdown {
@@ -517,7 +518,9 @@ struct Models: AsyncParsableCommand {
 
     func run() async throws {
         let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
-        let tools: [any Tool] = noTools ? [] : ToolRegistry(runner: config.runner).all
+        let tools: [any Tool] =
+            noTools
+            ? [] : ToolRegistry(runner: config.runner, disabled: config.disabledTools, custom: config.customTools).all
         let lines = await ModelListing.lines(
             config: config, home: Wisp.home, current: config.model, tools: tools, all: all)
         for line in lines { print(line) }

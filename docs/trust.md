@@ -9,7 +9,10 @@ here is enforced by code and covered by tests; the linked pages hold the detail.
 The model has seven tools: `current_date`, `read_file`, `inspect`, `notify`, `system_info`, `edit_file`,
 and `run_command`. Only the last two change anything; `notify` shows a banner, at most a few a minute,
 and changes nothing ([notify](tools/notify.md)); `system_info` runs fixed read-only commands wisp chooses,
-under the sandbox but without asking, since the model supplies no command ([system_info](tools/system_info.md)). `edit_file` writes a text file under the same directories the sandbox allows
+under the sandbox but without asking, since the model supplies no command ([system_info](tools/system_info.md)).
+Tools you declare yourself in `~/.wisp/config.json` run their command through `run_command`'s policy,
+classifier, approval, and sandbox, so they grant nothing `run_command` does not; a project cannot
+declare one ([custom tools](tools/custom.md)). `edit_file` writes a text file under the same directories the sandbox allows
 ([edit_file](tools/edit_file.md)). `run_command` runs a shell command through `/bin/sh -c` with wisp's
 own privileges, inside a Seatbelt sandbox ([run_command](tools/run_command.md)):
 

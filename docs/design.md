@@ -216,6 +216,10 @@ with the subject and body shape applied in code ([ADR 0035](decisions/0035-chang
 A session's model classifier is wrapped as `CachingRiskClassifier(TimedRiskClassifier(…))`: verdicts are
 kept per command line and directory, and only real classifications are timed for `/stats`
 ([approval.md](approval.md)).
+`CustomTool` turns a `tools.custom` definition from the config into a tool whose `GenerationSchema` is
+built at run time and whose calls run the substituted line through the registry's `CommandRunner`, gate
+included; `ToolRegistry` appends them after the built-ins and drops `tools.disabled`
+([ADR 0036](decisions/0036-custom-tools.md)).
 `system_info` (`SystemInfo`, `ProcessTable`) answers questions about the Mac from fixed read-only probes
 through the conversation's runner without the gate, and from `libproc` for processes, since Seatbelt
 will not run the setuid `ps` ([ADR 0034](decisions/0034-system-info.md)).

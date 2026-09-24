@@ -94,6 +94,8 @@ public struct Session: Sendable {
             case invalidJSON(String)
             /// A `run_command` policy pattern does not compile.
             case invalidPolicy(CommandPolicy.Failure)
+            /// A `tools` entry is not usable.
+            case invalidTool(CustomTool.Failure)
             /// The file exists but cannot be read.
             case unreadable(String)
 
@@ -102,6 +104,7 @@ public struct Session: Sendable {
                 switch self {
                 case .invalidJSON(let detail): detail
                 case .invalidPolicy(let failure): failure.description
+                case .invalidTool(let failure): failure.description
                 case .unreadable(let detail): detail
                 }
             }
@@ -181,6 +184,8 @@ public struct Session: Sendable {
             return try Config.load(from: home.configFile).resolved
         } catch let failure as CommandPolicy.Failure {
             throw Failure.malformedConfig(path: home.configFile.path, problem: .invalidPolicy(failure))
+        } catch let failure as CustomTool.Failure {
+            throw Failure.malformedConfig(path: home.configFile.path, problem: .invalidTool(failure))
         } catch let error as DecodingError {
             throw Failure.malformedConfig(path: home.configFile.path, problem: .invalidJSON(Self.describe(error)))
         } catch {
@@ -222,7 +227,7 @@ public struct Session: Sendable {
                 "note: model \(config.model) runs on Apple's Private Cloud Compute; prompts and tool output leave this Mac"
             )
         }
-        let toolNames = try Self.resolve(request.tools, runner: config.runner)
+        let toolNames = try Self.resolve(request.tools, config: config)
         let sessionID = ShortID.make()
         let sink: any AuditSink = config.auditEnabled ? try dependencies.makeSink(home, config) : NullAuditSink()
         let audit = AuditLog(session: sessionID, sink: sink)
@@ -263,8 +268,9 @@ public struct Session: Sendable {
     /// The whole registry for `.all`, or the names as given once each is known.
     ///
     /// - Throws: `Failure.unknownTools`.
-    private static func resolve(_ selection: ToolSelection, runner: CommandRunner.Options) throws -> [String] {
-        let registry = ToolRegistry(runner: runner)
+    private static func resolve(_ selection: ToolSelection, config: Config.Resolved) throws -> [String] {
+        let registry = ToolRegistry(
+            runner: config.runner, disabled: config.disabledTools, custom: config.customTools)
         let names = selection.resolved(or: registry.all.map(\.name))
         let unknown = registry.select(names).unknown
         guard unknown.isEmpty else { throw Failure.unknownTools(unknown) }
@@ -366,7 +372,7 @@ public struct Conversation: Sendable {
         let registry = ToolRegistry(
             runner: session.config.runner, audit: audit, approval: gate,
             introspection: session.introspection(for: audit, tools: toolNames, model: model),
-            notifier: session.notifier)
+            notifier: session.notifier, disabled: session.config.disabledTools, custom: session.config.customTools)
         let selection = registry.select(toolNames)
         guard selection.unknown.isEmpty else { throw Session.Failure.unknownTools(selection.unknown) }
         return Conversation(

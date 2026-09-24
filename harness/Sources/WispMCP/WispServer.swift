@@ -170,7 +170,7 @@ public struct WispServer: Sendable {
     ///
     /// - Throws: `MCPError.invalidParams` for an unknown URI; file errors reading the audit log.
     func read(_ params: ReadResource.Parameters) async throws -> ReadResource.Result {
-        let registry = ToolRegistry(runner: config.runner)
+        let registry = ToolRegistry(runner: config.runner, disabled: config.disabledTools, custom: config.customTools)
         let views = session.introspection
         func json(_ value: JSONValue) -> ReadResource.Result {
             .init(contents: [.text(Introspection.render(value), uri: params.uri, mimeType: "application/json")])

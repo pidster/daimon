@@ -31,6 +31,35 @@ public struct Config: Codable, Equatable, Sendable {
     public var mlx: MLXConfig?
     /// Notifications from the `notify` tool and `wisp notify`.
     public var notifications: NotificationsConfig?
+    /// Which built-in tools to leave out, and the user's own tools.
+    public var tools: ToolsConfig?
+
+    /// Tool settings in the file.
+    public struct ToolsConfig: Codable, Equatable, Sendable {
+        /// Built-in tools not to register at all.
+        public var disabled: [String]?
+        /// The user's own command-template tools ([ADR 0036](../../../../docs/decisions/0036-custom-tools.md)).
+        public var custom: [CustomTool.Definition]?
+
+        /// Creates settings.
+        public init(disabled: [String]? = nil, custom: [CustomTool.Definition]? = nil) {
+            self.disabled = disabled
+            self.custom = custom
+        }
+
+        /// Checks that every disabled name is a built-in tool and every custom tool is valid and unique.
+        ///
+        /// - Throws: `CustomTool.Failure`.
+        public func validate() throws {
+            if let unknown = (disabled ?? []).first(where: { !ToolRegistry.builtInNames.contains($0) }) {
+                throw CustomTool.Failure.invalid(
+                    tool: unknown,
+                    reason: "tools.disabled names no built-in tool; the built-ins are "
+                        + ToolRegistry.builtInNames.joined(separator: ", "))
+            }
+            try CustomTool.validate(custom ?? [], reserved: Set(ToolRegistry.builtInNames))
+        }
+    }
 
     /// Notification settings in the file.
     public struct NotificationsConfig: Codable, Equatable, Sendable {
@@ -180,6 +209,7 @@ public struct Config: Codable, Equatable, Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else { return Config() }
         let config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
         try config.commandPolicy?.validate()
+        try config.tools?.validate()
         return config
     }
 
@@ -219,7 +249,8 @@ public struct Config: Codable, Equatable, Sendable {
             mlxModelsDirectory: mlx?.modelsDirectory,
             mlxModels: (mlx?.models ?? [:]).mapValues { $0.capabilities ?? [] },
             notificationsEnabled: notifications?.enabled ?? true,
-            notificationsPerMinute: max(1, notifications?.perMinute ?? 5)
+            notificationsPerMinute: max(1, notifications?.perMinute ?? 5),
+            disabledTools: Set(tools?.disabled ?? []), customTools: tools?.custom ?? []
         )
     }
 
@@ -264,5 +295,9 @@ public struct Config: Codable, Equatable, Sendable {
         public var notificationsEnabled: Bool = true
         /// At most this many notifications a minute.
         public var notificationsPerMinute: Int = 5
+        /// Built-in tools not registered.
+        public var disabledTools: Set<String> = []
+        /// The user's own tools, validated.
+        public var customTools: [CustomTool.Definition] = []
     }
 }
