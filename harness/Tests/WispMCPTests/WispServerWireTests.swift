@@ -23,10 +23,10 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
             .call(name: "current_date", arguments: #"{"timeZone":"Asia/Tokyo"}"#), .say("The date is {tool}"),
         ],
         approver: any Approver = DenyingApprover(reason: "not in tests"), elicitation: Bool = false,
-        triageSteps: [ScriptedModel.Step] = []
+        triageSteps: [ScriptedModel.Step] = [], config: String? = nil, unopenable: ModelSelection? = nil
     ) async throws -> (client: Client, server: WispServer, sink: MemoryAuditSink) {
         let sink = MemoryAuditSink()
-        let session = try scratchSession(dependencies: .testing(sink: sink))
+        let session = try scratchSession(dependencies: .testing(sink: sink), config: config)
         let triageModel = ScriptedModel(steps: triageSteps, capabilities: [.guidedGeneration])
         let server = WispServer(session: session) { session, _, id, instructions, tools, model in
             let conversation = try session.conversation(
@@ -38,9 +38,12 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
             return OpenThread(
                 thread: ConversationThread(id: id, agent: agent), gate: conversation.gate, audit: conversation.audit,
                 receipts: conversation.receipts)
-        } makeTriageAgent: { conversation in
-            Agent(
-                instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: triageModel),
+        } makeTriageAgent: { conversation, model in
+            if let model, model == unopenable {
+                throw ModelSelection.Failure.unavailable(model: model.description, reason: "no Ollama server")
+            }
+            return Agent(
+                instructions: "x", tools: [], model: ResolvedModel(selection: model ?? .system, custom: triageModel),
                 audit: conversation.audit)
         }
         let transports = await InMemoryTransport.createConnectedPair()
@@ -448,6 +451,42 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(nothing.isError == true)
         await pair.client.disconnect()
         await pair.server.stop()
+    }
+
+    @Test func draftChangeRoutesByTheDiffsSizeWhenALadderIsConfigured() async throws {
+        let pair = try await connected(
+            triageSteps: [
+                .say(#"{"headline":"x","files":[{"path":"a.swift","summary":"s"}],"flags":[]}"#),
+                .say(#"{"subject":"Change a","points":[]}"#),
+            ], config: #"{"routing":{"ladder":["system","ollama:qwen3.8:27b"]}}"#)
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-wire-route-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let diff = dir.appending(path: "c.diff")
+        try Data("diff --git a/a.swift b/a.swift\n--- a/a.swift\n+++ b/a.swift\n@@ -1 +1 @@\n-a\n+b\n".utf8).write(
+            to: diff)
+        let result = try await call(
+            pair.client, "draft_change", ["kind": .string("commit"), "path": .string(diff.path)])
+        #expect(result.isError == false, "\(result)")
+        // The shipped measurements give the system model no drafting envelope, so the ladder's last rung drafts.
+        let fields = result.structuredContent?.objectValue
+        #expect(fields?["model"] == "ollama:qwen3.8:27b" && fields?["routing"]?.stringValue?.isEmpty == false)
+        let routed = pair.sink.events.first { $0.kind == .modelRouted }
+        #expect(routed?.details["model"] == "ollama:qwen3.8:27b" && routed?.details["inputBytes"] != nil)
+        await pair.client.disconnect()
+        await pair.server.stop()
+        // When the chosen rung cannot be opened, the first rung drafts and the reason says so.
+        let down = try await connected(
+            triageSteps: [
+                .say(#"{"headline":"x","files":[{"path":"a.swift","summary":"s"}],"flags":[]}"#),
+                .say(#"{"subject":"Change a","points":[]}"#),
+            ], config: #"{"routing":{"ladder":["system","ollama:qwen3.8:27b"]}}"#, unopenable: .ollama("qwen3.8:27b"))
+        let fallback = try await call(
+            down.client, "draft_change", ["kind": .string("commit"), "path": .string(diff.path)])
+        #expect(fallback.structuredContent?.objectValue?["model"] == "system", "\(fallback)")
+        #expect(fallback.structuredContent?.objectValue?["routing"]?.stringValue?.contains("cannot be opened") == true)
+        await down.client.disconnect()
+        await down.server.stop()
     }
 
     @Test func settingsOnAnExistingThreadAndCloseThreadOverTheProtocol() async throws {

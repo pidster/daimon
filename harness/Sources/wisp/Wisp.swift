@@ -671,11 +671,32 @@ struct Draft: AsyncParsableCommand {
         }
         let summarySchema = try OutputSchema(json: DiffSummary.schemaJSON)
         let draftSchema = try OutputSchema(json: ChangeDraft.schemaJSON)
+        let bytes = captured.text.utf8.count
+        let routed = ChangeDraft.route(
+            explicit: try model.map(Wisp.parseModel), inputBytes: bytes, ladder: session.config.routingLadder,
+            opens: { model in
+                do {
+                    _ = try conversation.openAgent(model: model)
+                    return nil
+                } catch {
+                    return "\(error)"
+                }
+            })
+        if let routed {
+            conversation.audit.record(
+                .modelRouted,
+                details: AuditEvent.Details.modelRouted(
+                    task: ChangeDraft.routingTask, inputBytes: bytes, decision: routed))
+            Wisp.note("model: \(routed.model) (\(routed.reason))")
+        }
+        let chosen = routed?.model
         do {
             let draft = try await ChangeDraft.draft(
                 kind, from: captured, source: source,
-                summarise: { try await conversation.openAgent().respond(to: $0, schema: summarySchema).text },
-                write: { try await conversation.openAgent().respond(to: $0, schema: draftSchema).text })
+                summarise: {
+                    try await conversation.openAgent(model: chosen).respond(to: $0, schema: summarySchema).text
+                },
+                write: { try await conversation.openAgent(model: chosen).respond(to: $0, schema: draftSchema).text })
             print(draft.text)
         } catch let failure as ChangeDraft.Failure {
             throw ValidationError("\(failure)")

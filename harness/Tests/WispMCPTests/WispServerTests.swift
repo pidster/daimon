@@ -25,10 +25,13 @@ func scriptedThreads(
 }
 
 /// A session over a scratch home, with a memory audit sink and a denying approver.
-func scratchSession(entryPoint: EntryPoint = .mcp, dependencies: Session.Dependencies = .testing()) throws -> Session {
+func scratchSession(
+    entryPoint: EntryPoint = .mcp, dependencies: Session.Dependencies = .testing(), config: String? = nil
+) throws -> Session {
     let root = FileManager.default.temporaryDirectory.appending(path: "wisp-mcp-tests-\(UUID().uuidString)")
     let home = Home(root: root)
     try home.ensure()
+    if let config { try Data(config.utf8).write(to: home.configFile) }
     return try Session.begin(.init(entryPoint: entryPoint), home: home, dependencies: dependencies)
 }
 

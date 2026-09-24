@@ -34,7 +34,7 @@ public struct WispServer: Sendable {
     /// Asks the client's user through elicitation; `--yes` sessions bypass it inside the gate.
     private let approver: ElicitationApprover
     /// Opens the agent that judges one chunk for a condensing tool; tests inject one over a scripted model.
-    private let makeTriageAgent: @Sendable (Conversation) throws -> Agent
+    private let makeTriageAgent: @Sendable (Conversation, ModelSelection?) throws -> Agent
 
     /// Creates a server over a session begun by the CLI. Threads are opened through
     /// `Session.conversation` with an elicitation approver, so every face of wisp shares one
@@ -43,7 +43,8 @@ public struct WispServer: Sendable {
     /// - Parameters:
     ///   - session: The session from `Session.begin`.
     ///   - makeThread: How threads are built; tests inject a fake that needs no model.
-    ///   - makeTriageAgent: How a triage chunk's agent is opened on its conversation; tests inject a
+    ///   - makeTriageAgent: How a condensing tool's agent is opened on its conversation, on a routed model
+    ///     when one was chosen and the conversation's own otherwise; tests inject a
     ///     scripted model.
     public init(
         session: Session,
@@ -54,7 +55,9 @@ public struct WispServer: Sendable {
                 thread: ConversationThread(id: id, agent: try conversation.openAgent()), gate: conversation.gate,
                 audit: conversation.audit, receipts: conversation.receipts)
         },
-        makeTriageAgent: @escaping @Sendable (Conversation) throws -> Agent = { try $0.openAgent() }
+        makeTriageAgent: @escaping @Sendable (Conversation, ModelSelection?) throws -> Agent = {
+            try $0.openAgent(model: $1)
+        }
     ) {
         server = Server(
             name: Self.name, version: Self.version,
@@ -283,7 +286,7 @@ public struct WispServer: Sendable {
             let schema = try OutputSchema(json: Triage.schemaJSON)
             let makeAgent = makeTriageAgent
             let triage = Triage(options: .init(maxFindings: request.maxFindings)) { prompt in
-                try await makeAgent(conversation).respond(to: prompt, schema: schema).text
+                try await makeAgent(conversation, nil).respond(to: prompt, schema: schema).text
             }
             let runner = CommandRunner(
                 options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
@@ -307,7 +310,7 @@ public struct WispServer: Sendable {
             let schema = try OutputSchema(json: DiffSummary.schemaJSON)
             let makeAgent = makeTriageAgent
             let summary = DiffSummary(options: .init(maxFiles: request.maxFiles)) { prompt in
-                try await makeAgent(conversation).respond(to: prompt, schema: schema).text
+                try await makeAgent(conversation, nil).respond(to: prompt, schema: schema).text
             }
             let runner = CommandRunner(
                 options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
@@ -349,11 +352,31 @@ public struct WispServer: Sendable {
     /// Summarises the diff per file, then drafts from the summary, on one conversation `draft-<id>`.
     private func draftChange(_ request: DraftChangeRequest) async -> CallTool.Result {
         await condense(prefix: "draft", source: request.source, model: request.model) { conversation, captured in
+            let bytes = captured.text.utf8.count
+            let routed = ChangeDraft.route(
+                explicit: request.model, inputBytes: bytes, ladder: config.routingLadder,
+                opens: { model in
+                    do {
+                        _ = try makeTriageAgent(conversation, model)
+                        return nil
+                    } catch {
+                        return "\(error)"
+                    }
+                })
+            if let routed {
+                conversation.audit.record(
+                    .modelRouted,
+                    details: AuditEvent.Details.modelRouted(
+                        task: ChangeDraft.routingTask, inputBytes: bytes, decision: routed))
+            }
             let draft = try await ChangeDraft.draft(
                 request.kind, from: captured, source: request.source,
-                summarise: judge(on: conversation, schema: DiffSummary.schemaJSON),
-                write: judge(on: conversation, schema: ChangeDraft.schemaJSON))
-            return (draft.text, draft.json)
+                summarise: judge(on: conversation, schema: DiffSummary.schemaJSON, model: routed?.model),
+                write: judge(on: conversation, schema: ChangeDraft.schemaJSON, model: routed?.model))
+            var fields = draft.json.objectValue ?? [:]
+            fields["model"] = .string((routed?.model ?? conversation.model).description)
+            fields["routing"] = routed.map { .string($0.reason) } ?? .null
+            return (draft.text, .object(fields))
         }
     }
 
@@ -450,11 +473,12 @@ public struct WispServer: Sendable {
         )
     }
 
-    /// A judge that answers each prompt in a fresh turn on `conversation`, shaped by `schema`.
-    private func judge(on conversation: Conversation, schema: JSONValue) -> Triage.Judge {
+    /// A judge that answers each prompt in a fresh turn on `conversation`, shaped by `schema`, on `model`
+    /// when routing chose one and the conversation's own otherwise.
+    private func judge(on conversation: Conversation, schema: JSONValue, model: ModelSelection? = nil) -> Triage.Judge {
         let makeAgent = makeTriageAgent
         return { prompt in
-            try await makeAgent(conversation).respond(to: prompt, schema: try OutputSchema(json: schema)).text
+            try await makeAgent(conversation, model).respond(to: prompt, schema: try OutputSchema(json: schema)).text
         }
     }
 

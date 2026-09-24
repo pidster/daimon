@@ -211,6 +211,9 @@ with `wisp scan` and `wisp redact` ([ADR 0031](decisions/0031-secret-scanning-an
 and ranking for logs, a parsed `.ips` for crashes, a merged outline for JSON
 ([ADR 0032](decisions/0032-log-and-json-condensers.md)). The server's `condense` helper gives every
 condensing tool its conversation, runner, gate, and capture.
+`ModelRouting` chooses a model by input size from `Measurements.embedded` and the config's ladder, before
+anything runs; `ChangeDraft.route` applies it, honouring an explicit model and passing over a rung that
+cannot open ([ADR 0037](decisions/0037-routing-by-input-size.md)).
 `draft_change` and `wisp draft` are `ChangeDraft`: a `DiffSummary` report, then one schema-shaped turn,
 with the subject and body shape applied in code ([ADR 0035](decisions/0035-change-drafts.md)).
 A session's model classifier is wrapped as `CachingRiskClassifier(TimedRiskClassifier(…))`: verdicts are

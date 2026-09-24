@@ -383,11 +383,13 @@ public struct Conversation: Sendable {
     /// Resolves the model, refuses a request its declared capabilities cannot serve, records
     /// `model.resolved`, and creates the agent that runs this conversation.
     ///
-    /// - Parameter transcript: A saved conversation to resume, or nil to start from the instructions.
+    /// - Parameters:
+    ///   - transcript: A saved conversation to resume, or nil to start from the instructions.
+    ///   - override: A model other than the conversation's, as routing by input size chooses one.
     /// - Returns: The agent, recording to this conversation's audit log and advancing its turn clock.
     /// - Throws: `ModelSelection.Failure` if the model cannot be used or lacks a needed capability.
-    public func openAgent(transcript: Transcript? = nil) throws -> Agent {
-        let resolved = try model.resolve(config: config, home: home)
+    public func openAgent(transcript: Transcript? = nil, model override: ModelSelection? = nil) throws -> Agent {
+        let resolved = try (override ?? model).resolve(config: config, home: home)
         try resolved.check(tools: tools)
         audit.record(
             .modelResolved,

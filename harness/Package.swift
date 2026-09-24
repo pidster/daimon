@@ -93,7 +93,9 @@ let package = Package(
         ),
         .testTarget(
             name: "ModelEvalTests",
-            dependencies: ["WispCore"]
+            dependencies: ["WispCore"],
+            // Real diffs from this repository's history, read by path in DraftEvalTests.
+            exclude: ["Fixtures"]
         ),
         .plugin(
             name: "EmbedSystemPrompt",

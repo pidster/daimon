@@ -43,6 +43,8 @@ wrapped body.
   local model for large changes.
 - A large diff costs the summary's turns (about 2 s per 4 KiB on the system model) plus one.
 - The draft is a draft: the tool's description and `wisp draft --help` say to review it.
+- Superseded in part by [ADR 0037](0037-routing-by-input-size.md): with stricter expected words the
+  system model scored 7 of 10 on small diffs, and drafts are routed by input size.
 - Tests without the model: the subject and wrapping rules, file ordering, each kind's shape, the
   fallback to the headline on a malformed answer, the empty-diff refusal, the whole flow over scripted
   judges, and the MCP tool over the wire.

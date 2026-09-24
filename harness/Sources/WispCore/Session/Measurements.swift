@@ -21,12 +21,19 @@ public struct Measurement: Codable, Equatable, Sendable {
     public var total: Int
     /// What a case is and what counted as a pass, in one sentence.
     public var notes: String
+    /// The largest input among the cases, in bytes, when the task routes by input size: the result is
+    /// evidence for inputs up to this size and no further ([ADR 0037](../../../../docs/decisions/0037-routing-by-input-size.md)).
+    public var maxInputBytes: Int?
 
     /// Creates a measurement dated today.
-    public init(task: String, tool: String? = nil, model: String, passed: Int, total: Int, notes: String) {
+    public init(
+        task: String, tool: String? = nil, model: String, passed: Int, total: Int, notes: String,
+        maxInputBytes: Int? = nil
+    ) {
         self.task = task
         self.tool = tool
         self.model = model
+        self.maxInputBytes = maxInputBytes
         date = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
         self.passed = passed
         self.total = total
@@ -53,17 +60,21 @@ public enum Measurements {
         try? JSONDecoder().decode([Measurement].self, from: Data(text.utf8))
     }
 
-    /// The measurements as pretty JSON, sorted by task.
+    /// The measurements as pretty JSON, sorted by task, then model, then input size.
     public static func encode(_ measurements: [Measurement]) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard let data = try? encoder.encode(measurements.sorted { $0.task < $1.task }) else { return "[]" }
+        let sorted = measurements.sorted {
+            ($0.task, $0.model, $0.maxInputBytes ?? 0) < ($1.task, $1.model, $1.maxInputBytes ?? 0)
+        }
+        guard let data = try? encoder.encode(sorted) else { return "[]" }
         return String(decoding: data, as: UTF8.self) + "\n"
     }
 
-    /// `existing` with `new` replacing any measurement of the same task and model.
+    /// `existing` with `new` replacing any measurement of the same task, model, and input size.
     public static func merge(_ existing: [Measurement], with new: Measurement) -> [Measurement] {
-        existing.filter { $0.task != new.task || $0.model != new.model } + [new]
+        existing.filter { $0.task != new.task || $0.model != new.model || $0.maxInputBytes != new.maxInputBytes }
+            + [new]
     }
 
     /// Prints the measurement and, when `WISP_EVAL_RECORD` (or `path`) names a file, merges it into

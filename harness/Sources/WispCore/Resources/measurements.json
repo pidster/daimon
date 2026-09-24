@@ -9,11 +9,57 @@
   },
   {
     "date" : "2026-09-24",
-    "model" : "system",
+    "maxInputBytes" : 481,
+    "model" : "ollama:qwen3.8:27b",
     "notes" : "commit subjects for five small diffs (a retry loop, a default changed, a new flag, an off-by-one fix, a docs addition), twice each; a pass is a subject naming what the change is about",
-    "passed" : 9,
+    "passed" : 10,
     "task" : "draft_change.commit",
     "total" : 10
+  },
+  {
+    "date" : "2026-09-24",
+    "maxInputBytes" : 14060,
+    "model" : "ollama:qwen3.8:27b",
+    "notes" : "commit subjects for 2 real commits of this repository up to 13 KB of diff; a pass is a subject naming what the commit did",
+    "passed" : 2,
+    "task" : "draft_change.commit",
+    "total" : 2
+  },
+  {
+    "date" : "2026-09-24",
+    "maxInputBytes" : 51816,
+    "model" : "ollama:qwen3.8:27b",
+    "notes" : "commit subjects for 2 real commits of this repository up to 50 KB of diff; a pass is a subject naming what the commit did",
+    "passed" : 2,
+    "task" : "draft_change.commit",
+    "total" : 2
+  },
+  {
+    "date" : "2026-09-24",
+    "maxInputBytes" : 481,
+    "model" : "system",
+    "notes" : "commit subjects for five small diffs (a retry loop, a default changed, a new flag, an off-by-one fix, a docs addition), twice each; a pass is a subject naming what the change is about",
+    "passed" : 7,
+    "task" : "draft_change.commit",
+    "total" : 10
+  },
+  {
+    "date" : "2026-09-24",
+    "maxInputBytes" : 14060,
+    "model" : "system",
+    "notes" : "commit subjects for 2 real commits of this repository up to 13 KB of diff; a pass is a subject naming what the commit did",
+    "passed" : 2,
+    "task" : "draft_change.commit",
+    "total" : 2
+  },
+  {
+    "date" : "2026-09-24",
+    "maxInputBytes" : 51816,
+    "model" : "system",
+    "notes" : "commit subjects for 2 real commits of this repository up to 50 KB of diff; a pass is a subject naming what the commit did",
+    "passed" : 1,
+    "task" : "draft_change.commit",
+    "total" : 2
   },
   {
     "date" : "2026-09-22",

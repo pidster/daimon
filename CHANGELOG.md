@@ -8,6 +8,9 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 Added:
 
+- Routing by input size: with `routing.ladder` in the config (such as `["system",
+  "ollama:qwen3.8:27b"]`), `draft_change` and `wisp draft` pick the first model the measurements trust
+  with a diff that large, and say which and why. Off unless configured; an explicit model wins.
 - Custom tools: declare your own tools for the model in `~/.wisp/config.json` (`tools.custom`), each a
   command with `{placeholders}` and typed arguments, run through `run_command`'s policy, approval, and
   sandbox; `tools.disabled` leaves built-in tools out. See `docs/tools/custom.md`.

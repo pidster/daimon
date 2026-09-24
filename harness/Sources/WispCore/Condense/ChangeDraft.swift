@@ -20,6 +20,38 @@ public struct ChangeDraft: Sendable {
         case changelog
     }
 
+    /// The measured task every kind routes on: summarising the diff is the costly, shared step, and the
+    /// commit eval measures it ([ADR 0037](../../../../docs/decisions/0037-routing-by-input-size.md)).
+    public static let routingTask = "draft_change.commit"
+
+    /// The model to draft with: the caller's when it named one, else the ladder's choice for this input's
+    /// size, else nil for the conversation's own.
+    ///
+    /// - Parameters:
+    ///   - explicit: The model the caller asked for, which always wins.
+    ///   - inputBytes: The diff's size.
+    ///   - ladder: The configured ladder; empty turns routing off.
+    ///   - measurements: What the eval recorded; the embedded set by default.
+    ///   - opens: Whether a model can be opened here, nil when it can; a model that cannot (Ollama not
+    ///     running) is passed over for the ladder's first, with the reason kept.
+    /// - Returns: The decision, or nil when nothing routes.
+    public static func route(
+        explicit: ModelSelection?, inputBytes: Int, ladder: [ModelSelection],
+        measurements: [Measurement] = Measurements.embedded, opens: (ModelSelection) -> String?
+    ) -> ModelRouting.Decision? {
+        guard explicit == nil,
+            let decision = ModelRouting.choose(
+                task: routingTask, inputBytes: inputBytes, ladder: ladder, measurements: measurements)
+        else { return nil }
+        if let problem = opens(decision.model) {
+            return ModelRouting.Decision(
+                model: ladder.first ?? decision.model,
+                reason: decision.reason
+                    + "; but \(decision.model) cannot be opened (\(problem)), so \(ladder.first ?? decision.model)")
+        }
+        return decision
+    }
+
     /// The placeholder the commit body ends with.
     public static let whyPlaceholder = "Why: <the reason for this change, which the diff cannot say>"
     /// Characters a subject or title may have.

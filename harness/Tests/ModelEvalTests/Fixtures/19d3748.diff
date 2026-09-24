@@ -1,0 +1,525 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index fa7e673..a57b2f1 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,19 @@ Notable changes per release, written for people who run wisp. The release script
+ section for the version being cut as the GitHub release notes and refuses to release without one.
+ Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
+ 
++## Unreleased
++
++Added:
++
++- `condense_log` reads this Mac's unified log with `last` (such as `10m`), optionally for one `process`
++  or `subsystem`, in wisp's own process: `/usr/bin/log` refuses to run in any sandbox.
++
++Fixed:
++
++- The condensing tools ignored a command's exit status, so a failing command's error message was
++  condensed as though it were the output. They now return `exitStatus` and `timedOut` and start their
++  text with a warning when the command failed.
++
+ ## 0.9.0
+ 
+ Added:
+diff --git a/docs/decisions/0032-log-and-json-condensers.md b/docs/decisions/0032-log-and-json-condensers.md
+index 4fc9a97..7ff5a4f 100644
+--- a/docs/decisions/0032-log-and-json-condensers.md
++++ b/docs/decisions/0032-log-and-json-condensers.md
+@@ -47,3 +47,20 @@ of which the process, exception, termination, and faulting thread's frames are w
+   name, a path) forms one group per value. The example and line range still point to the lines.
+ - Other condensers named with these (dependency audit output, profiler exports, flaky tests across
+   runs) are left for later; `docs/backlog.md` lists them.
++
++## Amendment, 2026-09-24: the unified log is read in process, and a failing command is flagged
++
++Using `condense_log` from Claude Code showed two gaps. `/usr/bin/log show` cannot run as a wisp command:
++it checks whether it is sandboxed and exits with `log: Cannot run while sandboxed`, even under a
++Seatbelt profile that allows everything, so no change to wisp's profile could help. The measurement
++above was of `log show` output captured outside wisp. `condense_log` now takes `last` (such as `10m`,
++at most a day) with optional `process` and `subsystem` filters and reads the unified log in wisp's own
++process through `OSLogStore.local()`, which an unsigned binary may open (probed the same day: 26,566
++entries from one minute in about a second). The entries are written as `log show` compact-style lines
++so their declared type decides severity.
++
++The same session showed the condensers ignoring the command's exit status: `log show`'s one-line refusal
++came back as a one-line `info` log, and a failing `git diff` would have read as a clean scan. Every
++condensing tool with a command source now returns `exitStatus` and `timedOut`, and its text starts with a
++warning and the first line of output when the command failed or timed out.
++
+diff --git a/docs/mcp.md b/docs/mcp.md
+index 75c5142..c692816 100644
+--- a/docs/mcp.md
++++ b/docs/mcp.md
+@@ -336,7 +336,7 @@ The measured result of the thorough pass is in [measurements.md](measurements.md
+ 
+ ### `condense_log`
+ 
+-Condense a log on this Mac (an app's log, CI output, `/usr/bin/log show`) to its distinct messages,
++Condense a log on this Mac (an app's log, CI output, the unified log) to its distinct messages,
+ without a model ([ADR 0032](decisions/0032-log-and-json-condensers.md)). Each line becomes a template:
+ the leading timestamp is removed and numbers, hex, UUIDs, long ids, and `log show`'s `[pid:thread]` are
+ replaced by `<n>`, `<hex>`, `<uuid>`, `<id>`, `[<pid>]`. Lines with the same template form a group,
+@@ -349,9 +349,12 @@ instead and returned as the process, version, OS, exception, termination, and th
+ 
+ | Argument | Type | Required | Meaning |
+ | --- | --- | --- | --- |
+-| `command` | string | one of | Shell command line whose output to condense, run as for `triage`, such as `/usr/bin/log show --last 10m --predicate 'process == "MyApp"'`. |
++| `command` | string | one of | Shell command line whose output to condense, run as for `triage`, such as `tail -20000 app.log`. Not `/usr/bin/log`: it refuses to run in any sandbox; use `last`. |
+ | `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+ | `path` | string | one of | Absolute path of a log or `.ips` file; the read clears the gate as `read_file` does. |
++| `last` | string | one of | Read this Mac's unified log for this long back, in wisp's own process through `OSLogStore`: `90s`, `10m`, `2h`, at most `24h`. |
++| `process` | string | no | With `last`: only this process, by name (case-insensitive). |
++| `subsystem` | string | no | With `last`: only subsystems starting with this, such as `com.apple.network`. |
+ | `max_groups` | integer | no | Groups to return at most (default 30); `more` is true when some were dropped. |
+ 
+ For a log, `structuredContent` is `{ "kind": "log", "lines", "templates", "more", "truncated",
+@@ -360,7 +363,12 @@ For a log, `structuredContent` is `{ "kind": "log", "lines", "templates", "more"
+ credentials redacted. For a crash report it is `{ "kind": "crash", "process", "version", "os",
+ "timestamp", "bugType", "exception", "termination", "faultingThread", "frames": [{ "image", "symbol",
+ "offset" }] }`. Measured on 2026-09-23: two minutes of `log show` (14,333 lines, 2.8 MB) reduced to 1,972
+-templates in 1.2 s, the top 30 in about 10 KB.
++templates in 1.2 s, the top 30 in about 10 KB (that output was captured outside wisp, since `log` will
++not run as a wisp command).
++
++Every condensing tool given a `command` returns its `exitStatus` and `timedOut` in `structuredContent`.
++When the command failed or timed out, the text starts with `warning: the command exited N` and the first
++line of its output, since a failing command's output is usually its error message.
+ 
+ ### `json_shape`
+ 
+diff --git a/docs/tools/run_command.md b/docs/tools/run_command.md
+index f3f9301..2832b00 100644
+--- a/docs/tools/run_command.md
++++ b/docs/tools/run_command.md
+@@ -84,11 +84,14 @@ The invariant: a write succeeds if and only if the real file lands inside the wr
+ one different mechanism, but creating one needs write access to the destination directory and the same
+ volume, so it can only alias files the command could already reach.
+ 
+-### Setuid programs
++### Programs that will not run sandboxed
+ 
+ Seatbelt will not execute a setuid binary, so `/bin/ps` and `/usr/bin/top` fail inside the sandbox
+ (`execvp() of '/bin/ps' failed: Operation not permitted`, verified on macOS 27 on 2026-09-23). The
+ `system_info` tool reads the process table through `libproc` instead ([system_info](system_info.md)).
++`/usr/bin/log` checks for a sandbox itself and exits (`log: Cannot run while sandboxed`), even under a
++profile that allows everything (verified 2026-09-24); `condense_log` with `last` reads the unified log
++in process instead ([mcp.md](../mcp.md)).
+ 
+ ### Nested sandboxes
+ 
+diff --git a/harness/Sources/WispCore/Condense/UnifiedLog.swift b/harness/Sources/WispCore/Condense/UnifiedLog.swift
+new file mode 100644
+index 0000000..b7d77a0
+--- /dev/null
++++ b/harness/Sources/WispCore/Condense/UnifiedLog.swift
+@@ -0,0 +1,139 @@
++import Foundation
++import OSLog
++
++/// Reads the unified log in wisp's own process through `OSLogStore`, for `condense_log`. `/usr/bin/log`
++/// cannot serve: it checks whether it is sandboxed and exits (`log: Cannot run while sandboxed`, even
++/// under a profile that allows everything, verified on macOS 27 on 2026-09-24), and every command wisp
++/// runs is sandboxed. The entries are written as lines in `log show`'s compact style, so `LogDigest`
++/// reads their declared type ([ADR 0032](../../../../docs/decisions/0032-log-and-json-condensers.md)).
++public enum UnifiedLog {
++    /// What to read.
++    public struct Query: Equatable, Sendable {
++        /// How far back, in seconds.
++        public var seconds: Int
++        /// Only entries from this process name, when given.
++        public var process: String?
++        /// Only entries whose subsystem starts with this, when given.
++        public var subsystem: String?
++
++        /// Creates a query.
++        public init(seconds: Int, process: String? = nil, subsystem: String? = nil) {
++            self.seconds = seconds
++            self.process = process
++            self.subsystem = subsystem
++        }
++    }
++
++    /// The longest window read: a day.
++    public static let maxSeconds = 86_400
++
++    /// Why a query cannot run.
++    public enum Failure: Error, CustomStringConvertible, Equatable {
++        /// `last` is not a duration such as `90s`, `10m`, or `2h`, or is longer than a day.
++        case badDuration(String)
++        /// The log store could not be opened or read.
++        case unreadable(String)
++
++        /// Human-readable explanation.
++        public var description: String {
++            switch self {
++            case .badDuration(let text): "'\(text)' is not a duration from 1s to 24h, such as 90s, 10m, or 2h"
++            case .unreadable(let detail): "the unified log could not be read: \(detail)"
++            }
++        }
++    }
++
++    /// Seconds in a duration written `90s`, `10m`, `2h`, or a bare number of seconds.
++    ///
++    /// - Throws: `Failure.badDuration` for anything else, zero, or more than a day.
++    public static func seconds(in text: String) throws -> Int {
++        let trimmed = text.trimmingCharacters(in: .whitespaces).lowercased()
++        let units: [Character: Int] = ["s": 1, "m": 60, "h": 3600]
++        let (digits, scale) =
++            trimmed.last.flatMap { units[$0] }.map { (String(trimmed.dropLast()), $0) } ?? (trimmed, 1)
++        guard let value = Int(digits), value > 0, value * scale <= maxSeconds else { throw Failure.badDuration(text) }
++        return value * scale
++    }
++
++    /// The query as a predicate `OSLogStore` evaluates, or nil when it filters nothing.
++    static func predicate(_ query: Query) -> NSPredicate? {
++        var parts: [NSPredicate] = []
++        if let process = query.process { parts.append(NSPredicate(format: "process ==[c] %@", process)) }
++        if let subsystem = query.subsystem { parts.append(NSPredicate(format: "subsystem BEGINSWITH %@", subsystem)) }
++        return parts.isEmpty ? nil : NSCompoundPredicate(andPredicateWithSubpredicates: parts)
++    }
++
++    /// The compact-style type code for a level: `F` fault, `E` error, `Df` default, `I` info, `Db` debug.
++    static func code(_ level: OSLogEntryLog.Level) -> String {
++        switch level {
++        case .fault: "F"
++        case .error: "E"
++        case .info: "I"
++        case .debug: "Db"
++        default: "Df"
++        }
++    }
++
++    /// One entry as a compact-style line, local time with its offset:
++    /// `2026-09-24T10:02:11.482+01:00 E  proc[pid:thread] [sub:cat] message`.
++    static func line(
++        date: Date, level: String, process: String, pid: Int32, thread: UInt64, subsystem: String, category: String,
++        message: String, timeZone: TimeZone = .current
++    ) -> String {
++        let stamp = date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true, timeZone: timeZone))
++        let origin = subsystem.isEmpty ? "" : " [\(subsystem):\(category)]"
++        let flat = message.replacingOccurrences(of: "\n", with: " ")
++        return
++            "\(stamp) \(level.padding(toLength: 2, withPad: " ", startingAt: 0)) \(process)[\(pid):\(String(thread, radix: 16))]\(origin) \(flat)"
++    }
++
++    /// Reads the entries of the last `query.seconds`, as compact lines, up to `maxBytes`, keeping the latest.
++    ///
++    /// - Returns: The text and whether older entries were dropped to fit.
++    /// - Throws: `Failure.unreadable` when the store cannot be opened or read.
++    public static func read(_ query: Query, maxBytes: Int) throws -> (text: String, truncated: Bool) {
++        let store: OSLogStore
++        do {
++            store = try OSLogStore.local()
++        } catch {
++            throw Failure.unreadable("\(error)")
++        }
++        let start = store.position(date: Date().addingTimeInterval(-Double(query.seconds)))
++        var lines: [String] = []
++        var bytes = 0
++        var truncated = false
++        do {
++            for entry in try store.getEntries(at: start, matching: predicate(query)) {
++                guard let log = entry as? OSLogEntryLog else { continue }
++                let text = line(
++                    date: log.date, level: code(log.level), process: log.process, pid: log.processIdentifier,
++                    thread: log.threadIdentifier, subsystem: log.subsystem, category: log.category,
++                    message: log.composedMessage)
++                lines.append(text)
++                bytes += text.utf8.count + 1
++                // Keep the newest: drop from the front once over the cap, in batches to stay linear.
++                if bytes > maxBytes * 2 {
++                    let (kept, size) = tail(lines, maxBytes: maxBytes)
++                    lines = kept
++                    bytes = size
++                    truncated = true
++                }
++            }
++        } catch {
++            throw Failure.unreadable("\(error)")
++        }
++        let (kept, size) = tail(lines, maxBytes: maxBytes)
++        return (kept.joined(separator: "\n"), truncated || size < bytes)
++    }
++
++    /// The latest lines that fit in `maxBytes`, and their size.
++    static func tail(_ lines: [String], maxBytes: Int) -> (lines: [String], bytes: Int) {
++        var size = 0
++        var start = lines.count
++        while start > 0, size + lines[start - 1].utf8.count + 1 <= maxBytes {
++            start -= 1
++            size += lines[start].utf8.count + 1
++        }
++        return (Array(lines[start...]), size)
++    }
++}
+diff --git a/harness/Sources/WispMCP/ToolCatalog.swift b/harness/Sources/WispMCP/ToolCatalog.swift
+index 0dfe8d9..1bd16fd 100644
+--- a/harness/Sources/WispMCP/ToolCatalog.swift
++++ b/harness/Sources/WispMCP/ToolCatalog.swift
+@@ -248,11 +248,12 @@ public enum ToolCatalog {
+     public static let condenseLog = Tool(
+         name: "condense_log",
+         description:
+-            "Condense a log on this Mac (an app log, CI output, or /usr/bin/log show output) to its distinct "
+-            + "messages: lines grouped by template with timestamps and ids removed, ranked by severity then count, "
+-            + "with line ranges and first and last timestamps. A macOS crash report (.ips) comes back as the "
+-            + "process, exception, and faulting thread's frames. No model; up to 8 MiB. Give exactly one of command "
+-            + "or path.",
++            "Condense a log on this Mac (an app log, CI output, or the unified log) to its distinct messages: lines "
++            + "grouped by template with timestamps and ids removed, ranked by severity then count, with line ranges "
++            + "and first and last timestamps. For the unified log give last (such as 10m), optionally with process "
++            + "or subsystem; /usr/bin/log refuses to run in the sandbox. A macOS crash report (.ips) comes back as "
++            + "the process, exception, and faulting thread's frames. No model; up to 8 MiB. Give exactly one of "
++            + "command, path, or last.",
+         inputSchema: .object([
+             "type": .string("object"),
+             "properties": .object([
+@@ -270,6 +271,19 @@ public enum ToolCatalog {
+                     "type": .string("string"),
+                     "description": .string("Absolute path of a file on this Mac to read instead."),
+                 ]),
++                "last": .object([
++                    "type": .string("string"),
++                    "description": .string(
++                        "Read this Mac's unified log for this long back instead: 90s, 10m, 2h (at most 24h)."),
++                ]),
++                "process": .object([
++                    "type": .string("string"),
++                    "description": .string("With last: only this process, by name, such as Safari."),
++                ]),
++                "subsystem": .object([
++                    "type": .string("string"),
++                    "description": .string("With last: only subsystems starting with this, such as com.apple.network."),
++                ]),
+                 "max_groups": .object([
+                     "type": .string("integer"),
+                     "description": .string("Message groups to return at most (default 30); more is flagged."),
+@@ -633,17 +647,42 @@ public struct RedactRequest: Equatable, Sendable {
+ public struct CondenseLogRequest: Equatable, Sendable {
+     /// Bytes of log read; only the tail beyond this.
+     static let maxBytes = 8 << 20
++    /// Where the log comes from.
++    public enum Origin: Equatable, Sendable {
++        /// A command's output or a file.
++        case captured(Triage.Source)
++        /// This Mac's unified log, read in process.
++        case unified(UnifiedLog.Query)
++    }
+     /// What to condense.
+-    public var source: Triage.Source
++    public var origin: Origin
+     /// Groups to return at most.
+     public var maxGroups: Int
+ 
+     /// Decodes and validates MCP call arguments.
+     ///
+     /// - Parameter arguments: The raw `tools/call` arguments.
+-    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, or for a bad `max_groups`.
++    /// - Throws: `MCPError.invalidParams` as `CondensingRequest`, for `last` beside a command or path, a bad
++    ///   duration, or a bad `max_groups`.
+     public init(arguments: [String: Value]?) throws {
+-        source = try CondensingRequest(arguments: arguments).source
++        if let raw = arguments?["last"] {
++            guard arguments?["command"] == nil, arguments?["path"] == nil else {
++                throw MCPError.invalidParams("give exactly one of 'command', 'path', or 'last'")
++            }
++            guard let text = raw.stringValue else { throw MCPError.invalidParams("'last' must be a string") }
++            let seconds: Int
++            do {
++                seconds = try UnifiedLog.seconds(in: text)
++            } catch {
++                throw MCPError.invalidParams("'last': \(error)")
++            }
++            origin = .unified(
++                .init(
++                    seconds: seconds, process: arguments?["process"]?.stringValue,
++                    subsystem: arguments?["subsystem"]?.stringValue))
++        } else {
++            origin = .captured(try CondensingRequest(arguments: arguments).source)
++        }
+         maxGroups = try CondensingRequest.count(arguments, "max_groups", fallback: LogDigest.Options().maxGroups)
+     }
+ }
+diff --git a/harness/Sources/WispMCP/WispServer.swift b/harness/Sources/WispMCP/WispServer.swift
+index 5a4dd91..821dafd 100644
+--- a/harness/Sources/WispMCP/WispServer.swift
++++ b/harness/Sources/WispMCP/WispServer.swift
+@@ -343,11 +343,10 @@ public struct WispServer: Sendable {
+         }
+     }
+ 
+-    /// Digests a log, or reads a crash report, without a model.
++    /// Digests a log, or reads a crash report, without a model: a command's output or a file through the
++    /// usual capture, or the unified log read in process.
+     private func condenseLog(_ request: CondenseLogRequest) async -> CallTool.Result {
+-        await condense(
+-            prefix: "log", source: request.source, model: nil, maxBytes: CondenseLogRequest.maxBytes
+-        ) { _, captured in
++        let digest: @Sendable (Triage.Captured) -> (text: String, json: JSONValue) = { captured in
+             if let crash = CrashReport(captured.text) { return (crash.rendered, crash.json) }
+             let report = LogDigest(options: .init(maxGroups: request.maxGroups)).run(captured.text)
+             var fields = report.json.objectValue ?? [:]
+@@ -355,6 +354,28 @@ public struct WispServer: Sendable {
+             let note = captured.truncated ? "\n(input cut to its last \(CondenseLogRequest.maxBytes) bytes)" : ""
+             return (report.rendered + note, .object(fields))
+         }
++        switch request.origin {
++        case .captured(let source):
++            return await condense(prefix: "log", source: source, model: nil, maxBytes: CondenseLogRequest.maxBytes) {
++                _, captured in digest(captured)
++            }
++        case .unified(let query):
++            do {
++                let conversation = try session.conversation(
++                    id: "log-" + ShortID.make(), approver: approver, tools: .none)
++                defer {
++                    conversation.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed"))
++                }
++                let read = try UnifiedLog.read(query, maxBytes: CondenseLogRequest.maxBytes)
++                let result = digest(Triage.Captured(text: read.text, truncated: read.truncated))
++                let structured: Value? = Value(json: result.json)
++                return .init(
++                    content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,
++                    isError: false)
++            } catch {
++                return failure(String(describing: error))
++            }
++        }
+     }
+ 
+     /// Outlines a JSON document or JSON Lines without a model; input cut to fit is refused, since a
+@@ -386,7 +407,7 @@ public struct WispServer: Sendable {
+                 options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+             let captured = try await Triage.capture(
+                 source, runner: runner, gate: conversation.gate, maxOutputBytes: maxBytes)
+-            let result = try await body(conversation, captured)
++            let result = Self.withExitStatus(try await body(conversation, captured), of: captured)
+             let structured: Value? = Value(json: result.json)
+             return .init(
+                 content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,
+@@ -396,6 +417,25 @@ public struct WispServer: Sendable {
+         }
+     }
+ 
++    /// A condensing result with the command's exit status and timeout added, and a warning ahead of the
++    /// text when the command failed: a failing command's output is usually its error message, which a
++    /// condenser would otherwise report as an empty diff or a one-line log.
++    static func withExitStatus(
++        _ result: (text: String, json: JSONValue), of captured: Triage.Captured
++    ) -> (text: String, json: JSONValue) {
++        guard let status = captured.exitStatus else { return result }
++        var fields = result.json.objectValue ?? [:]
++        fields["exitStatus"] = .int(Int(status))
++        fields["timedOut"] = .bool(captured.timedOut)
++        guard status != 0 || captured.timedOut else { return (result.text, .object(fields)) }
++        let why = captured.timedOut ? "timed out" : "exited \(status)"
++        let head = captured.text.split(separator: "\n").first.map { ": \($0.prefix(200))" } ?? ""
++        return (
++            "warning: the command \(why), so this may describe its error rather than its output\(head)\n\n"
++                + result.text, .object(fields)
++        )
++    }
++
+     /// A judge that answers each prompt in a fresh turn on `conversation`, shaped by `schema`.
+     private func judge(on conversation: Conversation, schema: JSONValue) -> Triage.Judge {
+         let makeAgent = makeTriageAgent
+diff --git a/harness/Tests/WispCoreTests/LogCondenserTests.swift b/harness/Tests/WispCoreTests/LogCondenserTests.swift
+index 86ad4e5..b010eb9 100644
+--- a/harness/Tests/WispCoreTests/LogCondenserTests.swift
++++ b/harness/Tests/WispCoreTests/LogCondenserTests.swift
+@@ -155,3 +155,51 @@ import Testing
+         #expect(JSONShape.Node.format(2.5) == "2.5" && JSONShape.Node.format(3) == "3")
+     }
+ }
++
++@Suite struct UnifiedLogTests {
++    @Test func durationsAreSecondsMinutesOrHoursUpToADay() throws {
++        #expect(try UnifiedLog.seconds(in: "90s") == 90)
++        #expect(try UnifiedLog.seconds(in: " 10M ") == 600)
++        #expect(try UnifiedLog.seconds(in: "2h") == 7200)
++        #expect(try UnifiedLog.seconds(in: "45") == 45)
++        for bad in ["0m", "25h", "ten", "-5s", ""] {
++            #expect(throws: UnifiedLog.Failure.self, "\(bad)") { try UnifiedLog.seconds(in: bad) }
++        }
++    }
++
++    @Test func linesAreCompactStyleSoTheDigestReadsTheirType() throws {
++        let utc = try #require(TimeZone(identifier: "UTC"))
++        let line = UnifiedLog.line(
++            date: Date(timeIntervalSince1970: 1_790_000_000.25), level: UnifiedLog.code(.error), process: "Safari",
++            pid: 412, thread: 0x1a2b, subsystem: "com.apple.WebKit", category: "Loading",
++            message: "load failed\nsecond line", timeZone: utc)
++        #expect(
++            line == "2026-09-21T14:13:20.250Z E  Safari[412:1a2b] [com.apple.WebKit:Loading] load failed second line")
++        let parsed = LogDigest.parse(line)
++        #expect(parsed.declared == .error && parsed.template.hasPrefix("Safari[<pid>] [com.apple.WebKit:Loading]"))
++        #expect(UnifiedLog.code(.fault) == "F" && UnifiedLog.code(.info) == "I" && UnifiedLog.code(.debug) == "Db")
++        #expect(UnifiedLog.code(.notice) == "Df")
++        let bare = UnifiedLog.line(
++            date: Date(), level: "Df", process: "p", pid: 1, thread: 1, subsystem: "", category: "", message: "m")
++        #expect(bare.hasSuffix(" Df p[1:1] m"))
++        #expect(LogDigest.parse(bare).declared == .info)
++    }
++
++    @Test func predicatesAndTailsAreBuiltFromTheQuery() {
++        #expect(UnifiedLog.predicate(.init(seconds: 60)) == nil)
++        let both = UnifiedLog.predicate(.init(seconds: 60, process: "Safari", subsystem: "com.apple"))
++        #expect(
++            both?.predicateFormat.contains("process") == true && both?.predicateFormat.contains("subsystem") == true)
++        let tail = UnifiedLog.tail(["aaaa", "bbbb", "cccc"], maxBytes: 10)
++        #expect(tail.lines == ["bbbb", "cccc"] && tail.bytes == 10)
++        #expect(UnifiedLog.tail(["toolongline"], maxBytes: 4).lines.isEmpty)
++    }
++
++    @Test(.enabled(if: !CommandRunner.isNestedSandbox)) func theLocalStoreCanBeReadInProcess() throws {
++        let read = try UnifiedLog.read(.init(seconds: 5), maxBytes: 1 << 20)
++        #expect(!read.text.isEmpty, "no entries in the last five seconds")
++        let small = try UnifiedLog.read(.init(seconds: 30), maxBytes: 2048)
++        #expect(small.text.utf8.count <= 2048)
++        #expect(UnifiedLog.Failure.badDuration("x").description.contains("such as 90s"))
++    }
++}
+diff --git a/harness/Tests/WispMCPTests/ToolCatalogTests.swift b/harness/Tests/WispMCPTests/ToolCatalogTests.swift
+index 850ea89..dc5c5a8 100644
+--- a/harness/Tests/WispMCPTests/ToolCatalogTests.swift
++++ b/harness/Tests/WispMCPTests/ToolCatalogTests.swift
+@@ -156,6 +156,13 @@ import WispCore
+         #expect(try CondenseLogRequest(arguments: ["path": .string("/x")]).maxGroups == 30)
+         #expect(try CondenseLogRequest(arguments: ["path": .string("/x"), "max_groups": .int(5)]).maxGroups == 5)
+         #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: [:]) }
++        let unified = try CondenseLogRequest(arguments: ["last": .string("10m"), "process": .string("Safari")])
++        #expect(unified.origin == .unified(.init(seconds: 600, process: "Safari")))
++        #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: ["last": .string("3d")]) }
++        #expect(throws: MCPError.self) {
++            try CondenseLogRequest(arguments: ["last": .string("1m"), "path": .string("/x")])
++        }
++        #expect(throws: MCPError.self) { try CondenseLogRequest(arguments: ["last": .int(5)]) }
+         let shape = try JSONShapeRequest(arguments: [
+             "path": .string("/x"), "max_depth": .int(3), "examples": .bool(false),
+         ])
+diff --git a/harness/Tests/WispMCPTests/WispServerWireTests.swift b/harness/Tests/WispMCPTests/WispServerWireTests.swift
+index b53e6d6..eea2203 100644
+--- a/harness/Tests/WispMCPTests/WispServerWireTests.swift
++++ b/harness/Tests/WispMCPTests/WispServerWireTests.swift
+@@ -398,6 +398,20 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
+                 == true)
+         let broken = try await call(pair.client, "json_shape", ["path": .string(log.path)])
+         #expect(broken.isError == true)
++        // A command that fails is flagged rather than digested as though its error were the log.
++        let failing = try await call(
++            pair.client, "condense_log",
++            ["command": .string("ls /nonexistent-wisp-dir"), "working_directory": .string(dir.path)])
++        #expect(failing.structuredContent?.objectValue?["exitStatus"] == .int(1))
++        guard case .text(let warned, _, _)? = failing.content.first else { Issue.record("no text"); return }
++        #expect(warned.hasPrefix("warning: the command exited 1"), "\(warned)")
++        let passing = try await call(
++            pair.client, "condense_log", ["command": .string("echo ok"), "working_directory": .string(dir.path)])
++        #expect(passing.structuredContent?.objectValue?["exitStatus"] == .int(0))
++        if !CommandRunner.isNestedSandbox {
++            let unified = try await call(pair.client, "condense_log", ["last": .string("5s")])
++            #expect(unified.isError == false && unified.structuredContent?.objectValue?["kind"] == "log", "\(unified)")
++        }
+         // Each is its own audited session, and neither opened a model.
+         #expect(pair.sink.events.contains { $0.session.hasPrefix("log-") && $0.kind == .sessionStart })
+         #expect(pair.sink.events.contains { $0.session.hasPrefix("shape-") && $0.kind == .sessionEnd })

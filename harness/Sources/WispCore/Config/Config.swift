@@ -33,6 +33,19 @@ public struct Config: Codable, Equatable, Sendable {
     public var notifications: NotificationsConfig?
     /// Which built-in tools to leave out, and the user's own tools.
     public var tools: ToolsConfig?
+    /// Choosing a model by input size for the tasks that route.
+    public var routing: RoutingConfig?
+
+    /// Routing settings in the file.
+    public struct RoutingConfig: Codable, Equatable, Sendable {
+        /// Models from least to most capable; empty or absent turns routing off.
+        public var ladder: [ModelSelection]?
+
+        /// Creates settings.
+        public init(ladder: [ModelSelection]? = nil) {
+            self.ladder = ladder
+        }
+    }
 
     /// Tool settings in the file.
     public struct ToolsConfig: Codable, Equatable, Sendable {
@@ -250,7 +263,8 @@ public struct Config: Codable, Equatable, Sendable {
             mlxModels: (mlx?.models ?? [:]).mapValues { $0.capabilities ?? [] },
             notificationsEnabled: notifications?.enabled ?? true,
             notificationsPerMinute: max(1, notifications?.perMinute ?? 5),
-            disabledTools: Set(tools?.disabled ?? []), customTools: tools?.custom ?? []
+            disabledTools: Set(tools?.disabled ?? []), customTools: tools?.custom ?? [],
+            routingLadder: routing?.ladder ?? []
         )
     }
 
@@ -299,5 +313,7 @@ public struct Config: Codable, Equatable, Sendable {
         public var disabledTools: Set<String> = []
         /// The user's own tools, validated.
         public var customTools: [CustomTool.Definition] = []
+        /// Models to route among by input size, least capable first; empty means no routing.
+        public var routingLadder: [ModelSelection] = []
     }
 }

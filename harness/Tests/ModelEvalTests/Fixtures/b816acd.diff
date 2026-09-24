@@ -1,0 +1,939 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index e9ee41e..e61563a 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -9,7 +9,7 @@ one). If you are a different harness, read this file in full and take only your
+ 
+ An on-device, tool-using AI microharness for macOS, written in Swift on Apple's Foundation Models framework
+ (the model behind Apple Intelligence and the `fm` CLI). One binary, `wisp`, with two faces: a CLI
+-(`respond`, `chat`, `tools`, `models`, `logs`, `config`, `doctor`, `approvals`, `notify`, `scan`, `redact`) and an MCP server over stdio (`mcp`) that other
++(`respond`, `chat`, `tools`, `models`, `logs`, `config`, `doctor`, `approvals`, `notify`, `scan`, `redact`, `watch`) and an MCP server over stdio (`mcp`) that other
+ harnesses delegate local work to. Every command the model runs passes a policy, a Seatbelt sandbox, a risk classifier, and,
+ when risky, human approval; everything is written to a verbatim audit log.
+ 
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2cf22a9..4f628f1 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -22,6 +22,10 @@ Added:
+ - The MCP tool `json_shape`: the structure of a JSON or JSON Lines file without its data, with redacted
+   string examples. No model.
+ 
++- `wisp watch <command>`: reruns a command when files change (build output and `.git` ignored) or on
++  an interval, triages a failing run with the model, and posts a notification when it starts or stops
++  failing (`--notify change|failure|always|never`).
++
+ Fixed:
+ 
+ - `summarise_diff`'s `secret` flag quoted the start of the added line, handing the credential to the
+diff --git a/README.md b/README.md
+index c34b359..4484ee9 100644
+--- a/README.md
++++ b/README.md
+@@ -38,6 +38,8 @@ wisp --yes "Run the tests in $PWD and tell me if they pass"   # non-interactive:
+ wisp logs --last 20             # what just happened, from the audit log
+ wisp approvals                  # what it has been told to remember; revoke or clear here
+ make test; wisp notify "Tests finished" --sound   # a macOS notification, from you or from the model
++wisp watch 'swift test 2>&1'    # rerun on every save; a notification when it starts or stops failing
++git diff --cached | wisp scan   # credentials in a commit, before it is made
+ ```
+ 
+ Running tests is a "moderate" action, so `chat` asks you before doing it; plain `wisp "…"` cannot ask
+diff --git a/docs/README.md b/docs/README.md
+index 4b56f90..6c07ecb 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -36,6 +36,7 @@
+ | [decisions/0030-notifications.md](decisions/0030-notifications.md) | Notifications through osascript with the text in argv, bounded, rate-limited, and audited, without approval |
+ | [decisions/0031-secret-scanning-and-redaction.md](decisions/0031-secret-scanning-and-redaction.md) | Secret scanning and redaction: rules first, masked findings and numbered markers, an opt-in model pass over rule-redacted text |
+ | [decisions/0032-log-and-json-condensers.md](decisions/0032-log-and-json-condensers.md) | Log and JSON condensers are deterministic: templates ranked by severity, parsed crash reports, merged JSON outlines |
++| [decisions/0033-watch-mode.md](decisions/0033-watch-mode.md) | Watch mode reruns a command on file changes and notifies when its outcome turns, triaging new failures |
+ | [decisions/0029-tui-front-end.md](decisions/0029-tui-front-end.md) | The terminal chat is a Rust front end (`wisp-tui`, ratatui) over a headless `wisp chat --json`; one palette for both faces |
+ | [decisions/0028-rename-to-wisp.md](decisions/0028-rename-to-wisp.md) | The project is wisp; one mechanical rename, no compatibility layer, a new Homebrew tap |
+ | [decisions/0027-verb-patterns.md](decisions/0027-verb-patterns.md) | Approval patterns include the verb for programs like git and cargo, from an embedded list; old patterns still count |
+diff --git a/docs/decisions/0033-watch-mode.md b/docs/decisions/0033-watch-mode.md
+new file mode 100644
+index 0000000..ab0fc6a
+--- /dev/null
++++ b/docs/decisions/0033-watch-mode.md
+@@ -0,0 +1,51 @@
++# ADR 0033: Watch mode reruns a command on file changes and notifies when its outcome turns
++
++Date: 2026-09-23. Status: accepted. Builds on [ADR 0023](0023-condensing-tools.md) and
++[ADR 0030](0030-notifications.md).
++
++## Context
++
++An on-device agent costs nothing to keep running, which a remote model cannot match: it can watch a
++build or test loop and speak up only when something changes. `triage` already turns failing output into
++a short list, and `Notifier` already posts bounded, rate-limited, audited notifications. What was
++missing was the loop that ties them to the file system and to time.
++
++## Decision
++
++- **`wisp watch <command>`** runs the command at once, then again on each change under the watched
++  paths (FSEvents through `FileWatcher`, 0.5 s latency so a save of several files is one change) and,
++  with `--every`, on an interval. Changes under build output and version control (`.git`, `.build`,
++  `target`, `node_modules`, `DerivedData`, and the like) and editor scratch files are ignored, since the
++  command writes there itself and would otherwise set itself off forever. Triggers are buffered one
++  deep: changes during a run cause one rerun after it, not one per change.
++- **The command runs through `CommandRunner`** on a conversation `watch-<id>`, under the policy,
++  sandbox, classifier, and approval as every command does, with the terminal approver (or `--yes`).
++  Choosing "session" on the first approval covers the reruns.
++- **Notifications follow a policy**: `change` (default: when pass turns to fail or back, and on a
++  first run that fails), `failure`, `always`, `never`. The body says whether it is failing and gives the
++  first finding; the subtitle is the command; a failure plays the sound. Posted through `Notifier` with
++  source `watch`, so the rate limit and the off switch apply.
++- **A failing run is triaged** by the model into findings (`Triage`) when it is new or will be
++  notified; a failure that repeats unannounced is not triaged again, so a broken build left alone costs
++  no model turns. `--no-triage` turns it off; a triage error is reported and does not end the watch.
++- **`Watcher` holds the loop in `WispCore`**, free of time and the file system: triggers arrive on an
++  `AsyncStream`, and running, triaging, notifying, and reporting are closures, so tests drive it with a
++  scripted stream. `FileWatcher` owns the FSEvents stream and is not `Sendable`; only its sink crosses
++  threads.
++- **Audit**: each run is a `watch.run` event with the trigger, exit status, state, whether it turned,
++  the finding count, and whether it notified. Ctrl-C stops after the current run so the session ends
++  cleanly; a second Ctrl-C exits at once.
++- CLI only: a long-running loop is not an MCP tool call.
++
++## Consequences
++
++- Smoke-tested on 2026-09-23 with `ls ok 2>&1` in a scratch directory: failed at start, passed on the
++  change that created the file, ignored a write under `.build`, and failed again when the file was
++  removed, each failure triaged by the system model. Every run took 1.3 to 1.7 s for a command that
++  itself takes milliseconds: the risk classifier judges the command on each run, as it does for every
++  command. Caching its verdict for an unchanged command line is a possible later saving.
++- A watch of a large tree relies on the ignore list; a project whose output lands elsewhere should watch
++  its source directories with `--path`.
++- Tests without the model or real time: the policy matrix, the messages, the loop over scripted triggers
++  (notifying, triaging only new failures, the run cap, timeouts, triage errors, a refused command), the
++  ignore rules, and one real FSEvents change in a temporary directory.
+diff --git a/docs/design.md b/docs/design.md
+index 0e83784..27b3f3d 100644
+--- a/docs/design.md
++++ b/docs/design.md
+@@ -211,6 +211,9 @@ with `wisp scan` and `wisp redact` ([ADR 0031](decisions/0031-secret-scanning-an
+ and ranking for logs, a parsed `.ips` for crashes, a merged outline for JSON
+ ([ADR 0032](decisions/0032-log-and-json-condensers.md)). The server's `condense` helper gives every
+ condensing tool its conversation, runner, gate, and capture.
++`wisp watch` is `Watcher` in `WispCore/Session`: a loop over an `AsyncStream` of triggers (start,
++FSEvents changes from `FileWatcher`, an interval) whose running, triaging, notifying, and reporting are
++injected, so it is tested without time or the file system ([ADR 0033](decisions/0033-watch-mode.md)).
+ `triage` and `summarise_diff` were the first condensing tools; `DiffSummary` chunks a diff at file
+ boundaries and joins the model's summaries and flags onto the file list the diff itself gives. `triage` was the first: `Triage`
+ in `WispCore/Condense` captures a command's output through `CommandRunner` (same policy, gate,
+diff --git a/docs/logging.md b/docs/logging.md
+index 272dc3c..5223ca1 100644
+--- a/docs/logging.md
++++ b/docs/logging.md
+@@ -35,7 +35,7 @@ sensitive; it is why it is user-only.
+ 
+ | Kind | Details | Written by |
+ | --- | --- | --- |
+-| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`, `notify`, `scan`, `redact`), `systemPromptExtension` and `instructions` (the operator's and the caller's layers, null when absent; wisp's own prompt is fixed per `version`), `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
++| `session.start` | `entryPoint` (`respond`, `chat`, `mcp`, `mcp-thread`, `notify`, `scan`, `redact`, `watch`), `systemPromptExtension` and `instructions` (the operator's and the caller's layers, null when absent; wisp's own prompt is fixed per `version`), `tools`, `model`, `unsafe`, `autoApprove`, `resume`; an MCP thread adds `parent` (the server session's id) and records the same fields through `Session.conversation`; a chat `/new` records `reason` (`new`), `tools`, and `model` only, from `Agent.reset` | `Session`, `Agent` |
+ | `session.end` | `reason`: `closed` (explicit, or a `triage-<id>` session finishing), `evicted` (least recently used thread dropped at capacity) | CLI, MCP |
+ | `model.resolved` | `model` (the selection), `backend` (`system`, `private-cloud`, or a scheme), `asset` (what backs a local model, null for Apple's), `capabilities` (declared names), `capabilitySource` (`framework`, `runtime`, `configuration`, `undeclared`), `tools` the conversation opened with; recorded when a conversation opens, after the capability check | `Conversation` |
+ | `prompt` | `text`; `schema` (the caller's JSON Schema) when the reply had to be shaped | `Agent` |
+@@ -46,7 +46,8 @@ sensitive; it is why it is user-only.
+ | `command.outcome` | `command`, `exitStatus`, `timedOut`, `truncated`, `stdout`, `stderr`, `seconds` | `CommandRunner` |
+ | `secrets.scan` | `source` (`command` and `workingDirectory`, `path`, or `stdin`), `bytes`, `diff`, `thorough`, `findings` (a count), `kinds` (count per kind); never a value or a preview | `WispServer`, `wisp scan` |
+ | `redaction` | `source`, `bytes`, `bytesOut`, `truncated`, `thorough`, `replaced` (occurrences per kind); never a value | `WispServer`, `wisp redact` |
+-| `notification` | `title`, `body` (both as bounded for display), `source` (`model`, `user`), `outcome` (`posted`, `refused`), `reason` when refused; one per request from the `notify` tool or `wisp notify` | `Notifier` |
++| `watch.run` | `command`, `run` (from 1), `trigger` (`start`, `change`, `interval`), `exitStatus`, `timedOut`, `state` (`pass`, `fail`), `previous`, `changed`, `seconds`, `findings` (a count, or null when not triaged), `triageError`, `notified`; one per run of `wisp watch` | `wisp watch` |
++| `notification` | `title`, `body` (both as bounded for display), `source` (`model`, `user`, `watch`), `outcome` (`posted`, `refused`), `reason` when refused; one per request from the `notify` tool or `wisp notify` | `Notifier` |
+ | `file.write` | `path`, `mode` (`write`, `append`, `replace`), `created`, `bytesBefore`, `bytesAfter`; recorded after an `edit_file` edit lands, the content being in the `tool.call` arguments | `EditFileTool` |
+ | `context.condensation` | `turnsBefore`, `turnsAfter`, `contextSize`, `tokenCount`, `reason` (`overflow`: the model refused the prompt and the retry follows; `budget`: the last request's reported usage plus the new prompt would pass `contextBudget` of a known window, so the transcript was condensed first) | `Agent` |
+ | `mcp.request` | `tool`, `arguments` | `WispServer` |
+diff --git a/docs/tools/notify.md b/docs/tools/notify.md
+index 7f2a3d4..f5c4138 100644
+--- a/docs/tools/notify.md
++++ b/docs/tools/notify.md
+@@ -25,7 +25,7 @@ and can say so.
+ | Rate | At most `notifications.perMinute` (default 5) in any minute, across every conversation of the process |
+ | Off switch | `notifications.enabled: false` in `config.json`; every request is then refused |
+ | Approval | None: a banner changes nothing on the Mac. Leave the tool out of a conversation with `--tool` or `tools` if it should not notify |
+-| Audit | Every request, posted or refused, is a `notification` event with the title, body, source (`model` or `user`), and outcome ([logging.md](../logging.md)) |
++| Audit | Every request, posted or refused, is a `notification` event with the title, body, source (`model`, `user`, or `watch` for `wisp watch`), and outcome ([logging.md](../logging.md)) |
+ 
+ ## How it is posted
+ 
+diff --git a/docs/wisp.md b/docs/wisp.md
+index b30ad32..a2bd2cf 100644
+--- a/docs/wisp.md
++++ b/docs/wisp.md
+@@ -255,6 +255,37 @@ wisp redact --thorough support-ticket.txt > ticket-clean.txt
+ 
+ Audited as `redaction` with the counts replaced per kind.
+ 
++### `wisp watch <command>`
++
++Runs a command at once, then again each time a file changes under the watched paths and, with `--every`,
++on an interval, and posts a notification when its outcome turns. A failing run is triaged by the model
++into its failures, shown under the run's line; a failure that repeats without a notification is not
++triaged again. Changes under `.git`, `.build`, `.swiftpm`, `target`, `node_modules`, `DerivedData`,
++`.venv`, `__pycache__`, `dist`, `.next`, and `.cache`, and editor scratch files, are ignored. The command
++runs under the policy, sandbox, and approval like any other; answer "session" to the first approval
++and the reruns are covered ([ADR 0033](decisions/0033-watch-mode.md)).
++
++| Flag | Meaning |
++| --- | --- |
++| `-C, --directory <dir>` | Where the command runs. Default: the current directory. |
++| `--path <dir>` (repeatable) | Directories to watch. Default: `--directory`. |
++| `--no-files` | Do not watch files; needs `--every`. |
++| `--every <seconds>` | Also run on this interval (at least 1). |
++| `--notify <when>` | `change` (default: when it starts or stops failing, and on a first run that fails), `failure`, `always`, `never`. |
++| `--no-triage` | Do not triage failing output. |
++| `--max-runs <n>` | Stop after this many runs. |
++| `-m, --model <model>` | The model for triage. Defaults to `config.json`. |
++| `-y, --yes` | Approve risky commands without asking. |
++
++```
++wisp watch 'swift test 2>&1'                   # rerun the tests on every save
++wisp watch --no-files --every 300 'make check'  # every five minutes
++```
++
++Each run prints a line (`[22:15:34] run 2 (change): pass, exit 0, 1.3 s; was fail`) and is audited as
++`watch.run`; notifications are audited as `notification` with source `watch`. Ctrl-C stops after the
++current run; a second Ctrl-C stops at once.
++
+ ### `wisp approvals`
+ 
+ `wisp approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, pattern
+diff --git a/harness/Sources/WispCore/Audit/AuditDetails.swift b/harness/Sources/WispCore/Audit/AuditDetails.swift
+index d481d40..8c7dc0a 100644
+--- a/harness/Sources/WispCore/Audit/AuditDetails.swift
++++ b/harness/Sources/WispCore/Audit/AuditDetails.swift
+@@ -154,6 +154,18 @@ extension AuditEvent {
+             ]
+         }
+ 
++        /// `watch.run`: one run of a watched command, how it ended, and whether it turned and notified.
++        public static func watchRun(_ run: Watcher.Run, command: String) -> [String: JSONValue] {
++            [
++                "command": .string(command), "run": .int(run.number), "trigger": .string(run.trigger.rawValue),
++                "exitStatus": run.exitStatus.map { .int(Int($0)) } ?? .null, "timedOut": .bool(run.timedOut),
++                "state": .string(run.state.rawValue), "previous": run.previous.map { .string($0.rawValue) } ?? .null,
++                "changed": .bool(run.changed), "seconds": .double(run.seconds),
++                "findings": run.findings.map { .int($0.count) } ?? .null,
++                "triageError": run.triageError.map { .string($0) } ?? .null, "notified": .bool(run.notified),
++            ]
++        }
++
+         /// `redaction`: where, how much, and how many values of each kind were replaced.
+         public static func redaction(_ report: Redaction.Report) -> [String: JSONValue] {
+             [
+@@ -257,6 +269,11 @@ extension AuditEvent {
+         case .notification: ["title", "body", "source", "outcome", "reason"]
+         case .secretScan: ["source", "bytes", "diff", "thorough", "findings", "kinds"]
+         case .redaction: ["source", "bytes", "bytesOut", "truncated", "thorough", "replaced"]
++        case .watchRun:
++            [
++                "command", "run", "trigger", "exitStatus", "timedOut", "state", "previous", "changed", "seconds",
++                "findings", "triageError", "notified",
++            ]
+         case .condensation: ["turnsBefore", "turnsAfter", "contextSize", "tokenCount", "reason"]
+         case .mcpRequest: ["tool", "arguments"]
+         case .mcpResult: ["tool", "isError", "text", "seconds"]
+diff --git a/harness/Sources/WispCore/Audit/AuditEvent.swift b/harness/Sources/WispCore/Audit/AuditEvent.swift
+index 5ab907f..196b0c0 100644
+--- a/harness/Sources/WispCore/Audit/AuditEvent.swift
++++ b/harness/Sources/WispCore/Audit/AuditEvent.swift
+@@ -27,6 +27,7 @@ public struct AuditEvent: Codable, Equatable, Sendable {
+         case notification = "notification"
+         case secretScan = "secrets.scan"
+         case redaction = "redaction"
++        case watchRun = "watch.run"
+         case classifierVerdict = "classifier.verdict"
+         case approvalRequested = "approval.requested"
+         case approvalDecided = "approval.decided"
+diff --git a/harness/Sources/WispCore/Session/EntryPoint.swift b/harness/Sources/WispCore/Session/EntryPoint.swift
+index 8f533b8..bdab328 100644
+--- a/harness/Sources/WispCore/Session/EntryPoint.swift
++++ b/harness/Sources/WispCore/Session/EntryPoint.swift
+@@ -15,6 +15,8 @@ public enum EntryPoint: String, Sendable, Codable, CaseIterable {
+     case scan
+     /// `wisp redact`, text redacted on its way somewhere else.
+     case redact
++    /// `wisp watch`, a command rerun as files change.
++    case watch
+ 
+     /// The entry point of a further conversation opened under this one.
+     public var thread: EntryPoint {
+diff --git a/harness/Sources/WispCore/Session/Watcher.swift b/harness/Sources/WispCore/Session/Watcher.swift
+new file mode 100644
+index 0000000..a02140f
+--- /dev/null
++++ b/harness/Sources/WispCore/Session/Watcher.swift
+@@ -0,0 +1,196 @@
++import Foundation
++
++/// `wisp watch`: runs a command each time a trigger arrives (the start, a file change, an interval) and,
++/// when its outcome turns, triages the failure and posts a notification, so a long build or test loop can
++/// run in the background and speak up only when something changes
++/// ([ADR 0033](../../../../docs/decisions/0033-watch-mode.md)).
++///
++/// The loop is free of time and the file system: triggers arrive on an `AsyncStream`, and running the
++/// command, triaging, notifying, and reporting are closures, so tests drive it with a scripted stream.
++public struct Watcher: Sendable {
++    /// What set a run off.
++    public enum Trigger: String, Sendable {
++        /// The first run.
++        case start
++        /// A file under a watched path changed.
++        case change
++        /// The interval elapsed.
++        case interval
++    }
++
++    /// How a run ended.
++    public enum State: String, Sendable {
++        /// Exit status 0.
++        case pass
++        /// Anything else, a timeout included.
++        case fail
++    }
++
++    /// When to post a notification.
++    public enum NotifyPolicy: String, Sendable, CaseIterable {
++        /// When the state turns, and on a first run that fails: the default.
++        case change
++        /// On every failing run.
++        case failure
++        /// On every run.
++        case always
++        /// Never; the terminal still shows each run.
++        case never
++    }
++
++    /// Knobs for one watch.
++    public struct Options: Equatable, Sendable {
++        /// When to notify.
++        public var notify: NotifyPolicy
++        /// Whether a failing run's output is triaged into findings.
++        public var triage: Bool
++        /// Runs before the watch ends by itself; nil runs until the triggers end.
++        public var maxRuns: Int?
++
++        /// Creates options.
++        public init(notify: NotifyPolicy = .change, triage: Bool = true, maxRuns: Int? = nil) {
++            self.notify = notify
++            self.triage = triage
++            self.maxRuns = maxRuns
++        }
++    }
++
++    /// One run and what came of it.
++    public struct Run: Equatable, Sendable {
++        /// Which run, from 1.
++        public var number: Int
++        /// What set it off.
++        public var trigger: Trigger
++        /// The command's exit status.
++        public var exitStatus: Int32?
++        /// Whether it timed out.
++        public var timedOut: Bool
++        /// Pass or fail.
++        public var state: State
++        /// The state before, or nil for the first run.
++        public var previous: State?
++        /// How long the command took.
++        public var seconds: Double
++        /// The failures triage found, or nil when it did not run.
++        public var findings: [Triage.Finding]?
++        /// Why triage could not run, when it failed.
++        public var triageError: String?
++        /// Whether a notification was requested.
++        public var notified: Bool
++
++        /// Whether the state turned.
++        public var changed: Bool { previous.map { $0 != state } ?? false }
++
++        /// One line for the terminal: the time is the caller's to add.
++        public var summary: String {
++            var line = "run \(number) (\(trigger.rawValue)): \(state == .pass ? "pass" : "FAIL")"
++            if let exitStatus { line += ", exit \(exitStatus)" }
++            if timedOut { line += ", timed out" }
++            line += String(format: ", %.1f s", seconds)
++            if let previous, changed { line += "; was \(previous.rawValue)" }
++            if let findings { line += "; \(findings.count) finding\(findings.count == 1 ? "" : "s")" }
++            if let triageError { line += "; triage failed: \(triageError)" }
++            return line
++        }
++    }
++
++    /// Whether to notify for a run in `state` after one in `previous`.
++    public static func shouldNotify(_ policy: NotifyPolicy, previous: State?, current: State) -> Bool {
++        switch policy {
++        case .never: false
++        case .always: true
++        case .failure: current == .fail
++        case .change: previous.map { $0 != current } ?? (current == .fail)
++        }
++    }
++
++    /// The notification for a run: the command as the subtitle, the outcome and the first finding as the body.
++    public static func message(for run: Run, command: String) -> Notifier.Message {
++        var body: String
++        switch (run.state, run.previous) {
++        case (.pass, .fail?): body = "Passing again"
++        case (.pass, _): body = "Passing"
++        case (.fail, _):
++            body = run.timedOut ? "Timed out" : "Failing (exit \(run.exitStatus.map(String.init) ?? "?"))"
++            if let findings = run.findings, let first = findings.first {
++                body += ": \(first.location.map { "\($0) " } ?? "")\(first.message)"
++                if findings.count > 1 { body += " (+\(findings.count - 1) more)" }
++            }
++        }
++        return Notifier.Message(title: "wisp watch", body: body, subtitle: command, sound: run.state == .fail)
++    }
++
++    /// The command line, as reported.
++    public let command: String
++    /// The options in force.
++    public let options: Options
++    /// Runs the command once and returns its output.
++    private let execute: @Sendable () async throws -> Triage.Captured
++    /// Triages a failing run's output.
++    private let triage: (@Sendable (Triage.Captured) async throws -> [Triage.Finding])?
++    /// Posts a notification.
++    private let notify: @Sendable (Notifier.Message) -> Void
++    /// Hears about each run as it ends: the terminal line and the audit record.
++    private let report: @Sendable (Run) -> Void
++
++    /// Creates a watch.
++    ///
++    /// - Parameters:
++    ///   - command: The command line, for reports and notifications.
++    ///   - options: Notification policy, triage, run limit.
++    ///   - execute: Runs the command once; a thrown error ends the watch.
++    ///   - triage: Turns a failing run's output into findings; nil skips triage.
++    ///   - notify: Posts a notification.
++    ///   - report: Receives each run as it ends.
++    public init(
++        command: String, options: Options = Options(), execute: @escaping @Sendable () async throws -> Triage.Captured,
++        triage: (@Sendable (Triage.Captured) async throws -> [Triage.Finding])?,
++        notify: @escaping @Sendable (Notifier.Message) -> Void, report: @escaping @Sendable (Run) -> Void
++    ) {
++        self.command = command
++        self.options = options
++        self.execute = execute
++        self.triage = triage
++        self.notify = notify
++        self.report = report
++    }
++
++    /// Runs once per trigger until the triggers end, `maxRuns` is reached, or the task is cancelled.
++    ///
++    /// - Parameter triggers: What sets each run off; the first element is normally `.start`.
++    /// - Returns: The runs, in order.
++    /// - Throws: Whatever `execute` throws, such as a refused command.
++    @discardableResult
++    public func run(_ triggers: AsyncStream<Trigger>) async throws -> [Run] {
++        var runs: [Run] = []
++        var previous: State?
++        for await trigger in triggers {
++            if Task.isCancelled { break }
++            let started = Date()
++            let captured = try await execute()
++            let seconds = Date().timeIntervalSince(started)
++            let state: State = captured.exitStatus == 0 && !captured.timedOut ? .pass : .fail
++            var run = Run(
++                number: runs.count + 1, trigger: trigger, exitStatus: captured.exitStatus, timedOut: captured.timedOut,
++                state: state, previous: previous, seconds: seconds, findings: nil, triageError: nil, notified: false)
++            let notifying = Self.shouldNotify(options.notify, previous: previous, current: state)
++            // Triage only what will be shown: a failure that is new or will be notified.
++            if state == .fail, options.triage, let triage, notifying || previous != .fail {
++                do {
++                    run.findings = try await triage(captured)
++                } catch {
++                    run.triageError = "\(error)"
++                }
++            }
++            if notifying {
++                notify(Self.message(for: run, command: command))
++                run.notified = true
++            }
++            report(run)
++            runs.append(run)
++            previous = state
++            if let maxRuns = options.maxRuns, runs.count >= maxRuns { break }
++        }
++        return runs
++    }
++}
+diff --git a/harness/Sources/WispCore/Support/FileWatcher.swift b/harness/Sources/WispCore/Support/FileWatcher.swift
+new file mode 100644
+index 0000000..52ac7d9
+--- /dev/null
++++ b/harness/Sources/WispCore/Support/FileWatcher.swift
+@@ -0,0 +1,84 @@
++import CoreServices
++import Foundation
++
++/// Reports file changes under a set of directories through FSEvents, for `wisp watch`. Changes under
++/// build output and version-control directories are ignored, since the watched command writes there
++/// itself and would otherwise set itself off forever. FSEvents batches changes over `latency`, so a save
++/// that touches several files arrives as one change. Not `Sendable`: the command that starts it owns it
++/// for its life, and only the callback's sink crosses threads.
++public final class FileWatcher {
++    /// Directory names whose contents never count as a change.
++    public static let ignoredDirectories: Set<String> = [
++        ".git", ".build", ".swiftpm", "target", "node_modules", "DerivedData", ".venv", "__pycache__", "dist",
++        ".next", ".cache",
++    ]
++
++    /// Whether a changed path counts: it has no ignored directory among its components and its file name
++    /// is not an editor's scratch file.
++    public static func counts(_ path: String) -> Bool {
++        let components = path.split(separator: "/").map(String.init)
++        if components.contains(where: ignoredDirectories.contains) { return false }
++        let name = components.last ?? ""
++        return !(name.hasSuffix("~") || name.hasSuffix(".swp") || name.hasPrefix(".#") || name == ".DS_Store")
++    }
++
++    /// What the FSEvents callback reaches: where to send changes.
++    private final class Sink: Sendable {
++        /// Called once per batch that has a path that counts.
++        let onChange: @Sendable () -> Void
++
++        /// Creates a sink.
++        init(onChange: @escaping @Sendable () -> Void) {
++            self.onChange = onChange
++        }
++    }
++
++    /// The stream, owned for the watcher's life.
++    private let stream: FSEventStreamRef
++    /// The sink the stream's context points to; kept alive with the watcher.
++    private let sink: Sink
++
++    /// Starts watching; fails (nil) when the stream cannot be created or started.
++    ///
++    /// - Parameters:
++    ///   - paths: Directories to watch, recursively.
++    ///   - latency: Seconds FSEvents gathers changes before reporting them.
++    ///   - onChange: Called on a private queue once per batch with a path that counts.
++    public init?(paths: [String], latency: Double = 0.5, onChange: @escaping @Sendable () -> Void) {
++        let sink = Sink(onChange: onChange)
++        var context = FSEventStreamContext(
++            version: 0, info: Unmanaged.passUnretained(sink).toOpaque(), retain: nil, release: nil,
++            copyDescription: nil)
++        let callback: FSEventStreamCallback = { _, info, count, paths, _, _ in
++            guard let info else { return }
++            let sink = Unmanaged<Sink>.fromOpaque(info).takeUnretainedValue()
++            // With kFSEventStreamCreateFlagUseCFTypes the paths arrive as a CFArray of CFStrings.
++            let names = Unmanaged<CFArray>.fromOpaque(paths).takeUnretainedValue() as NSArray
++            let changed = (0..<count).contains { index in
++                (names[index] as? String).map(FileWatcher.counts) ?? false
++            }
++            if changed { sink.onChange() }
++        }
++        guard
++            let stream = FSEventStreamCreate(
++                nil, callback, &context, paths as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
++                latency,
++                FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents))
++        else { return nil }
++        FSEventStreamSetDispatchQueue(stream, DispatchQueue(label: "wisp.watch.fsevents"))
++        guard FSEventStreamStart(stream) else {
++            FSEventStreamInvalidate(stream)
++            FSEventStreamRelease(stream)
++            return nil
++        }
++        self.stream = stream
++        self.sink = sink
++    }
++
++    /// Stops the stream and releases it.
++    deinit {
++        FSEventStreamStop(stream)
++        FSEventStreamInvalidate(stream)
++        FSEventStreamRelease(stream)
++    }
++}
+diff --git a/harness/Sources/WispCore/Support/Notifier.swift b/harness/Sources/WispCore/Support/Notifier.swift
+index 58a8f87..2948874 100644
+--- a/harness/Sources/WispCore/Support/Notifier.swift
++++ b/harness/Sources/WispCore/Support/Notifier.swift
+@@ -36,6 +36,8 @@ public final class Notifier: Sendable {
+         case model
+         /// A person, through `wisp notify`.
+         case user
++        /// `wisp watch`, when a watched command's outcome turns.
++        case watch
+     }
+ 
+     /// What happened to one request.
+diff --git a/harness/Sources/wisp/Wisp.swift b/harness/Sources/wisp/Wisp.swift
+index eae168d..dd3d5ee 100644
+--- a/harness/Sources/wisp/Wisp.swift
++++ b/harness/Sources/wisp/Wisp.swift
+@@ -17,7 +17,7 @@ struct Wisp: AsyncParsableCommand {
+         subcommands: [
+             Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
+             DoctorCommand.self,
+-            Approvals.self, Notify.self, Scan.self, Redact.self,
++            Approvals.self, Notify.self, Scan.self, Redact.self, Watch.self,
+         ],
+         defaultSubcommand: Respond.self
+     )
+@@ -191,6 +191,31 @@ extension Wisp {
+         return { prompt in try await conversation.openAgent().respond(to: prompt, schema: schema).text }
+     }
+ 
++    /// A line for the user on stderr.
++    static func note(_ text: String) {
++        FileHandle.standardError.write(Data((text + "\n").utf8))
++    }
++
++    /// Handles Ctrl-C: the first calls `finish` so the work in progress can end cleanly, the second exits
++    /// at once with status 130. Cancel the returned source to restore the default.
++    static func stopOnInterrupt(_ finish: @escaping @Sendable () -> Void) -> any DispatchSourceSignal {
++        signal(SIGINT, SIG_IGN)
++        let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
++        let presses = Mutex(0)
++        source.setEventHandler {
++            let count = presses.withLock { count in
++                count += 1
++                return count
++            }
++            if count > 1 { Darwin.exit(130) }
++            note("stopping after the current run; Ctrl-C again to stop now")
++            finish()
++        }
++        source.setCancelHandler { signal(SIGINT, SIG_DFL) }
++        source.resume()
++        return source
++    }
++
+     /// Parses a `--model` value into a usage error on failure.
+     static func parseModel(_ text: String) throws -> ModelSelection {
+         try usage { try ModelSelection(parsing: text) }
+@@ -601,6 +626,115 @@ struct Redact: AsyncParsableCommand {
+     }
+ }
+ 
++extension Watcher.NotifyPolicy: ExpressibleByArgument {}
++
++/// Reruns a command as files change or on an interval, and notifies when its outcome turns.
++struct Watch: AsyncParsableCommand {
++    static let configuration = CommandConfiguration(
++        abstract: "Rerun a command when files change, and notify when it starts or stops failing.",
++        discussion:
++            "Runs the command at once, then again after each change under the watched paths (build output and "
++            + ".git ignored) and, with --every, on an interval. A failing run is triaged by the model into its "
++            + "failures; when the outcome turns, a notification says so. The command runs under the policy, "
++            + "sandbox, and approval like any other. Ctrl-C stops after the current run; a second Ctrl-C at once.")
++
++    @Argument(help: "The command line to run, such as 'swift test 2>&1'.")
++    var command: String
++
++    @Option(name: [.customShort("C"), .long], help: "Directory to run the command in. Default: the current one.")
++    var directory: String?
++
++    @Option(name: .customLong("path"), help: "A directory to watch for changes (repeatable). Default: --directory.")
++    var paths: [String] = []
++
++    @Flag(name: .customLong("no-files"), help: "Do not watch files; run on the interval only.")
++    var noFiles = false
++
++    @Option(name: .long, help: "Also run every this many seconds.")
++    var every: Double?
++
++    @Option(name: .long, help: "When to notify: change (default), failure, always, never.")
++    var notify: Watcher.NotifyPolicy = .change
++
++    @Flag(name: .customLong("no-triage"), help: "Do not have the model triage a failing run.")
++    var noTriage = false
++
++    @Option(name: .long, help: "Stop after this many runs.")
++    var maxRuns: Int?
++
++    @Option(name: [.short, .customLong("model")], help: "Model for triage. Defaults to config.json.")
++    var model: String?
++
++    @Flag(name: [.short, .long], help: "Approve risky commands without asking.")
++    var yes = false
++
++    func validate() throws {
++        if noFiles && every == nil { throw ValidationError("--no-files needs --every, or nothing would rerun it") }
++        if let every, every < 1 { throw ValidationError("--every must be at least 1 second") }
++        if let maxRuns, maxRuns < 1 { throw ValidationError("--max-runs must be at least 1") }
++    }
++
++    func run() async throws {
++        let session = try Wisp.begin(
++            .init(entryPoint: .watch, model: try model.map(Wisp.parseModel), autoApprove: yes))
++        defer { session.end() }
++        let conversation = try session.conversation(
++            id: "watch-" + ShortID.make(), approver: TerminalApprover(style: .plain), tools: .none)
++        let directory = directory ?? FileManager.default.currentDirectoryPath
++        let source = Triage.Source.command(command, workingDirectory: directory)
++        let runner = CommandRunner(
++            options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
++        let schema = try OutputSchema(json: Triage.schemaJSON)
++        let triage = Triage { prompt in try await conversation.openAgent().respond(to: prompt, schema: schema).text }
++        let (triggers, continuation) = AsyncStream.makeStream(
++            of: Watcher.Trigger.self, bufferingPolicy: .bufferingNewest(1))
++        continuation.yield(.start)
++        let watcher =
++            noFiles
++            ? nil
++            : FileWatcher(paths: paths.isEmpty ? [directory] : paths) {
++                continuation.yield(.change)
++            }
++        if !noFiles && watcher == nil { throw ValidationError("cannot watch \(paths.isEmpty ? [directory] : paths)") }
++        let interval = every.map { seconds in
++            Task {
++                while !Task.isCancelled {
++                    try? await Task.sleep(for: .seconds(seconds))
++                    continuation.yield(.interval)
++                }
++            }
++        }
++        defer { interval?.cancel() }
++        let stop = Wisp.stopOnInterrupt { continuation.finish() }
++        defer { stop.cancel() }
++        let command = command
++        let clock = Date.FormatStyle(date: .omitted, time: .standard)
++        Wisp.note(
++            "watching \(watcher == nil ? "" : "\(paths.isEmpty ? directory : paths.joined(separator: ", ")) ")"
++                + "\(every.map { "every \($0) s " } ?? "")for: \(command)")
++        // The file watcher must outlive the loop; nothing else refers to it after this point.
++        defer { withExtendedLifetime(watcher) {} }
++        try await Watcher(
++            command: command,
++            options: .init(notify: notify, triage: !noTriage, maxRuns: maxRuns),
++            execute: {
++                try await Triage.capture(
++                    source, runner: runner, gate: conversation.gate, maxOutputBytes: Triage.Options().maxOutputBytes)
++            },
++            triage: { captured in try await triage.run(captured, from: source).findings },
++            notify: { message in _ = session.notifier.post(message, source: .watch, audit: conversation.audit) },
++            report: { run in
++                print("[\(Date().formatted(clock))] \(run.summary)")
++                for finding in run.findings ?? [] {
++                    print("  \(finding.kind)  \(finding.location ?? "-")  \(finding.message)")
++                }
++                fflush(stdout)
++                conversation.audit.record(.watchRun, details: AuditEvent.Details.watchRun(run, command: command))
++            }
++        ).run(triggers)
++    }
++}
++
+ /// Checks that this install can work: OS version, model availability, sandbox, config, home directory.
+ struct DoctorCommand: ParsableCommand {
+     static let configuration = CommandConfiguration(
+diff --git a/harness/Tests/WispCoreTests/SecretScannerTests.swift b/harness/Tests/WispCoreTests/SecretScannerTests.swift
+index 1c6e7da..9a7c4c5 100644
+--- a/harness/Tests/WispCoreTests/SecretScannerTests.swift
++++ b/harness/Tests/WispCoreTests/SecretScannerTests.swift
+@@ -165,6 +165,30 @@ import Testing
+         #expect(capped.more && capped.findings.count == 1 && capped.rendered.hasPrefix("1+ finding"))
+     }
+ 
++    @Test func aThoroughDiffScanLocatesModelFindingsOnAddedLinesOnly() async throws {
++        let diff = """
++            diff --git a/notes.md b/notes.md
++            --- a/notes.md
++            +++ b/notes.md
++            @@ -3,2 +3,2 @@
++            -Owner: Old Name
++            +Owner: Jane Doe
++             Reviewed by Sam Park
++            """
++        // The model names a value on an added line, one only on a context line, and one of an unwanted kind.
++        let answer = #"{"items":[{"text":"Jane Doe","kind":"name"},{"text":"Sam Park","kind":"name"}]}"#
++        let report = try await SecretScan(
++            options: .init(categories: [.secret, .personal], thorough: true), judge: { _ in answer }
++        ).run(diff, from: .command("git diff", workingDirectory: nil))
++        #expect(report.diff && report.findings.map(\.location) == ["notes.md:3"], "\(report.findings)")
++        let secretsOnly = try await SecretScan(options: .init(thorough: true), judge: { _ in answer }).run(
++            diff, from: nil)
++        #expect(secretsOnly.findings.isEmpty)
++        #expect(SecretScan.locate("absent", in: "text", diff: false, source: nil) == nil)
++        #expect(Condensing.label(nil) == "text read from standard input")
++        #expect(Condensing.json(.command("ls", workingDirectory: "/r")) == ["command": "ls", "workingDirectory": "/r"])
++    }
++
+     @Test func aRedactionReplacesByRuleThenByModelAndCapsItsOutput() async throws {
+         let text = "Jane Doe <jane@acme.co> used \(Self.github)\n"
+         let rules = try await Redaction().run(text, from: nil)
+diff --git a/harness/Tests/WispCoreTests/WatcherTests.swift b/harness/Tests/WispCoreTests/WatcherTests.swift
+new file mode 100644
+index 0000000..eb6f2f1
+--- /dev/null
++++ b/harness/Tests/WispCoreTests/WatcherTests.swift
+@@ -0,0 +1,163 @@
++import Foundation
++import Synchronization
++import Testing
++
++@testable import WispCore
++
++@Suite struct WatcherTests {
++    /// What a watch did, collected from its closures.
++    final class Record: Sendable {
++        let notified = Mutex<[Notifier.Message]>([])
++        let reported = Mutex<[Watcher.Run]>([])
++        let triaged = Mutex(0)
++        let outcomes: Mutex<[Triage.Captured]>
++
++        init(_ outcomes: [Triage.Captured]) { self.outcomes = Mutex(outcomes) }
++
++        func watcher(
++            _ options: Watcher.Options = .init(), triage: Bool = true, failTriage: Bool = false
++        ) -> Watcher {
++            let judge: @Sendable (Triage.Captured) async throws -> [Triage.Finding] = { _ in
++                self.triaged.withLock { $0 += 1 }
++                if failTriage { throw Busy() }
++                return [.init(kind: "test-failure", location: "A.swift:3", message: "expected 1")]
++            }
++            return Watcher(
++                command: "swift test", options: options,
++                execute: { self.outcomes.withLock { $0.removeFirst() } },
++                triage: triage ? judge : nil,
++                notify: { message in self.notified.withLock { $0.append(message) } },
++                report: { run in self.reported.withLock { $0.append(run) } })
++        }
++    }
++
++    /// A judge that cannot answer.
++    struct Busy: Error, CustomStringConvertible {
++        var description: String { "model busy" }
++    }
++
++    static let pass = Triage.Captured(text: "ok", exitStatus: 0)
++    static let fail = Triage.Captured(text: "boom", exitStatus: 1)
++
++    static func triggers(_ list: [Watcher.Trigger]) -> AsyncStream<Watcher.Trigger> {
++        AsyncStream { continuation in
++            for trigger in list { continuation.yield(trigger) }
++            continuation.finish()
++        }
++    }
++
++    @Test func notificationsFollowThePolicy() {
++        let turns: [(Watcher.State?, Watcher.State)] = [
++            (nil, .pass), (nil, .fail), (.pass, .pass), (.pass, .fail), (.fail, .fail), (.fail, .pass),
++        ]
++        func pattern(_ policy: Watcher.NotifyPolicy) -> [Bool] {
++            turns.map { Watcher.shouldNotify(policy, previous: $0.0, current: $0.1) }
++        }
++        #expect(pattern(.change) == [false, true, false, true, false, true])
++        #expect(pattern(.failure) == [false, true, false, true, true, false])
++        #expect(pattern(.always) == [true, true, true, true, true, true])
++        #expect(pattern(.never) == [false, false, false, false, false, false])
++        var run = Watcher.Run(
++            number: 1, trigger: .start, exitStatus: 0, timedOut: false, state: .pass, previous: nil, seconds: 1,
++            findings: nil, triageError: nil, notified: false)
++        #expect(Watcher.message(for: run, command: "make").body == "Passing")
++        #expect(Watcher.message(for: run, command: "make").sound == false)
++        run.state = .fail
++        run.exitStatus = 2
++        run.findings = [
++            .init(kind: "error", location: nil, message: "linker failed"),
++            .init(kind: "error", location: "b", message: "x"),
++        ]
++        #expect(Watcher.message(for: run, command: "make").body == "Failing (exit 2): linker failed (+1 more)")
++        #expect(Watcher.message(for: run, command: "make").sound)
++    }
++
++    @Test func aWatchRunsPerTriggerAndSpeaksUpWhenTheOutcomeTurns() async throws {
++        let record = Record([Self.fail, Self.fail, Self.pass, Self.pass, Self.fail])
++        let runs = try await record.watcher().run(Self.triggers([.start, .change, .change, .interval, .change]))
++        #expect(runs.map(\.state) == [.fail, .fail, .pass, .pass, .fail])
++        #expect(runs.map(\.trigger) == [.start, .change, .change, .interval, .change])
++        #expect(runs.map(\.notified) == [true, false, true, false, true])
++        #expect(runs.map(\.changed) == [false, false, true, false, true])
++        // A failure that repeats unannounced is not triaged again.
++        #expect(record.triaged.withLock { $0 } == 2)
++        #expect(runs[1].findings == nil && runs[0].findings?.count == 1)
++        let bodies = record.notified.withLock { $0.map(\.body) }
++        #expect(
++            bodies == [
++                "Failing (exit 1): A.swift:3 expected 1", "Passing again", "Failing (exit 1): A.swift:3 expected 1",
++            ])
++        #expect(record.notified.withLock { $0.allSatisfy { $0.title == "wisp watch" && $0.subtitle == "swift test" } })
++        #expect(record.reported.withLock { $0.count } == 5)
++        #expect(runs[2].summary.hasPrefix("run 3 (change): pass, exit 0, ") && runs[2].summary.hasSuffix("; was fail"))
++    }
++
++    @Test func maxRunsTriageFailuresAndTimeoutsAreReported() async throws {
++        let timedOut = Triage.Captured(text: "", exitStatus: nil, timedOut: true)
++        let record = Record([timedOut, Self.pass, Self.pass])
++        let runs = try await record.watcher(.init(notify: .always, maxRuns: 2), failTriage: true)
++            .run(Self.triggers([.start, .change, .change]))
++        #expect(runs.count == 2)
++        #expect(runs[0].state == .fail && runs[0].triageError?.contains("model busy") == true)
++        #expect(runs[0].summary.contains("timed out") && runs[0].summary.contains("triage failed"))
++        #expect(record.notified.withLock { $0.map(\.body) } == ["Timed out", "Passing again"])
++        let quiet = Record([Self.fail])
++        let unTriaged = try await quiet.watcher(.init(triage: false)).run(Self.triggers([.start]))
++        #expect(unTriaged[0].findings == nil && quiet.triaged.withLock { $0 } == 0)
++    }
++
++    @Test func eachRunIsAuditedWithTheDocumentedFields() {
++        let run = Watcher.Run(
++            number: 2, trigger: .change, exitStatus: 1, timedOut: false, state: .fail, previous: .pass, seconds: 1.5,
++            findings: [.init(kind: "error", location: nil, message: "x")], triageError: nil, notified: true)
++        let details = AuditEvent.Details.watchRun(run, command: "make")
++        #expect(Set(details.keys).isSubset(of: AuditEvent.fields(for: .watchRun)))
++        #expect(details["state"] == "fail" && details["previous"] == "pass" && details["changed"] == true)
++        #expect(details["findings"] == .int(1) && details["exitStatus"] == .int(1) && details["trigger"] == "change")
++        var first = run
++        first.previous = nil
++        first.findings = nil
++        first.exitStatus = nil
++        let bare = AuditEvent.Details.watchRun(first, command: "make")
++        #expect(bare["previous"] == .null && bare["findings"] == .null && bare["exitStatus"] == .null)
++    }
++
++    @Test func aRefusedCommandEndsTheWatch() async {
++        let watcher = Watcher(
++            command: "rm -rf /", execute: { throw CommandRunner.Failure.denied("no") }, triage: nil,
++            notify: { _ in }, report: { _ in })
++        await #expect(throws: CommandRunner.Failure.self) { try await watcher.run(Self.triggers([.start])) }
++    }
++
++    @Test func buildOutputAndScratchFilesDoNotCount() {
++        #expect(FileWatcher.counts("/repo/Sources/A.swift"))
++        #expect(!FileWatcher.counts("/repo/.build/debug/wisp") && !FileWatcher.counts("/repo/.git/index"))
++        #expect(!FileWatcher.counts("/repo/node_modules/x/y.js") && !FileWatcher.counts("/repo/target/debug/a"))
++        #expect(!FileWatcher.counts("/repo/.A.swift.swp") && !FileWatcher.counts("/repo/notes.txt~"))
++        #expect(!FileWatcher.counts("/repo/.DS_Store"))
++    }
++
++    @Test func fsEventsReportAChangeUnderTheWatchedDirectory() async throws {
++        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-watch-\(UUID().uuidString)")
++        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
++        defer { try? FileManager.default.removeItem(at: dir) }
++        let (events, continuation) = AsyncStream.makeStream(of: Void.self)
++        let watcher = try #require(FileWatcher(paths: [dir.path], latency: 0.1) { continuation.yield() })
++        defer { withExtendedLifetime(watcher) {} }
++        // FSEvents can miss a write made before the stream settles; write until one is seen.
++        let writer = Task {
++            for index in 0..<50 where !Task.isCancelled {
++                try? Data("\(index)".utf8).write(to: dir.appending(path: "file.txt"))
++                try? await Task.sleep(for: .milliseconds(200))
++            }
++            continuation.finish()
++        }
++        defer { writer.cancel() }
++        var seen = false
++        for await _ in events {
++            seen = true
++            break
++        }
++        #expect(seen, "no FSEvents change within ten seconds")
++    }
++}
+diff --git a/harness/coverage-baseline b/harness/coverage-baseline
+index 9ed310e..fafa3a1 100644
+--- a/harness/coverage-baseline
++++ b/harness/coverage-baseline
+@@ -1 +1 @@
+-94.99
++95.14

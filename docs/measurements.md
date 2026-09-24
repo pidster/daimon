@@ -21,7 +21,7 @@ Mac on one day; it is evidence, not a certification.
 | `triage` | `TriageEvalTests`, abridged swift build, swift test, cargo test, and pytest output | an expected failure found, by test name or file:line |
 | `summarise_diff` | `DiffSummaryEvalTests`, five small diffs | the expected flag (secret, deleted or disabled test) on the expected file, or no flag for an ordinary change, from the rules and the model together; every file must also get a summary line. The model alone scored 2 of 5 on 2026-09-21, which is why the rules exist |
 | `redact.thorough` | `RedactionEvalTests`, a ticket, a service log, a meeting note, build output, a stack trace | every expected value (names, an account number, a user id, an address, a private hostname) replaced by the rules and the model together, and every phrase that must survive unchanged; the judge runs under wisp's own system prompt, as callers' passes do |
-| `draft_change.commit` | `DraftEvalTests`, five small diffs, twice each | a commit subject naming what the change is about (one of the words a reviewer would expect); the shape is enforced in code. Two runs on 2026-09-24 scored 10 and 9 of 10 |
+| `draft_change.commit` | `DraftEvalTests`, three size bands: five small diffs twice each, then real commits of this repository at 9 and 14 KB and at 30 and 52 KB, once each; per model with `WISP_EVAL_MODELS` | a commit subject naming the gist of the change (words chosen so a vague subject fails); each band is recorded with its `maxInputBytes` for routing ([ADR 0037](decisions/0037-routing-by-input-size.md)). On 2026-09-24 the system model scored 7/10, 2/2, 1/2 and `qwen3.8:27b` 10/10, 2/2, 2/2 |
 | `system_info.topic` | `SystemInfoEvalTests`, eight plain questions about the Mac, twice each, with `run_command` also offered | a `system_info` call in the turn naming the expected topic (and port or process); three runs on 2026-09-24, with the process name required, scored 15, 16, and 16 of 16 |
 | `edit_file.replace` | `ToolEvalTests`, ten small files | after read_file then edit_file replace by line number, the file is exactly as intended |
 | `respond.schema` | `ToolEvalTests`, six code snippets | the schema-shaped reply parses and names the language |
@@ -37,7 +37,13 @@ scripts/check eval record
 
 runs `ModelEvalTests` on the configured model with `WISP_EVAL_RECORD` pointing at
 `harness/Sources/WispCore/Resources/measurements.json`; each test merges its `Measurement` into
-that file, replacing the previous one for the same task and model. A plain `scripts/check eval`, which
+that file, replacing the previous one for the same task, model, and input size.
+
+A task that routes by input size ([ADR 0037](decisions/0037-routing-by-input-size.md)) records one
+measurement per size band, each with `maxInputBytes`, the largest input among its cases: the result is
+evidence for inputs up to that size and no further. `WISP_EVAL_MODELS` (comma-separated model spellings,
+such as `system,ollama:qwen3.8:27b`) measures each named model in turn, so a ladder's rungs all have
+numbers; without it the eval measures the configured model only. A plain `scripts/check eval`, which
 is what a release runs, asserts the floors and records nothing: the sets are small, a rerun re-rolls
 the numbers (on 2026-09-22 two consecutive runs gave 5 and 6 of 6 for the same task), and the file
 should change only when someone means it to. The file is embedded at build time

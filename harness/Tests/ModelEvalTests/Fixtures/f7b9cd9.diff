@@ -1,0 +1,126 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 923b4e5..dbbaade 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -16,6 +16,8 @@ Added:
+ 
+ Fixed:
+ 
++- `system_info` asked about a named app ("Is Ollama running?") often left the name out and fell back
++  to `ps`, which cannot run in the sandbox; the name is now a required argument.
+ - The condensing tools ignored a command's exit status, so a failing command's error message was
+   condensed as though it were the output. They now return `exitStatus` and `timedOut` and start their
+   text with a warning when the command failed.
+diff --git a/docs/decisions/0034-system-info.md b/docs/decisions/0034-system-info.md
+index e76613b..901a21e 100644
+--- a/docs/decisions/0034-system-info.md
++++ b/docs/decisions/0034-system-info.md
+@@ -52,3 +52,12 @@ far more than the answer needs.
+ - Tests without the model: every parser over captured output, each topic through a scripted probe and
+   fixed process samples, validation, the tool's error text, the `KERN_PROCARGS2` layout, the CPU
+   arithmetic, and a live read of the test process itself through `ProcessTable`.
++
++## Amendment, 2026-09-24: the process name is required
++
++The miss that remained was "Is Ollama running, and how much memory does it use?": the model called
++`process` without the optional `process` argument and then fell back to `ps`. The argument is now a
++required string, empty for the other topics, so the model writes a value on every call. The same
++eval then scored 15, 16, and 16 of 16 on three runs, the Ollama question passing every time; the one
++miss was the model putting a topic name into `process` for a free-space question.
++
+diff --git a/docs/measurements.md b/docs/measurements.md
+index 21d9d25..f3f0c13 100644
+--- a/docs/measurements.md
++++ b/docs/measurements.md
+@@ -22,7 +22,7 @@ Mac on one day; it is evidence, not a certification.
+ | `summarise_diff` | `DiffSummaryEvalTests`, five small diffs | the expected flag (secret, deleted or disabled test) on the expected file, or no flag for an ordinary change, from the rules and the model together; every file must also get a summary line. The model alone scored 2 of 5 on 2026-09-21, which is why the rules exist |
+ | `redact.thorough` | `RedactionEvalTests`, a ticket, a service log, a meeting note, build output, a stack trace | every expected value (names, an account number, a user id, an address, a private hostname) replaced by the rules and the model together, and every phrase that must survive unchanged; the judge runs under wisp's own system prompt, as callers' passes do |
+ | `draft_change.commit` | `DraftEvalTests`, five small diffs, twice each | a commit subject naming what the change is about (one of the words a reviewer would expect); the shape is enforced in code. Two runs on 2026-09-24 scored 10 and 9 of 10 |
+-| `system_info.topic` | `SystemInfoEvalTests`, eight plain questions about the Mac, twice each, with `run_command` also offered | a `system_info` call in the turn naming the expected topic (and port or process); three runs on 2026-09-23 scored 15, 14, and 16 of 16 |
++| `system_info.topic` | `SystemInfoEvalTests`, eight plain questions about the Mac, twice each, with `run_command` also offered | a `system_info` call in the turn naming the expected topic (and port or process); three runs on 2026-09-24, with the process name required, scored 15, 16, and 16 of 16 |
+ | `edit_file.replace` | `ToolEvalTests`, ten small files | after read_file then edit_file replace by line number, the file is exactly as intended |
+ | `respond.schema` | `ToolEvalTests`, six code snippets | the schema-shaped reply parses and names the language |
+ 
+diff --git a/docs/tools/system_info.md b/docs/tools/system_info.md
+index 9c5dde6..1812157 100644
+--- a/docs/tools/system_info.md
++++ b/docs/tools/system_info.md
+@@ -12,7 +12,7 @@ through `libproc`), parses them, and returns a short table. Decided in
+ | --- | --- | --- | --- |
+ | `topic` | enum | yes | `ports`, `freeSpace`, `folderSizes`, `processes`, `memory`, `process`, `battery`, `system`, `network`. |
+ | `port` | integer | no | For `ports`: the port asked about; without it, every listening TCP socket. |
+-| `process` | string | for `process` | The app or process name (matched case-insensitively) or its id. |
++| `process` | string | yes | For `process`: the app or process name (matched case-insensitively) or its id; empty for other topics. Required so the model does not leave the name out. |
+ | `path` | string | no | For `folderSizes`: the folder; `~` expands; default the home directory. |
+ 
+ ## What each topic reads
+@@ -45,6 +45,7 @@ without a name (the message says how to call again).
+ ## Measured
+ 
+ `SystemInfoEvalTests` (`scripts/check eval`): eight plain questions that do not name the tool, twice
+-each, with `run_command` also offered. On 2026-09-23 on the system model, 15, 14, and 16 of 16 on three
+-runs; the recorded figure is in [measurements.md](../measurements.md). The miss is a question naming an
+-app, where the model sometimes leaves out the name and falls back to `ps`.
++each, with `run_command` also offered. On 2026-09-24 on the system model, after the process name became
++required, 15, 16, and 16 of 16 on three runs; the recorded figure is in
++[measurements.md](../measurements.md). Before that change (2026-09-23) the question naming an app failed
++about half the time, the model leaving out the name and falling back to `ps`.
+diff --git a/harness/Sources/WispCore/Resources/measurements.json b/harness/Sources/WispCore/Resources/measurements.json
+index b84075e..037595d 100644
+--- a/harness/Sources/WispCore/Resources/measurements.json
++++ b/harness/Sources/WispCore/Resources/measurements.json
+@@ -49,7 +49,7 @@
+     "total" : 5
+   },
+   {
+-    "date" : "2026-09-23",
++    "date" : "2026-09-24",
+     "model" : "system",
+     "notes" : "eight plain questions about the Mac (a port, the busiest process, free space, a folder's usage, battery, macOS version, memory, one app) with run_command also offered, twice each; a pass is a system_info call in the turn naming the expected topic and target",
+     "passed" : 16,
+diff --git a/harness/Sources/WispCore/Tools/SystemInfoTool.swift b/harness/Sources/WispCore/Tools/SystemInfoTool.swift
+index e2dffa8..5f81f64 100644
+--- a/harness/Sources/WispCore/Tools/SystemInfoTool.swift
++++ b/harness/Sources/WispCore/Tools/SystemInfoTool.swift
+@@ -23,9 +23,12 @@ public struct SystemInfoTool: WispTool {
+         /// The port for `ports`.
+         @Guide(description: "For ports: the port number asked about, such as 8080.")
+         public var port: Int?
+-        /// The process for `process`.
+-        @Guide(description: "For process: the app or process name, such as Safari, or its id. Required for process.")
+-        public var process: String?
++        /// The process for `process`; empty for other topics. Required rather than optional because the
++        /// model left an optional name out of "Is Ollama running?" and then fell back to `ps`.
++        @Guide(
++            description: "For process: the app or process name from the question, such as Safari, or its id. "
++                + "Otherwise empty.")
++        public var process: String
+         /// The folder for `folderSizes`.
+         @Guide(description: "For folderSizes: the folder to measure, such as ~/Library. Default: home.")
+         public var path: String?
+@@ -68,7 +71,8 @@ public struct SystemInfoTool: WispTool {
+     /// - Returns: A short report, or `error: …` saying what was wrong.
+     public func call(arguments: Arguments) async -> String {
+         do {
+-            let target = arguments.topic == .ports ? arguments.port.map(String.init) : arguments.process
++            let named = arguments.process.trimmingCharacters(in: .whitespaces)
++            let target = arguments.topic == .ports ? arguments.port.map(String.init) : named.isEmpty ? nil : named
+             return try await info.report(arguments.topic, target: target, path: arguments.path)
+         } catch {
+             return "error: \(error)"
+diff --git a/harness/Tests/WispCoreTests/SystemInfoTests.swift b/harness/Tests/WispCoreTests/SystemInfoTests.swift
+index 16455e3..608bd80 100644
+--- a/harness/Tests/WispCoreTests/SystemInfoTests.swift
++++ b/harness/Tests/WispCoreTests/SystemInfoTests.swift
+@@ -158,9 +158,9 @@ import Testing
+         #expect(partial.hasSuffix("(timed out; sizes are partial)"), "\(partial)")
+         let tool = SystemInfoTool(info: slow)
+         #expect(
+-            await tool.call(arguments: .init(topic: .process, port: nil, process: nil, path: nil)).hasPrefix(
++            await tool.call(arguments: .init(topic: .process, port: nil, process: "", path: nil)).hasPrefix(
+                 "error: target"))
+-        #expect(await tool.call(arguments: .init(topic: .ports, port: 0, process: nil, path: nil)).hasPrefix("error:"))
++        #expect(await tool.call(arguments: .init(topic: .ports, port: 0, process: "", path: nil)).hasPrefix("error:"))
+         #expect(
+             tool.name == "system_info" && tool.limits.contains("4096") && tool.examplePrompt.contains("system_info"))
+         #expect(SystemInfo.Failure.badPath("/p").description == "path is not a folder on this Mac: /p")

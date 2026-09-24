@@ -154,6 +154,16 @@ extension AuditEvent {
             ]
         }
 
+        /// `model.routed`: the model chosen for a task by its input's size, and why.
+        public static func modelRouted(
+            task: String, inputBytes: Int, decision: ModelRouting.Decision
+        ) -> [String: JSONValue] {
+            [
+                "task": .string(task), "inputBytes": .int(inputBytes), "model": .string(decision.model.description),
+                "reason": .string(decision.reason),
+            ]
+        }
+
         /// `watch.run`: one run of a watched command, how it ended, and whether it turned and notified.
         public static func watchRun(_ run: Watcher.Run, command: String) -> [String: JSONValue] {
             [
@@ -269,6 +279,7 @@ extension AuditEvent {
         case .notification: ["title", "body", "source", "outcome", "reason"]
         case .secretScan: ["source", "bytes", "diff", "thorough", "findings", "kinds"]
         case .redaction: ["source", "bytes", "bytesOut", "truncated", "thorough", "replaced"]
+        case .modelRouted: ["task", "inputBytes", "model", "reason"]
         case .watchRun:
             [
                 "command", "run", "trigger", "exitStatus", "timedOut", "state", "previous", "changed", "seconds",

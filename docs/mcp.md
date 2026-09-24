@@ -293,9 +293,11 @@ with `Why: <…>` for the reason, which a diff cannot give ([ADR 0035](decisions
 | `model` | string | no | The model, as for `respond`. |
 
 Result content is the draft as it would be pasted; `structuredContent` is `{ "kind", "subject", "body":
-[…], "flags": […], "text" }`, plus `exitStatus` for a command. An empty diff is an error. The system
-model drafts small changes well and large ones poorly; for a change of many files pass a larger local
-model, such as `model: ollama:qwen3.8:27b`. The measured
+[…], "flags": […], "text", "model", "routing" }`, plus `exitStatus` for a command; `model` is the one
+that drafted and `routing` says why when it was chosen by size. An empty diff is an error. The system
+model drafts small changes well and large ones poorly: with a `routing.ladder` in the config, wisp picks
+the model by the diff's size from the measurements ([ADR 0037](decisions/0037-routing-by-input-size.md));
+without one, pass a larger local model for a change of many files, such as `model: ollama:qwen3.8:27b`. The measured
 result is in [measurements.md](measurements.md).
 
 ### `scan_secrets`
