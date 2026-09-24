@@ -52,3 +52,12 @@ far more than the answer needs.
 - Tests without the model: every parser over captured output, each topic through a scripted probe and
   fixed process samples, validation, the tool's error text, the `KERN_PROCARGS2` layout, the CPU
   arithmetic, and a live read of the test process itself through `ProcessTable`.
+
+## Amendment, 2026-09-24: the process name is required
+
+The miss that remained was "Is Ollama running, and how much memory does it use?": the model called
+`process` without the optional `process` argument and then fell back to `ps`. The argument is now a
+required string, empty for the other topics, so the model writes a value on every call. The same
+eval then scored 15, 16, and 16 of 16 on three runs, the Ollama question passing every time; the one
+miss was the model putting a topic name into `process` for a free-space question.
+

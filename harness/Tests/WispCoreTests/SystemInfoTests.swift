@@ -158,9 +158,9 @@ import Testing
         #expect(partial.hasSuffix("(timed out; sizes are partial)"), "\(partial)")
         let tool = SystemInfoTool(info: slow)
         #expect(
-            await tool.call(arguments: .init(topic: .process, port: nil, process: nil, path: nil)).hasPrefix(
+            await tool.call(arguments: .init(topic: .process, port: nil, process: "", path: nil)).hasPrefix(
                 "error: target"))
-        #expect(await tool.call(arguments: .init(topic: .ports, port: 0, process: nil, path: nil)).hasPrefix("error:"))
+        #expect(await tool.call(arguments: .init(topic: .ports, port: 0, process: "", path: nil)).hasPrefix("error:"))
         #expect(
             tool.name == "system_info" && tool.limits.contains("4096") && tool.examplePrompt.contains("system_info"))
         #expect(SystemInfo.Failure.badPath("/p").description == "path is not a folder on this Mac: /p")

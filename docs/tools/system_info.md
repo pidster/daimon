@@ -12,7 +12,7 @@ through `libproc`), parses them, and returns a short table. Decided in
 | --- | --- | --- | --- |
 | `topic` | enum | yes | `ports`, `freeSpace`, `folderSizes`, `processes`, `memory`, `process`, `battery`, `system`, `network`. |
 | `port` | integer | no | For `ports`: the port asked about; without it, every listening TCP socket. |
-| `process` | string | for `process` | The app or process name (matched case-insensitively) or its id. |
+| `process` | string | yes | For `process`: the app or process name (matched case-insensitively) or its id; empty for other topics. Required so the model does not leave the name out. |
 | `path` | string | no | For `folderSizes`: the folder; `~` expands; default the home directory. |
 
 ## What each topic reads
@@ -45,6 +45,7 @@ without a name (the message says how to call again).
 ## Measured
 
 `SystemInfoEvalTests` (`scripts/check eval`): eight plain questions that do not name the tool, twice
-each, with `run_command` also offered. On 2026-09-23 on the system model, 15, 14, and 16 of 16 on three
-runs; the recorded figure is in [measurements.md](../measurements.md). The miss is a question naming an
-app, where the model sometimes leaves out the name and falls back to `ps`.
+each, with `run_command` also offered. On 2026-09-24 on the system model, after the process name became
+required, 15, 16, and 16 of 16 on three runs; the recorded figure is in
+[measurements.md](../measurements.md). Before that change (2026-09-23) the question naming an app failed
+about half the time, the model leaving out the name and falling back to `ps`.

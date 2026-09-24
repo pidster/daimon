@@ -23,9 +23,12 @@ public struct SystemInfoTool: WispTool {
         /// The port for `ports`.
         @Guide(description: "For ports: the port number asked about, such as 8080.")
         public var port: Int?
-        /// The process for `process`.
-        @Guide(description: "For process: the app or process name, such as Safari, or its id. Required for process.")
-        public var process: String?
+        /// The process for `process`; empty for other topics. Required rather than optional because the
+        /// model left an optional name out of "Is Ollama running?" and then fell back to `ps`.
+        @Guide(
+            description: "For process: the app or process name from the question, such as Safari, or its id. "
+                + "Otherwise empty.")
+        public var process: String
         /// The folder for `folderSizes`.
         @Guide(description: "For folderSizes: the folder to measure, such as ~/Library. Default: home.")
         public var path: String?
@@ -68,7 +71,8 @@ public struct SystemInfoTool: WispTool {
     /// - Returns: A short report, or `error: …` saying what was wrong.
     public func call(arguments: Arguments) async -> String {
         do {
-            let target = arguments.topic == .ports ? arguments.port.map(String.init) : arguments.process
+            let named = arguments.process.trimmingCharacters(in: .whitespaces)
+            let target = arguments.topic == .ports ? arguments.port.map(String.init) : named.isEmpty ? nil : named
             return try await info.report(arguments.topic, target: target, path: arguments.path)
         } catch {
             return "error: \(error)"

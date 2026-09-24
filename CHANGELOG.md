@@ -16,6 +16,8 @@ Added:
 
 Fixed:
 
+- `system_info` asked about a named app ("Is Ollama running?") often left the name out and fell back
+  to `ps`, which cannot run in the sandbox; the name is now a required argument.
 - The condensing tools ignored a command's exit status, so a failing command's error message was
   condensed as though it were the output. They now return `exitStatus` and `timedOut` and start their
   text with a warning when the command failed.

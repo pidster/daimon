@@ -49,7 +49,7 @@
     "total" : 5
   },
   {
-    "date" : "2026-09-23",
+    "date" : "2026-09-24",
     "model" : "system",
     "notes" : "eight plain questions about the Mac (a port, the busiest process, free space, a folder's usage, battery, macOS version, memory, one app) with run_command also offered, twice each; a pass is a system_info call in the turn naming the expected topic and target",
     "passed" : 16,
