@@ -7,6 +7,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use serde_json::Value;
 
+use crate::editor::{Edit, Editor};
 use crate::palette;
 use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
 
@@ -70,7 +71,7 @@ pub struct App {
     /// The reply so far on the current line, not yet committed.
     pub partial: String,
     /// What the user has typed.
-    pub input: String,
+    pub editor: Editor,
     /// The last status wisp sent.
     pub status: Option<Status>,
     /// An approval awaiting an answer.
@@ -181,16 +182,14 @@ impl App {
                 decision: decision.to_string(),
             });
         }
-        if !self.busy {
-            self.input.push(c);
-        }
+        self.edit(&Edit::Insert(c));
         Action::None
     }
 
-    /// Backspace.
-    pub fn backspace(&mut self) {
-        if self.approval.is_none() {
-            self.input.pop();
+    /// An edit to the input: ignored while a dialog wants its keys or a turn is running.
+    pub fn edit(&mut self, edit: &Edit) {
+        if self.approval.is_none() && !self.busy {
+            self.editor.apply(edit);
         }
     }
 
@@ -199,8 +198,7 @@ impl App {
         if self.approval.is_some() || self.busy {
             return Action::None;
         }
-        let text = self.input.trim().to_string();
-        self.input.clear();
+        let text = self.editor.take().trim().to_string();
         if text.is_empty() {
             return Action::None;
         }
@@ -224,13 +222,13 @@ impl App {
         }
         let index = match self.recall_at {
             None => {
-                self.draft = std::mem::take(&mut self.input);
+                self.draft = self.editor.take();
                 self.recall.len() - 1
             }
             Some(index) => index.saturating_sub(1),
         };
         self.recall_at = Some(index);
-        self.input.clone_from(&self.recall[index]);
+        self.editor.set(&self.recall[index]);
     }
 
     /// Down: moves to the next submitted line, and past the newest back to the draft.
@@ -243,10 +241,11 @@ impl App {
         };
         if index + 1 < self.recall.len() {
             self.recall_at = Some(index + 1);
-            self.input.clone_from(&self.recall[index + 1]);
+            self.editor.set(&self.recall[index + 1]);
         } else {
             self.recall_at = None;
-            self.input = std::mem::take(&mut self.draft);
+            let draft = std::mem::take(&mut self.draft);
+            self.editor.set(&draft);
         }
     }
 
@@ -297,10 +296,21 @@ impl App {
                 Paragraph::new("").style(palette::input_background()),
                 row(INPUT_ROW, area),
             );
+            let (line, column) = self.input_line(usize::from(inset.width));
             frame.render_widget(
-                Paragraph::new(self.input_line()).style(palette::input_background()),
+                Paragraph::new(line).style(palette::input_background()),
                 row(INPUT_ROW, inset),
             );
+            // The terminal's own cursor marks where typing goes, while typing is taken.
+            if let Some(column) = column {
+                let x = inset
+                    .x
+                    .saturating_add(u16::try_from(column).unwrap_or(u16::MAX));
+                frame.set_cursor_position((
+                    x.min(area.right().saturating_sub(1)),
+                    area.y + INPUT_ROW,
+                ));
+            }
         }
         strip(frame, INPUT_ROW + 1, "▀");
         plain(frame, STATUS_ROW, self.status_line());
@@ -325,17 +335,25 @@ impl App {
         ])
     }
 
-    fn input_line(&self) -> Line<'static> {
+    /// The input row in `width` cells, and the cursor's column when typing is taken. The text scrolls
+    /// sideways to keep the cursor in sight; newlines show as `⏎`.
+    fn input_line(&self, width: usize) -> (Line<'static>, Option<usize>) {
+        const PROMPT_CELLS: usize = 2;
         let prompt = if self.busy { "…" } else { "›" };
-        let text = if self.input.is_empty() && !self.busy {
+        let (text, column) = self.editor.view(width.saturating_sub(PROMPT_CELLS));
+        let shown = if self.editor.is_empty() && !self.busy {
             Span::styled(PLACEHOLDER, palette::muted())
         } else {
-            Span::styled(self.input.clone(), palette::user())
+            Span::styled(text, palette::user())
         };
-        Line::from(vec![
-            Span::styled(format!("{prompt} "), palette::prompt()),
-            text,
-        ])
+        let typing = self.approval.is_none() && !self.busy;
+        (
+            Line::from(vec![
+                Span::styled(format!("{prompt} "), palette::prompt()),
+                shown,
+            ]),
+            typing.then_some(PROMPT_CELLS + column),
+        )
     }
 
     fn status_line(&self) -> Line<'static> {
@@ -540,7 +558,7 @@ mod tests {
         for c in "hi".chars() {
             assert_eq!(app.type_char(c), Action::None);
         }
-        app.backspace();
+        app.edit(&Edit::Backspace);
         app.type_char('o');
         assert_eq!(
             app.submit(),
@@ -556,7 +574,7 @@ mod tests {
         );
         // Typing while busy is dropped; a dialog takes over the keys.
         app.type_char('x');
-        assert!(app.input.is_empty());
+        assert!(app.editor.is_empty());
         app.handle(Outbound::Approval(Approval {
             id: "a1".into(),
             command: "git push".into(),
@@ -587,32 +605,32 @@ mod tests {
         };
         // Nothing to recall yet: Up leaves the input alone.
         app.recall_previous();
-        assert!(app.input.is_empty());
+        assert!(app.editor.is_empty());
         for line in ["first", "second", "second", "third"] {
-            app.input = line.into();
+            app.editor.set(line);
             app.submit();
             app.handle(Outbound::Status(Status::default()));
         }
         // A line repeating the one before it is kept once.
         assert_eq!(app.recall, vec!["first", "second", "third"]);
-        app.input = "draft".into();
+        app.editor.set("draft");
         app.recall_previous();
-        assert_eq!(app.input, "third");
+        assert_eq!(app.editor.text(), "third");
         app.recall_previous();
         app.recall_previous();
-        assert_eq!(app.input, "first");
+        assert_eq!(app.editor.text(), "first");
         // Up at the oldest stays there.
         app.recall_previous();
-        assert_eq!(app.input, "first");
+        assert_eq!(app.editor.text(), "first");
         app.recall_next();
-        assert_eq!(app.input, "second");
+        assert_eq!(app.editor.text(), "second");
         app.recall_next();
         app.recall_next();
         // Down past the newest restores what was being typed.
-        assert_eq!(app.input, "draft");
+        assert_eq!(app.editor.text(), "draft");
         assert_eq!(app.recall_at, None);
         app.recall_next();
-        assert_eq!(app.input, "draft");
+        assert_eq!(app.editor.text(), "draft");
         // A recalled line can be edited and sent; it joins the end of the list.
         app.recall_previous();
         app.type_char('!');
@@ -625,14 +643,63 @@ mod tests {
         assert_eq!(app.recall.last().map(String::as_str), Some("third!"));
         // Busy or in a dialog, the keys do nothing.
         app.recall_previous();
-        assert!(app.input.is_empty());
+        assert!(app.editor.is_empty());
+    }
+
+    #[test]
+    fn edits_go_to_the_input_only_while_typing_is_taken() {
+        let mut app = App::default();
+        app.edit(&Edit::Paste("git log\n-3".into()));
+        app.edit(&Edit::Home);
+        app.type_char('>');
+        assert_eq!(app.editor.text(), ">git log\n-3");
+        app.busy = true;
+        app.edit(&Edit::KillToEnd);
+        assert_eq!(app.editor.text(), ">git log\n-3");
+        app.busy = false;
+        app.approval = Some(Approval {
+            id: "a".into(),
+            command: "x".into(),
+            line: "x".into(),
+            pattern: "x".into(),
+            directory: "/".into(),
+            level: "moderate".into(),
+            reasons: vec![],
+        });
+        app.edit(&Edit::Backspace);
+        assert_eq!(app.editor.text(), ">git log\n-3");
+    }
+
+    #[test]
+    fn the_terminal_cursor_sits_where_typing_goes() {
+        let mut app = App {
+            status: Some(Status::default()),
+            ..Default::default()
+        };
+        app.editor.set("hello world");
+        app.edit(&Edit::WordLeft);
+        let backend = TestBackend::new(40, BAND_HEIGHT);
+        let mut terminal = Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| app.render(frame, frame.area()))
+            .expect("draw");
+        // The margin, the prompt's two cells, then "hello ".
+        let position = terminal.get_cursor_position().expect("cursor");
+        assert_eq!((position.x, position.y), (MARGIN + 2 + 6, INPUT_ROW));
+        // Longer than the row: the text scrolls so the end, and the cursor, stay in sight.
+        app.editor.set(&"x".repeat(100));
+        terminal
+            .draw(|frame| app.render(frame, frame.area()))
+            .expect("draw");
+        let position = terminal.get_cursor_position().expect("cursor");
+        assert_eq!(position.x, 40 - MARGIN - 1);
     }
 
     #[test]
     fn recall_keeps_only_the_latest_lines() {
         let mut app = App::default();
         for index in 0..=RECALL_LIMIT {
-            app.input = format!("line {index}");
+            app.editor.set(&format!("line {index}"));
             app.submit();
             app.busy = false;
         }
@@ -651,7 +718,11 @@ mod tests {
                 approval: "--yes".into(),
                 context_used: Some(0.137),
             }),
-            input: "hello".into(),
+            editor: {
+                let mut editor = Editor::default();
+                editor.set("hello");
+                editor
+            },
             partial: "so far".into(),
             ..Default::default()
         };

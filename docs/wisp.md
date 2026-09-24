@@ -42,6 +42,23 @@ the one before it kept once): Up from a fresh line keeps what was typed as a dra
 newest line brings it back. The plain chat reads whole lines and has no recall; `/history` lists them
 in both.
 
+`wisp-tui`'s input edits in place, with readline's keys:
+
+| Keys | Effect |
+| --- | --- |
+| Left, Right | Move a character. |
+| Alt-Left, Alt-Right (or Ctrl-), Alt-B, Alt-F | Move a word. macOS terminals send Alt-B and Alt-F for Option-Left and Option-Right. |
+| Home, End, Ctrl-A, Ctrl-E | Move to the start or end. |
+| Backspace, Delete | Delete the character before or at the cursor. |
+| Ctrl-W, Alt-Backspace | Delete back to the previous whitespace. |
+| Ctrl-U, Ctrl-K | Delete to the start or to the end. |
+| Alt-Enter | A newline, for a message of several lines; shown as `⏎`. |
+| Paste | Inserted whole (bracketed paste), newlines kept, so pasting never sends. |
+
+A line longer than the row scrolls sideways to keep the cursor in sight, and the terminal's own cursor
+marks where typing goes. Keys other than a dialog's answers are ignored while an approval is asked and
+while a turn runs.
+
 What a session shows, and where it goes:
 
 - A banner with the version, model, tool count, and audit session, then a status line above every

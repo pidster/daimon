@@ -59,8 +59,10 @@ for after them:
 ## Terminal front end
 
 Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Input history shipped 2026-09-23
-(Up and Down recall, `/history` in chat). Next, in order: line editing in `wisp-tui`'s input (a cursor
-moved with Left and Right, multi-line composition, paste); a `turn` event in the
+(Up and Down recall, `/history` in chat). Line editing shipped 2026-09-24: a cursor, word and line
+motions, readline's deletions, bracketed paste, and Alt-Enter for a newline. Next, in order: an input
+that grows to several rows for a multi-line message (today it scrolls on one, newlines shown as `⏎`); a
+`turn` event in the
 protocol and a decision on raw versus pre-rendered events; a bordered approval dialog with the reasons inside
 it; Markdown-ish rendering of replies at commit time.
 

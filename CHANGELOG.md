@@ -4,6 +4,14 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `wisp-tui` line editing: a cursor moved with Left and Right, word motions (Alt or Ctrl with an arrow,
+  Alt-B and Alt-F), Home and End, Ctrl-A, E, U, K, and W, Delete, Alt-Backspace, bracketed paste, and
+  Alt-Enter for a newline. A long line scrolls to keep the cursor in sight.
+
 ## 0.10.1
 
 Fixed:

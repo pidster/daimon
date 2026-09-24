@@ -6,6 +6,7 @@
 //! wisp binary (default `wisp` on `PATH`).
 
 mod app;
+mod editor;
 mod palette;
 mod protocol;
 
@@ -16,13 +17,18 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use ratatui::crossterm::event::{self, Event as TermEvent, KeyCode, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{
+    self, DisableBracketedPaste, EnableBracketedPaste, Event as TermEvent, KeyCode, KeyEventKind,
+    KeyModifiers,
+};
+use ratatui::crossterm::execute;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Widget, Wrap};
 use ratatui::{TerminalOptions, Viewport};
 
 use app::{Action, App, BAND_HEIGHT, HistoryLine, LineKind, MARGIN};
+use editor::Edit;
 use protocol::Outbound;
 
 /// What the main loop waits on.
@@ -85,7 +91,10 @@ fn main() -> Result<()> {
     let mut terminal = ratatui::init_with_options(TerminalOptions {
         viewport: Viewport::Inline(BAND_HEIGHT),
     });
+    // Bracketed paste delivers a paste as one event, so its newlines and keys cannot submit or edit.
+    let _ = execute!(std::io::stdout(), EnableBracketedPaste);
     let result = run(&mut terminal, &rx, &mut stdin);
+    let _ = execute!(std::io::stdout(), DisableBracketedPaste);
     ratatui::restore();
     let _ = child.wait();
     result
@@ -128,24 +137,25 @@ fn run(
             Some(Incoming::Line(line)) => app.handle(Outbound::parse(&line)),
             Some(Incoming::Stderr(line)) => app.handle(Outbound::Note { text: line }),
             Some(Incoming::Closed) => app.exited = true,
+            Some(Incoming::Terminal(TermEvent::Paste(text))) => app.edit(&Edit::Paste(text)),
             Some(Incoming::Terminal(TermEvent::Key(key))) if key.kind == KeyEventKind::Press => {
-                let action = match (key.code, key.modifiers) {
-                    (KeyCode::Char('c' | 'd'), KeyModifiers::CONTROL) => app.interrupt(),
-                    (KeyCode::Enter, _) => app.submit(),
-                    (KeyCode::Backspace, _) => {
-                        app.backspace();
+                let action = match command_for(key.code, key.modifiers) {
+                    Key::Interrupt => app.interrupt(),
+                    Key::Submit => app.submit(),
+                    Key::Type(c) => app.type_char(c),
+                    Key::Edit(edit) => {
+                        app.edit(&edit);
                         Action::None
                     }
-                    (KeyCode::Up, _) => {
+                    Key::RecallPrevious => {
                         app.recall_previous();
                         Action::None
                     }
-                    (KeyCode::Down, _) => {
+                    Key::RecallNext => {
                         app.recall_next();
                         Action::None
                     }
-                    (KeyCode::Char(c), _) => app.type_char(c),
-                    _ => Action::None,
+                    Key::Nothing => Action::None,
                 };
                 match action {
                     Action::None => {}
@@ -166,6 +176,59 @@ fn run(
         if app.exited {
             return Ok(());
         }
+    }
+}
+
+/// What a key asks for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Key {
+    /// Cancel a dialog, or quit.
+    Interrupt,
+    /// Send the input.
+    Submit,
+    /// A character: typed into the input, or an answer to a dialog.
+    Type(char),
+    /// An edit to the input.
+    Edit(Edit),
+    /// The previous submitted line.
+    RecallPrevious,
+    /// The next submitted line, or back to the draft.
+    RecallNext,
+    /// Nothing wisp-tui uses.
+    Nothing,
+}
+
+/// The key map. Readline's bindings where a terminal user expects them (Ctrl-A, E, U, K, W), Alt with an
+/// arrow or `b`/`f` for words (what macOS terminals send for Option-arrow), and Alt-Enter for a newline,
+/// since a terminal cannot tell Shift-Enter from Enter without the keyboard protocol few support.
+fn command_for(code: KeyCode, modifiers: KeyModifiers) -> Key {
+    let control = modifiers.contains(KeyModifiers::CONTROL);
+    let alt = modifiers.contains(KeyModifiers::ALT);
+    match code {
+        KeyCode::Char('c' | 'd') if control => Key::Interrupt,
+        KeyCode::Char('a') if control => Key::Edit(Edit::Home),
+        KeyCode::Char('e') if control => Key::Edit(Edit::End),
+        KeyCode::Char('u') if control => Key::Edit(Edit::KillToStart),
+        KeyCode::Char('k') if control => Key::Edit(Edit::KillToEnd),
+        KeyCode::Char('w') if control => Key::Edit(Edit::DeleteWordBefore),
+        KeyCode::Char('b') if alt => Key::Edit(Edit::WordLeft),
+        KeyCode::Char('f') if alt => Key::Edit(Edit::WordRight),
+        KeyCode::Char(_) if control => Key::Nothing,
+        KeyCode::Char(c) => Key::Type(c),
+        KeyCode::Enter if alt => Key::Edit(Edit::Newline),
+        KeyCode::Enter => Key::Submit,
+        KeyCode::Backspace if alt || control => Key::Edit(Edit::DeleteWordBefore),
+        KeyCode::Backspace => Key::Edit(Edit::Backspace),
+        KeyCode::Delete => Key::Edit(Edit::Delete),
+        KeyCode::Left if alt || control => Key::Edit(Edit::WordLeft),
+        KeyCode::Right if alt || control => Key::Edit(Edit::WordRight),
+        KeyCode::Left => Key::Edit(Edit::Left),
+        KeyCode::Right => Key::Edit(Edit::Right),
+        KeyCode::Home => Key::Edit(Edit::Home),
+        KeyCode::End => Key::Edit(Edit::End),
+        KeyCode::Up => Key::RecallPrevious,
+        KeyCode::Down => Key::RecallNext,
+        _ => Key::Nothing,
     }
 }
 
@@ -200,7 +263,63 @@ fn wrapped_height(text: &str, width: u16) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::{version_requested, wrapped_height};
+    use super::{Edit, Key, KeyCode, KeyModifiers, command_for, version_requested, wrapped_height};
+
+    #[test]
+    fn keys_map_to_the_edits_a_terminal_user_expects() {
+        let none = KeyModifiers::NONE;
+        let ctrl = KeyModifiers::CONTROL;
+        let alt = KeyModifiers::ALT;
+        assert_eq!(command_for(KeyCode::Char('x'), none), Key::Type('x'));
+        assert_eq!(
+            command_for(KeyCode::Char('X'), KeyModifiers::SHIFT),
+            Key::Type('X')
+        );
+        assert_eq!(command_for(KeyCode::Char('c'), ctrl), Key::Interrupt);
+        assert_eq!(command_for(KeyCode::Char('d'), ctrl), Key::Interrupt);
+        assert_eq!(command_for(KeyCode::Char('a'), ctrl), Key::Edit(Edit::Home));
+        assert_eq!(command_for(KeyCode::Char('e'), ctrl), Key::Edit(Edit::End));
+        assert_eq!(
+            command_for(KeyCode::Char('u'), ctrl),
+            Key::Edit(Edit::KillToStart)
+        );
+        assert_eq!(
+            command_for(KeyCode::Char('k'), ctrl),
+            Key::Edit(Edit::KillToEnd)
+        );
+        assert_eq!(
+            command_for(KeyCode::Char('w'), ctrl),
+            Key::Edit(Edit::DeleteWordBefore)
+        );
+        assert_eq!(command_for(KeyCode::Char('z'), ctrl), Key::Nothing);
+        assert_eq!(
+            command_for(KeyCode::Char('b'), alt),
+            Key::Edit(Edit::WordLeft)
+        );
+        assert_eq!(
+            command_for(KeyCode::Char('f'), alt),
+            Key::Edit(Edit::WordRight)
+        );
+        assert_eq!(command_for(KeyCode::Enter, none), Key::Submit);
+        assert_eq!(command_for(KeyCode::Enter, alt), Key::Edit(Edit::Newline));
+        assert_eq!(
+            command_for(KeyCode::Backspace, none),
+            Key::Edit(Edit::Backspace)
+        );
+        assert_eq!(
+            command_for(KeyCode::Backspace, alt),
+            Key::Edit(Edit::DeleteWordBefore)
+        );
+        assert_eq!(command_for(KeyCode::Delete, none), Key::Edit(Edit::Delete));
+        assert_eq!(command_for(KeyCode::Left, none), Key::Edit(Edit::Left));
+        assert_eq!(command_for(KeyCode::Right, alt), Key::Edit(Edit::WordRight));
+        assert_eq!(command_for(KeyCode::Left, ctrl), Key::Edit(Edit::WordLeft));
+        assert_eq!(command_for(KeyCode::Home, none), Key::Edit(Edit::Home));
+        assert_eq!(command_for(KeyCode::End, none), Key::Edit(Edit::End));
+        assert_eq!(command_for(KeyCode::Up, none), Key::RecallPrevious);
+        assert_eq!(command_for(KeyCode::Down, none), Key::RecallNext);
+        assert_eq!(command_for(KeyCode::F(1), none), Key::Nothing);
+    }
 
     #[test]
     fn version_is_only_the_bare_flag() {
