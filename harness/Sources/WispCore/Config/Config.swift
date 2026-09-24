@@ -197,8 +197,11 @@ public struct Config: Codable, Equatable, Sendable {
         commandTimeoutSeconds: Int? = nil,
         commandMaxOutputBytes: Int? = nil, maxThreads: Int? = nil, commandPolicy: CommandPolicy? = nil,
         audit: AuditConfig? = nil, approval: ApprovalConfig? = nil, ollama: OllamaConfig? = nil,
-        coreai: CoreAIConfig? = nil, mlx: MLXConfig? = nil, notifications: NotificationsConfig? = nil
+        coreai: CoreAIConfig? = nil, mlx: MLXConfig? = nil, notifications: NotificationsConfig? = nil,
+        tools: ToolsConfig? = nil, routing: RoutingConfig? = nil
     ) {
+        self.tools = tools
+        self.routing = routing
         self.systemPromptExtension = systemPromptExtension
         self.instructions = instructions
         self.model = model

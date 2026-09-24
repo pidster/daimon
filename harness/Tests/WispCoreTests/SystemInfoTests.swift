@@ -132,6 +132,12 @@ import Testing
         #expect(try await info(commands).report(.network) == "no network information")
     }
 
+    @Test func theDefaultProcessSourceReadsThisMacsProcessTable() async throws {
+        let live = SystemInfo(probe: { _ in ("", 0, false) })
+        let report = try await live.report(.process, target: String(ProcessInfo.processInfo.processIdentifier))
+        #expect(report.contains("PID") && report.contains("command:"), "\(report)")
+    }
+
     @Test func helpersFormatQuoteExpandAndBound() {
         #expect(SystemInfo.size(kilobytes: 512) == "512 KB" && SystemInfo.size(kilobytes: 3_565_158) == "3.4 GB")
         #expect(SystemInfo.size(kilobytes: 150 * 1024) == "150 MB")

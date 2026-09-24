@@ -44,6 +44,13 @@ import WispTestSupport
         bad.arguments = ["path": Argument(type: "integer", default: "five")]
         #expect(Self.invalid(bad)?.contains("default") == true)
         bad = Self.count
+        bad.command = "  "
+        #expect(Self.invalid(bad)?.contains("the command is empty") == true)
+        bad = Self.count
+        bad.arguments = ["Path": Argument(type: "string")]
+        bad.command = "wc -w {Path}"
+        #expect(Self.invalid(bad) != nil)
+        bad = Self.count
         bad.timeoutSeconds = 0
         #expect(Self.invalid(bad)?.contains("timeoutSeconds") == true)
         // Names are unique among the built-ins and each other.

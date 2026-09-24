@@ -73,6 +73,7 @@ import Testing
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         #expect(config.resolved.routingLadder == [.system, Self.big])
         #expect(Config().resolved.routingLadder.isEmpty)
+        #expect(Config(routing: .init(ladder: [.system])).resolved.routingLadder == [.system])
         let details = AuditEvent.Details.modelRouted(
             task: Self.task, inputBytes: 5, decision: .init(model: .system, reason: "r"))
         #expect(Set(details.keys) == AuditEvent.fields(for: .modelRouted) && details["model"] == "system")

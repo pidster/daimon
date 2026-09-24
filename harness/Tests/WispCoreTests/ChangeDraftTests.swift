@@ -39,6 +39,12 @@ import Testing
         #expect(prompt.range(of: "Sources/Upload.swift (")!.lowerBound < prompt.range(of: "CHANGELOG.md (")!.lowerBound)
     }
 
+    @Test func eachKindAsksForItsOwnText() {
+        #expect(ChangeDraft.prompt(.commit, from: Self.report).hasPrefix("Write a git commit message"))
+        #expect(ChangeDraft.prompt(.pr, from: Self.report).hasPrefix("Write a pull request"))
+        #expect(ChangeDraft.prompt(.changelog, from: Self.report).hasPrefix("Write one changelog line"))
+    }
+
     @Test func eachKindTakesItsShape() {
         let answer = #"{"subject":"add retry to uploads.","points":["Retries a failed upload twice", "  "]}"#
         let commit = ChangeDraft.draft(.commit, answer: answer, report: Self.report)
