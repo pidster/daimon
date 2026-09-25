@@ -23,6 +23,7 @@ use ratatui::crossterm::event::{
     KeyModifiers,
 };
 use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Widget, Wrap};
@@ -170,16 +171,12 @@ fn run(
             }
             Some(Incoming::Terminal(_)) | None => {}
         }
-        let width = terminal.size()?.width;
-        for line in app.take_pending() {
-            insert(terminal, &line, width)?;
-        }
-        let wanted = app.band_height(width);
-        if wanted != height {
-            regrow(terminal, wanted)?;
-            height = wanted;
-        }
-        terminal.draw(|frame| app.render(frame, frame.area()))?;
+        // One synchronized update per frame: the terminal shows the finished frame, not the cleared band
+        // of a resize or the steps of inserting lines, which it would otherwise paint as they arrive.
+        let _ = execute!(std::io::stdout(), BeginSynchronizedUpdate);
+        let frame = paint(terminal, &mut app, &mut height);
+        let _ = execute!(std::io::stdout(), EndSynchronizedUpdate);
+        frame?;
         if app.exited {
             return Ok(());
         }
@@ -237,6 +234,22 @@ fn command_for(code: KeyCode, modifiers: KeyModifiers) -> Key {
         KeyCode::Down => Key::RecallNext,
         _ => Key::Nothing,
     }
+}
+
+/// One frame: the lines finished since the last go above the band, the band takes the height the
+/// input needs, and the band is drawn.
+fn paint(terminal: &mut ratatui::DefaultTerminal, app: &mut App, height: &mut u16) -> Result<()> {
+    let width = terminal.size()?.width;
+    for line in app.take_pending() {
+        insert(terminal, &line, width)?;
+    }
+    let wanted = app.band_height(width);
+    if wanted != *height {
+        regrow(terminal, wanted)?;
+        *height = wanted;
+    }
+    terminal.draw(|frame| app.render(frame, frame.area()))?;
+    Ok(())
 }
 
 /// Gives the band a new height. ratatui fixes an inline viewport's height when the terminal is made, so

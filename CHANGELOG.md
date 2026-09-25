@@ -12,6 +12,11 @@ Added:
   within them beyond that, and shrinking back when the message is sent. Long lines now wrap instead of
   scrolling sideways.
 
+Fixed:
+
+- `wisp-tui` flickered when the input grew or shrank and as replies streamed in: each frame is now one
+  synchronized update, and lines are added above the band by scrolling a region instead of redrawing it.
+
 ## 0.10.2
 
 Added:
