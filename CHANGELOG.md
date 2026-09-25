@@ -15,6 +15,8 @@ Added:
 - `wisp-tui` asks for approval in a bordered dialog in place of the input: the command, the line it is
   part of, the directory, every reason, the pattern, and the keys, with the answer kept in the
   scrollback as one line.
+- `wisp-tui` renders the Markdown in replies: headings, bullets, inline code, bold, and italics, with
+  fenced code blocks kept as they are in the code colour.
 
 Fixed:
 

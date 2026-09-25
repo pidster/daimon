@@ -8,6 +8,7 @@ use ratatui::widgets::{Block, BorderType, Padding, Paragraph};
 use unicode_width::UnicodeWidthChar;
 
 use crate::editor::{Edit, Editor};
+use crate::markdown;
 use crate::palette;
 use crate::protocol::{Approval, Inbound, Outbound, Status};
 
@@ -46,8 +47,12 @@ pub struct HistoryLine {
 pub enum LineKind {
     /// The user's own input, echoed.
     User,
-    /// The model's reply.
+    /// The model's reply, in the little Markdown `markdown::spans` renders.
     Reply,
+    /// A line inside a fenced block of a reply, shown as it is.
+    Code,
+    /// A fence opening or closing a block.
+    Fence,
     /// A tool call or result.
     Tool,
     /// A note from wisp.
@@ -100,6 +105,8 @@ pub struct App {
     pub busy: bool,
     /// The turn under way, or how the last one ended, for the status line.
     pub turn: Option<TurnState>,
+    /// Whether the reply is inside a fenced block; a turn's end closes one left open.
+    pub in_fence: bool,
     /// Whether wisp said goodbye.
     pub exited: bool,
     /// Lines submitted this session, oldest first, for Up and Down.
@@ -125,7 +132,7 @@ impl App {
                 while let Some(index) = self.partial.find('\n') {
                     let line = self.partial[..index].to_string();
                     self.partial.drain(..=index);
-                    self.push(&line, LineKind::Reply);
+                    self.push_reply(&line);
                 }
             }
             Outbound::Note { text } => {
@@ -144,6 +151,7 @@ impl App {
             }
             Outbound::Turn(turn) => {
                 self.flush_partial();
+                self.in_fence = false;
                 self.turn = Some(if turn.is_start() {
                     self.busy = true;
                     TurnState::Running(turn.number)
@@ -178,8 +186,21 @@ impl App {
     fn flush_partial(&mut self) {
         if !self.partial.is_empty() {
             let line = std::mem::take(&mut self.partial);
-            self.push(&line, LineKind::Reply);
+            self.push_reply(&line);
         }
+    }
+
+    /// Commits one reply line, as code while a fenced block is open.
+    fn push_reply(&mut self, line: &str) {
+        let kind = if markdown::is_fence(line) {
+            self.in_fence = !self.in_fence;
+            LineKind::Fence
+        } else if self.in_fence {
+            LineKind::Code
+        } else {
+            LineKind::Reply
+        };
+        self.push(line, kind);
     }
 
     fn push(&mut self, text: &str, kind: LineKind) {
@@ -681,6 +702,32 @@ mod tests {
                 failed: true
             })
         );
+    }
+
+    #[test]
+    fn fenced_blocks_are_code_until_they_close_or_the_turn_ends() {
+        let mut app = App::default();
+        app.handle(Outbound::Delta {
+            text: "Run:\n```sh\ngit **status**\n```\nthen\n```\nleft open\n".into(),
+        });
+        let kinds: Vec<LineKind> = app.take_pending().iter().map(|line| line.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                LineKind::Reply,
+                LineKind::Fence,
+                LineKind::Code,
+                LineKind::Fence,
+                LineKind::Reply,
+                LineKind::Fence,
+                LineKind::Code
+            ]
+        );
+        app.handle(Outbound::Turn(turn("end", 1, Some(1.0), Some("ok"))));
+        app.handle(Outbound::Delta {
+            text: "fresh\n".into(),
+        });
+        assert_eq!(app.take_pending()[0].kind, LineKind::Reply);
     }
 
     #[test]

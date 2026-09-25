@@ -39,6 +39,22 @@ pub fn prompt() -> Style {
 pub fn wisp() -> Style {
     Style::default().fg(WISP)
 }
+/// A reply's `**strong**` text.
+pub fn strong() -> Style {
+    body().add_modifier(Modifier::BOLD)
+}
+/// A reply's `*emphasis*`.
+pub fn emphasis() -> Style {
+    body().add_modifier(Modifier::ITALIC)
+}
+/// A reply's headings.
+pub fn heading() -> Style {
+    Style::default().fg(GLOW).add_modifier(Modifier::BOLD)
+}
+/// Code in a reply, inline or in a fenced block.
+pub fn code() -> Style {
+    Style::default().fg(WISP)
+}
 /// Attention.
 pub fn amber() -> Style {
     Style::default().fg(AMBER)

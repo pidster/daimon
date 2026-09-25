@@ -73,6 +73,13 @@ chat` offers them. Lines too long for the dialog end in an ellipsis. The answer 
 scrollback as one line, `⚠ approved for this session: git push` or `⚠ refused: …`, and the band gives
 the rows back to the input. Ctrl-C or Ctrl-D refuses.
 
+Replies are rendered as each line goes into the scrollback, in the little Markdown the model writes:
+`#` headings in bold, `-`, `*`, and `+` bullets as `•`, and `` `code` ``, `**strong**`, and `*emphasis*`
+styled with their markers removed. A fenced block keeps its lines as they are, in the code colour, with
+the fences dimmed; a fence left open closes at the end of the turn. Anything that is not clearly markup,
+such as `2 * 3` or `snake_case`, is left as typed. The line still being streamed is shown raw until it
+is complete.
+
 What a session shows, and where it goes:
 
 - A banner with the version, model, tool count, and audit session, then a status line above every

@@ -62,8 +62,9 @@ Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Input history
 (Up and Down recall, `/history` in chat). Line editing shipped 2026-09-24: a cursor, word and line
 motions, readline's deletions, bracketed paste, and Alt-Enter for a newline. The input grows to six rows
 for a multi-line message, done 2026-09-25. The `turn` event and the rendered `text` on
-events, done 2026-09-25 (ADR 0029, amendment), and a bordered approval dialog with the reasons inside
-it, the same day. Next: Markdown-ish rendering of replies at commit time.
+events, done 2026-09-25 (ADR 0029, amendment), a bordered approval dialog with the reasons inside it,
+and Markdown rendering of replies as they are committed, the same day. Nothing further is planned for
+the front end; tables and links in replies are shown as typed.
 
 ## When wisp can be signed
 

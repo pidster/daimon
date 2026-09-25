@@ -7,6 +7,7 @@
 
 mod app;
 mod editor;
+mod markdown;
 mod palette;
 mod protocol;
 
@@ -31,6 +32,7 @@ use ratatui::{Terminal, TerminalOptions, Viewport};
 
 use app::{Action, App, BAND_HEIGHT, HistoryLine, LineKind, MARGIN};
 use editor::Edit;
+use markdown::Tone;
 use protocol::Outbound;
 
 /// What the main loop waits on.
@@ -295,21 +297,50 @@ fn regrow(terminal: &mut ratatui::DefaultTerminal, height: u16) -> Result<()> {
 
 /// Writes one history line into scrollback above the band, wrapped to the width.
 fn insert(terminal: &mut ratatui::DefaultTerminal, line: &HistoryLine, width: u16) -> Result<()> {
-    let style = match line.kind {
-        LineKind::User => palette::user(),
-        LineKind::Reply | LineKind::Output => palette::body(),
-        LineKind::Tool | LineKind::Note => palette::muted(),
-        LineKind::Error => palette::ember(),
-    };
+    let rendered = styled(line);
     let inner = width.saturating_sub(MARGIN * 2).max(1);
-    let height = wrapped_height(&line.text, inner);
-    let text = line.text.clone();
+    let shown: String = rendered
+        .spans
+        .iter()
+        .map(|span| span.content.as_ref())
+        .collect();
+    let height = wrapped_height(&shown, inner);
     terminal.insert_before(height, move |buffer| {
-        Paragraph::new(Line::from(Span::styled(text, style)))
+        Paragraph::new(rendered)
             .wrap(Wrap { trim: false })
             .render(Rect::new(MARGIN.min(width / 2), 0, inner, height), buffer);
     })?;
     Ok(())
+}
+
+/// A history line in its colours; a reply's Markdown is rendered here, as the line is committed.
+fn styled(line: &HistoryLine) -> Line<'static> {
+    let style = match line.kind {
+        LineKind::User => palette::user(),
+        LineKind::Reply => {
+            return Line::from(
+                markdown::spans(&line.text)
+                    .into_iter()
+                    .map(|(text, tone)| {
+                        let style = match tone {
+                            Tone::Plain => palette::body(),
+                            Tone::Strong => palette::strong(),
+                            Tone::Emphasis => palette::emphasis(),
+                            Tone::Code => palette::code(),
+                            Tone::Heading => palette::heading(),
+                            Tone::Bullet => palette::muted(),
+                        };
+                        Span::styled(text, style)
+                    })
+                    .collect::<Vec<_>>(),
+            );
+        }
+        LineKind::Code => palette::code(),
+        LineKind::Output => palette::body(),
+        LineKind::Tool | LineKind::Note | LineKind::Fence => palette::muted(),
+        LineKind::Error => palette::ember(),
+    };
+    Line::from(Span::styled(line.text.clone(), style))
 }
 
 /// Rows `text` takes at `width`, counting characters (wide glyphs may take one more).
@@ -328,6 +359,7 @@ mod tests {
         Edit, Incoming, Key, KeyCode, KeyModifiers, TermEvent, changes_the_band, command_for,
         next_height, version_requested, wrapped_height,
     };
+    use super::{HistoryLine, Line, LineKind, palette, styled};
     use ratatui::crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 
     #[test]
@@ -419,6 +451,32 @@ mod tests {
         assert_eq!(command_for(KeyCode::Up, none), Key::RecallPrevious);
         assert_eq!(command_for(KeyCode::Down, none), Key::RecallNext);
         assert_eq!(command_for(KeyCode::F(1), none), Key::Nothing);
+    }
+
+    #[test]
+    fn replies_are_committed_with_their_markdown_rendered() {
+        let line = |text: &str, kind| HistoryLine {
+            text: text.into(),
+            kind,
+        };
+        let text = |rendered: &Line| -> String {
+            rendered
+                .spans
+                .iter()
+                .map(|span| span.content.as_ref())
+                .collect()
+        };
+        let reply = styled(&line("Use `git log` **now**", LineKind::Reply));
+        assert_eq!(text(&reply), "Use git log now");
+        assert_eq!(reply.spans[1].style, palette::code());
+        assert_eq!(reply.spans[3].style, palette::strong());
+        // Code and everything that is not a reply keep their text as it is.
+        let code = styled(&line("let **x** = 1", LineKind::Code));
+        assert_eq!(
+            (text(&code), code.spans[0].style),
+            ("let **x** = 1".into(), palette::code())
+        );
+        assert_eq!(text(&styled(&line("`raw`", LineKind::Tool))), "`raw`");
     }
 
     #[test]
