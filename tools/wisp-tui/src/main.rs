@@ -136,6 +136,7 @@ fn run(
             Err(mpsc::RecvTimeoutError::Timeout) => None,
             Err(mpsc::RecvTimeoutError::Disconnected) => return Ok(()),
         };
+        let changed = changes_the_band(incoming.as_ref());
         match incoming {
             Some(Incoming::Line(line)) => app.handle(Outbound::parse(&line)),
             Some(Incoming::Stderr(line)) => app.handle(Outbound::Note { text: line }),
@@ -171,6 +172,9 @@ fn run(
             }
             Some(Incoming::Terminal(_)) | None => {}
         }
+        if !changed {
+            continue;
+        }
         // One synchronized update per frame: the terminal shows the finished frame, not the cleared band
         // of a resize or the steps of inserting lines, which it would otherwise paint as they arrive.
         let _ = execute!(std::io::stdout(), BeginSynchronizedUpdate);
@@ -181,6 +185,27 @@ fn run(
             return Ok(());
         }
     }
+}
+
+/// Whether what arrived can change what the band shows. Nothing in the band animates, so a wake with
+/// nothing, a key release, or focus and mouse events leave it as drawn; drawing anyway would show and
+/// move the cursor four times a second, which some terminals paint as a flicker or a restarted blink.
+fn changes_the_band(incoming: Option<&Incoming>) -> bool {
+    match incoming {
+        None => false,
+        Some(Incoming::Terminal(TermEvent::Key(key))) => key.kind == KeyEventKind::Press,
+        Some(Incoming::Terminal(event)) => {
+            matches!(event, TermEvent::Paste(_) | TermEvent::Resize(..))
+        }
+        Some(Incoming::Line(_) | Incoming::Stderr(_) | Incoming::Closed) => true,
+    }
+}
+
+/// The band's next height, when it should change: at once when the input needs more rows, but back
+/// down only once the input is empty, as it is when a message is sent. Shrinking remakes the terminal,
+/// so doing it on every Backspace across a wrap would remake it back and forth while the user types.
+fn next_height(current: u16, wanted: u16, input_empty: bool) -> Option<u16> {
+    (wanted > current || (wanted < current && input_empty)).then_some(wanted)
 }
 
 /// What a key asks for.
@@ -243,8 +268,7 @@ fn paint(terminal: &mut ratatui::DefaultTerminal, app: &mut App, height: &mut u1
     for line in app.take_pending() {
         insert(terminal, &line, width)?;
     }
-    let wanted = app.band_height(width);
-    if wanted != *height {
+    if let Some(wanted) = next_height(*height, app.band_height(width), app.input_is_empty()) {
         regrow(terminal, wanted)?;
         *height = wanted;
     }
@@ -300,7 +324,46 @@ fn wrapped_height(text: &str, width: u16) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Edit, Key, KeyCode, KeyModifiers, command_for, version_requested, wrapped_height};
+    use super::{
+        Edit, Incoming, Key, KeyCode, KeyModifiers, TermEvent, changes_the_band, command_for,
+        next_height, version_requested, wrapped_height,
+    };
+    use ratatui::crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
+
+    #[test]
+    fn only_what_can_change_the_band_redraws_it() {
+        let key = |kind| {
+            Incoming::Terminal(TermEvent::Key(KeyEvent {
+                code: KeyCode::Char('x'),
+                modifiers: KeyModifiers::NONE,
+                kind,
+                state: KeyEventState::NONE,
+            }))
+        };
+        assert!(!changes_the_band(None));
+        assert!(!changes_the_band(Some(&key(KeyEventKind::Release))));
+        assert!(!changes_the_band(Some(&Incoming::Terminal(
+            TermEvent::FocusGained
+        ))));
+        assert!(changes_the_band(Some(&key(KeyEventKind::Press))));
+        assert!(changes_the_band(Some(&Incoming::Terminal(
+            TermEvent::Resize(80, 24)
+        ))));
+        assert!(changes_the_band(Some(&Incoming::Terminal(
+            TermEvent::Paste("p".into())
+        ))));
+        assert!(changes_the_band(Some(&Incoming::Line("{}".into()))));
+        assert!(changes_the_band(Some(&Incoming::Stderr("note".into()))));
+        assert!(changes_the_band(Some(&Incoming::Closed)));
+    }
+
+    #[test]
+    fn the_band_grows_at_once_and_shrinks_only_when_the_input_is_empty() {
+        assert_eq!(next_height(6, 8, false), Some(8));
+        assert_eq!(next_height(8, 7, false), None);
+        assert_eq!(next_height(8, 6, true), Some(6));
+        assert_eq!(next_height(6, 6, true), None);
+    }
 
     #[test]
     fn keys_map_to_the_edits_a_terminal_user_expects() {

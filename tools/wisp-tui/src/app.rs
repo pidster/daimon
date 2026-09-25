@@ -266,6 +266,11 @@ impl App {
         Action::Quit
     }
 
+    /// Whether nothing is typed.
+    pub fn input_is_empty(&self) -> bool {
+        self.editor.is_empty()
+    }
+
     /// The band's height for a terminal `width` cells wide: the base, plus a row for each further row
     /// the input's text needs, up to `MAX_INPUT_ROWS`.
     pub fn band_height(&self, width: u16) -> u16 {

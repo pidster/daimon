@@ -56,12 +56,14 @@ in both.
 | Paste | Inserted whole (bracketed paste), newlines kept, so pasting never sends. |
 
 The input grows a row for each line or wrapped line of the message, up to six rows; beyond that it
-scrolls within them to keep the cursor's row in sight, and it shrinks back when the message is sent. The
+scrolls within them to keep the cursor's row in sight. It shrinks back only once the input is empty, as
+it is when the message is sent, so deleting across a wrap does not resize the band as you type. The
 terminal's own cursor marks where typing goes. ratatui fixes an inline band's height when it is made, so
 the band is redrawn at the new height; after it shrinks it can sit a row or two above the bottom of the
 terminal until the next output closes the gap. Each frame is sent as one synchronized update, so a
 terminal that supports it (Ghostty, iTerm2, kitty, WezTerm, Alacritty) shows only finished frames, and
-lines are added above the band by scrolling a region rather than redrawing it. Keys other than a dialog's answers are ignored while an approval is asked and
+lines are added above the band by scrolling a region rather than redrawing it. The band is redrawn only
+when something changes it (a line from wisp, a key, a paste, a resize), never while idle. Keys other than a dialog's answers are ignored while an approval is asked and
 while a turn runs.
 
 What a session shows, and where it goes:

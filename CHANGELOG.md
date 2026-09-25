@@ -4,6 +4,13 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Fixed:
+
+- `wisp-tui` no longer redraws its band while idle, which could make the cursor flicker or restart its
+  blink, and no longer resizes the band back and forth when deleting across a wrapped line.
+
 ## 0.10.3
 
 Added:
