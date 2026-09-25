@@ -136,7 +136,8 @@ what the model said. A *turn* is one message from you and everything the model d
 
 `--json` replaces the terminal with JSON Lines on stdin and stdout so another program can be the face
 while the session, tools, gate, and audit stay in this process. The `wisp-tui` front end in `tools/`
-drives it (spike, 2026-09-22; the shape may change). One object per line, `type` names it.
+drives it ([ADR 0029](decisions/0029-tui-front-end.md)). One object per line, `type` names it; a front end
+ignores types and fields it does not know, so new ones can be added without breaking it.
 
 Out, to the front end:
 
@@ -144,9 +145,10 @@ Out, to the front end:
 | --- | --- | --- |
 | `note` | `text` | The banner, the help line, and anything chat would say on stderr. |
 | `status` | `model`, `directory`, `branch`, `dirty`, `approval`, `contextUsed` (nulls when unknown) | Before each prompt: the turn is over and input is wanted. |
+| `turn` | `phase`, `turn`, and at the end `seconds` and `outcome` | `phase` `start` when a message goes to the model, `end` when its reply is complete; `turn` is the number the turn's `event` lines carry, `outcome` is `ok` or `error` (the error is a `note` just before). Slash commands are not turns. |
 | `delta` | `text` | A fragment of the streamed reply. |
 | `output` | `text` | A whole line, as `/help` or `/last` print; an empty one ends a reply. |
-| `event` | `kind`, `call`, `turn`, `details` | Every audit event of the conversation, as `logging.md` describes them; the front end chooses what to show. |
+| `event` | `kind`, `call`, `turn`, `details`, `text` | Every audit event of the conversation, as `logging.md` describes them. `text` is the unstyled line the terminal chat shows for it, null when it shows none; a front end shows `text` so every face words tool activity alike, and reads the raw fields only for a view of its own. |
 | `approval` | `id`, `command`, `line`, `pattern`, `directory`, `level`, `reasons` | A command needs a decision; answer with the `id` within `approval.timeoutSeconds` or it is refused. |
 | `exit` | | The loop has ended. |
 

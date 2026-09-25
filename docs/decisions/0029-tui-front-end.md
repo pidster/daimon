@@ -35,3 +35,25 @@ ratatui by process split was spiked on a branch and judged on a real terminal th
   the input, are the next work (`backlog.md`).
 - Tests: the loop over the protocol without a model (`ChatProtocolTests`), the band rendered to
   ratatui's test backend, key handling, and event rendering; the viewport itself needs a real terminal.
+
+## Amendment, 2026-09-25: the protocol's shape
+
+The two open questions are settled.
+
+- **A `turn` event.** `{"type":"turn","phase":"start","turn":n}` when a message goes to the model and
+  `{"type":"turn","phase":"end","turn":n,"seconds":…,"outcome":"ok"|"error"}` when the reply is done.
+  Before, a front end inferred a turn from its own submit and the next `status`, which also follows
+  slash commands, and had no duration or outcome. The number is the one the turn's audit events carry,
+  so a front end can group them. `wisp-tui` shows the running turn and the last one's time in the
+  status line.
+- **Raw events, with the rendered line beside them.** Each `event` keeps its raw `kind`, `call`,
+  `turn`, and `details`, and gains `text`: the unstyled line the terminal chat shows for it
+  (`ChatEvents.render` with `Style.plain`), null when it shows none. Raw alone meant every front end
+  re-implemented the wording, and `wisp-tui`'s copy had already drifted (it lacked `current_date`'s
+  time zone and `read_file`'s start line). Pre-rendered alone would have taken the facts away from a
+  front end that wants its own view. `wisp-tui` now shows `text` and has no renderer of its own; its
+  styling is chosen by `kind`.
+- **Compatibility.** A front end ignores types and fields it does not know, so additions like these
+  need no version negotiation. `wisp-tui` ships with the wisp of the same version (the release checks
+  the two match), so neither side keeps a fallback for the other's older shape. A removal or a changed
+  meaning needs a new amendment.

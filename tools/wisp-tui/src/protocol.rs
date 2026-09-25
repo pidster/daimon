@@ -24,6 +24,8 @@ pub enum Outbound {
     },
     /// The status before a prompt: the turn is over and input is wanted.
     Status(Status),
+    /// A turn's start or end.
+    Turn(Turn),
     /// An audit event of the conversation.
     Event(Event),
     /// An approval the front end must answer.
@@ -53,7 +55,28 @@ pub struct Status {
     pub context_used: Option<f64>,
 }
 
-/// An audit event, kind and details.
+/// One edge of a turn: a message to the model and everything it does to answer it.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct Turn {
+    /// `start` or `end`.
+    pub phase: String,
+    /// The number the turn's audit events carry.
+    #[serde(rename = "turn")]
+    pub number: u64,
+    /// At the end, how long the turn took.
+    pub seconds: Option<f64>,
+    /// At the end, `ok` or `error`.
+    pub outcome: Option<String>,
+}
+
+impl Turn {
+    /// Whether this is the turn's start.
+    pub fn is_start(&self) -> bool {
+        self.phase == "start"
+    }
+}
+
+/// An audit event: kind, details, and the line wisp's terminal chat shows for it.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Event {
     /// `tool.call`, `tool.result`, `command.outcome`, `file.write`, `context.condensation`, `error`, and so on.
@@ -63,6 +86,9 @@ pub struct Event {
     /// Kind-specific fields.
     #[serde(default)]
     pub details: Value,
+    /// The line to show, worded by wisp so every face agrees; `None` for events chat does not show.
+    #[serde(default)]
+    pub text: Option<String>,
 }
 
 /// An approval request.
@@ -147,9 +173,26 @@ mod tests {
             r#"{"type":"event","kind":"tool.call","call":"c","details":{"tool":"read_file"}}"#,
         );
         match event {
-            Outbound::Event(e) => assert_eq!(e.details["tool"], "read_file"),
+            Outbound::Event(e) => {
+                assert_eq!(e.details["tool"], "read_file");
+                assert_eq!(e.text, None);
+            }
             other => panic!("not an event: {other:?}"),
         }
+        let shown = Outbound::parse(
+            r#"{"type":"event","kind":"tool.call","call":"c","details":{},"text":"⚙ read_file a"}"#,
+        );
+        assert!(matches!(shown, Outbound::Event(e) if e.text.as_deref() == Some("⚙ read_file a")));
+        let start = Outbound::parse(r#"{"type":"turn","phase":"start","turn":2}"#);
+        assert!(
+            matches!(&start, Outbound::Turn(t) if t.is_start() && t.number == 2 && t.seconds.is_none())
+        );
+        let end = Outbound::parse(
+            r#"{"type":"turn","phase":"end","turn":2,"seconds":1.5,"outcome":"error"}"#,
+        );
+        assert!(
+            matches!(&end, Outbound::Turn(t) if !t.is_start() && t.outcome.as_deref() == Some("error"))
+        );
         assert_eq!(Outbound::parse(r#"{"type":"exit"}"#), Outbound::Exit);
         assert_eq!(Outbound::parse(r#"{"type":"future"}"#), Outbound::Unknown);
         assert_eq!(

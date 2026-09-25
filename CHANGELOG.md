@@ -6,6 +6,13 @@ Keep an `Unreleased` section at the top while working; the version-bump commit r
 
 ## Unreleased
 
+Added:
+
+- `wisp chat --json` sends a `turn` line when a message goes to the model and when its reply is done,
+  with the turn's number, time, and outcome, and every `event` line carries `text`, the line the
+  terminal chat shows for it. `wisp-tui` shows the running turn and the last one's time in its status
+  line, and words tool activity exactly as `wisp chat` does.
+
 Fixed:
 
 - `wisp-tui` no longer redraws its band while idle, which could make the cursor flicker or restart its

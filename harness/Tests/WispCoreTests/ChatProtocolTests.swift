@@ -32,6 +32,14 @@ import WispTestSupport
         let fields = ChatProtocol.event(event)
         #expect(fields["kind"] == "tool.call" && fields["call"] == "c1" && fields["turn"] == 2)
         #expect(fields["details"]?.objectValue?["tool"] == "read_file")
+        #expect(fields["text"] == "⚙ read_file ")
+        let unshown = ChatProtocol.event(AuditEvent(session: "s", kind: .prompt, turn: 2, details: [:]))
+        #expect(unshown["text"] == .null)
+        #expect(ChatProtocol.turn(.start(turn: 3)) == ["phase": "start", "turn": 3])
+        #expect(
+            ChatProtocol.turn(.end(turn: 3, seconds: 1.5, failed: false))
+                == ["phase": "end", "turn": 3, "seconds": .double(1.5), "outcome": "ok"])
+        #expect(ChatProtocol.turn(.end(turn: 4, seconds: 0, failed: true))["outcome"] == "error")
         let request = ApprovalRequest(
             command: "git push", line: "git add && git push", pattern: "git push *", workingDirectory: "/r",
             assessment: RiskAssessment(level: .dangerous, reasons: ["changes repository state"], sources: ["rules"]))
@@ -98,7 +106,8 @@ import WispTestSupport
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
                 write: { send(ChatProtocol.encode("delta", ["text": .string($0)])) },
                 note: { send(ChatProtocol.encode("note", ["text": .string($0)])) },
-                prompt: { send(ChatProtocol.encode("status", ChatProtocol.status($0))) }))
+                prompt: { send(ChatProtocol.encode("status", ChatProtocol.status($0))) },
+                turn: { send(ChatProtocol.encode("turn", ChatProtocol.turn($0))) }))
         tap.onEvent { event in send(ChatProtocol.encode("event", ChatProtocol.event(event))) }
         router.receive(#"{"type":"message","text":"date?"}"#)
         router.receive("/quit")
@@ -111,6 +120,15 @@ import WispTestSupport
         let events = lines.withLock { $0 }.filter { $0.contains(#""type":"event""#) }
         #expect(events.contains { $0.contains(#""kind":"tool.call""#) })
         #expect(events.contains { $0.contains(#""kind":"tool.result""#) })
+        #expect(events.contains { $0.contains(#""text":"⚙ current_date"#) })
+        // The turn's edges bracket its reply and events, numbered as the events are.
+        let turns = lines.withLock { $0 }.enumerated().filter { $0.element.contains(#""type":"turn""#) }
+        #expect(turns.count == 2)
+        #expect(turns.first?.element.contains(#""phase":"start","turn":1"#) == true)
+        #expect(turns.last?.element.contains(#""outcome":"ok","phase":"end""#) == true)
+        let deltas = lines.withLock { $0 }.enumerated().filter { $0.element.contains(#""type":"delta""#) }
+        #expect(deltas.allSatisfy { $0.offset > turns[0].offset && $0.offset < turns[1].offset })
+        #expect(events.allSatisfy { $0.contains(#""turn":1"#) })
         #expect(lines.withLock { $0 }.last?.contains(#""type":"output""#) == true || types.last == "status")
     }
 }

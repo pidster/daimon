@@ -7,10 +7,10 @@ import Synchronization
 /// not JSON is taken as a typed message so the protocol can be driven by hand.
 ///
 /// Outbound (to the front end): `banner`, `status`, `output` (a whole line, as `/help` prints), `delta`
-/// (streamed reply text), `turn` (`start`/`end`), `event` (an audit event of the conversation: tool
-/// calls, results, command outcomes, file writes, condensation, errors), `note`, `approval` (a request
-/// the front end must answer), `exit`. Inbound: `message` (a chat line, slash commands included) and
-/// `answer` (to an approval, by id). Spike; the shape may change.
+/// (streamed reply text), `turn` (`start`/`end`), `event` (an audit event of the conversation, raw, with
+/// the line the terminal chat would show for it as `text`), `note`, `approval` (a request the front end
+/// must answer), `exit`. Inbound: `message` (a chat line, slash commands included) and `answer` (to an
+/// approval, by id).
 public enum ChatProtocol {
     /// What the front end sends.
     public enum Inbound: Equatable, Sendable {
@@ -56,12 +56,26 @@ public enum ChatProtocol {
         ]
     }
 
-    /// The `event` line's fields: the audit event's kind, call, and details.
+    /// The `event` line's fields: the audit event's kind, call, turn, and details, and `text`, the
+    /// unstyled line the terminal chat shows for it (null when it shows none), so every face words tool
+    /// activity alike and a front end renders the raw fields only when it wants to.
     public static func event(_ event: AuditEvent) -> [String: JSONValue] {
         [
             "kind": .string(event.kind.rawValue), "call": event.call.map { .string($0) } ?? .null,
             "turn": event.turn.map { .int($0) } ?? .null, "details": .object(event.details),
+            "text": ChatEvents.render(event, style: .plain).map { .string($0) } ?? .null,
         ]
+    }
+
+    /// The `turn` line's fields: `phase` `start` or `end`, the turn number, and at the end the seconds
+    /// taken and the `outcome`, `ok` or `error`.
+    public static func turn(_ mark: ChatTurn) -> [String: JSONValue] {
+        switch mark {
+        case .start(let turn):
+            ["phase": "start", "turn": .int(turn)]
+        case .end(let turn, let seconds, let failed):
+            ["phase": "end", "turn": .int(turn), "seconds": .double(seconds), "outcome": failed ? "error" : "ok"]
+        }
     }
 
     /// The `approval` line's fields.

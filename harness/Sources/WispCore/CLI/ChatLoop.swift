@@ -1,6 +1,14 @@
 import Foundation
 import FoundationModels
 
+/// The edges of one turn: a message to the model and everything it does to answer it.
+public enum ChatTurn: Equatable, Sendable {
+    /// The message has gone to the model; `turn` is the number its audit events carry.
+    case start(turn: Int)
+    /// The reply is complete, or the turn failed with the error noted before this.
+    case end(turn: Int, seconds: Double, failed: Bool)
+}
+
 /// The `wisp chat` read-eval-print loop over an agent, with its input and output injected so the
 /// whole loop runs in tests over a scripted model. The CLI supplies the terminal; tests supply lines.
 ///
@@ -21,17 +29,22 @@ public struct ChatLoop {
         public var note: @Sendable (String) -> Void
         /// The prompt, on a fresh line, with the status above it; the IO renders the status.
         public var prompt: (ChatStatus) -> Void
+        /// A turn's start and end, for a face that shows when the model is working; the terminal
+        /// ignores them, since its prompt returning says as much.
+        public var turn: (ChatTurn) -> Void
 
         /// Creates an IO.
         public init(
             readLine: @escaping () -> String?, print: @escaping (String) -> Void, write: @escaping (String) -> Void,
-            note: @escaping @Sendable (String) -> Void, prompt: @escaping (ChatStatus) -> Void
+            note: @escaping @Sendable (String) -> Void, prompt: @escaping (ChatStatus) -> Void,
+            turn: @escaping (ChatTurn) -> Void = { _ in }
         ) {
             self.readLine = readLine
             self.print = print
             self.write = write
             self.note = note
             self.prompt = prompt
+            self.turn = turn
         }
     }
 
@@ -227,13 +240,21 @@ public struct ChatLoop {
                 io.note("unknown command /\(command); /help lists commands")
             case .message(let text):
                 guard !text.isEmpty else { continue }
+                // The agent advances the clock as the prompt arrives, so this is the number the turn's
+                // audit events carry.
+                let number = agent.turns.current + 1
+                let started = Date()
+                io.turn(.start(turn: number))
+                var failed = false
                 do {
                     _ = try await agent.stream(text) { io.write($0) }
                     io.print("")
                 } catch {
+                    failed = true
                     io.print("")
                     io.note(style.ember("error: \(error)"))
                 }
+                io.turn(.end(turn: number, seconds: Date().timeIntervalSince(started), failed: failed))
             }
         }
         if let saveName {

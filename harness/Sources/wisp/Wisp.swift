@@ -420,8 +420,9 @@ struct Chat: AsyncParsableCommand {
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
                 write: { send(ChatProtocol.encode("delta", ["text": .string($0)])) },
                 note: { send(ChatProtocol.encode("note", ["text": .string($0)])) },
-                prompt: { send(ChatProtocol.encode("status", ChatProtocol.status($0))) }))
-        // Raw events for the front end to render, instead of the terminal lines the loop would note.
+                prompt: { send(ChatProtocol.encode("status", ChatProtocol.status($0))) },
+                turn: { send(ChatProtocol.encode("turn", ChatProtocol.turn($0))) }))
+        // Events for the front end, raw and with the terminal's line, instead of the notes the loop would write.
         tap.onEvent { event in send(ChatProtocol.encode("event", ChatProtocol.event(event))) }
         try await loop.run()
         send(ChatProtocol.encode("exit"))

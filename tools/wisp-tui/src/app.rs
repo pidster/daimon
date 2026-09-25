@@ -5,11 +5,10 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use serde_json::Value;
 
 use crate::editor::{Edit, Editor};
 use crate::palette;
-use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
+use crate::protocol::{Approval, Inbound, Outbound, Status};
 
 /// Rows the band occupies with a one-row input: reply in progress, dialog, a half-height strip, the
 /// input, a half-height strip, status. The strips are rows of half-block glyphs in the tint, which read
@@ -69,6 +68,20 @@ pub enum Action {
     Quit,
 }
 
+/// What the status line says about turns.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TurnState {
+    /// This turn is running.
+    Running(u64),
+    /// The last turn took `seconds`, and failed or not.
+    Ended {
+        /// How long it took.
+        seconds: f64,
+        /// Whether it ended in an error.
+        failed: bool,
+    },
+}
+
 /// The whole state.
 #[derive(Debug, Default)]
 pub struct App {
@@ -84,6 +97,8 @@ pub struct App {
     pub approval: Option<Approval>,
     /// Whether a turn is in progress (input is held until the next status).
     pub busy: bool,
+    /// The turn under way, or how the last one ended, for the status line.
+    pub turn: Option<TurnState>,
     /// Whether wisp said goodbye.
     pub exited: bool,
     /// Lines submitted this session, oldest first, for Up and Down.
@@ -126,8 +141,20 @@ impl App {
                 self.status = Some(status);
                 self.busy = false;
             }
+            Outbound::Turn(turn) => {
+                self.flush_partial();
+                self.turn = Some(if turn.is_start() {
+                    self.busy = true;
+                    TurnState::Running(turn.number)
+                } else {
+                    TurnState::Ended {
+                        seconds: turn.seconds.unwrap_or(0.0),
+                        failed: turn.outcome.as_deref() == Some("error"),
+                    }
+                });
+            }
             Outbound::Event(event) => {
-                if let Some(line) = event_line(&event) {
+                if let Some(line) = event.text {
                     self.flush_partial();
                     let kind = if event.kind == "error" {
                         LineKind::Error
@@ -445,97 +472,51 @@ impl App {
             };
             spans.push(Span::styled(format!("context {percent}% used"), style));
         }
+        match self.turn {
+            Some(TurnState::Running(number)) => {
+                spans.push(sep());
+                spans.push(Span::styled(format!("turn {number}…"), palette::wisp()));
+            }
+            Some(TurnState::Ended { seconds, failed }) => {
+                spans.push(sep());
+                spans.push(if failed {
+                    Span::styled(
+                        format!("last turn failed after {seconds:.1} s"),
+                        palette::ember(),
+                    )
+                } else {
+                    Span::styled(format!("last turn {seconds:.1} s"), palette::muted())
+                });
+            }
+            None => {}
+        }
         Line::from(spans)
-    }
-}
-
-/// The one-line rendering of an audit event, as the terminal chat shows it; nil for kinds not shown.
-pub fn event_line(event: &Event) -> Option<String> {
-    let d = &event.details;
-    let text = |key: &str| d.get(key).and_then(Value::as_str).unwrap_or("").to_string();
-    let number = |key: &str| d.get(key).and_then(Value::as_i64).unwrap_or(0);
-    match event.kind.as_str() {
-        "tool.call" => {
-            let tool = text("tool");
-            let arguments: Value = serde_json::from_str(&text("arguments")).unwrap_or(Value::Null);
-            let key = match tool.as_str() {
-                "run_command" => "command",
-                "read_file" | "edit_file" => "path",
-                "inspect" => "what",
-                _ => "",
-            };
-            let summary = arguments.get(key).and_then(Value::as_str).map_or_else(
-                || shortened(&text("arguments")),
-                |value| {
-                    let mode = arguments.get("mode").and_then(Value::as_str);
-                    match (tool.as_str(), mode) {
-                        ("edit_file", Some(mode)) => shortened(&format!("{mode} {value}")),
-                        _ => shortened(value),
-                    }
-                },
-            );
-            Some(format!("⚙ {tool} {summary}"))
-        }
-        "tool.result" if text("tool") != "run_command" => {
-            let seconds = d.get("seconds").and_then(Value::as_f64).unwrap_or(0.0);
-            let head = shortened(text("output").lines().next().unwrap_or(""));
-            Some(format!(
-                "  ↳ {} bytes in {seconds:.1} s: {head}",
-                number("bytes")
-            ))
-        }
-        "command.outcome" => {
-            let mut extras = Vec::new();
-            if d.get("timedOut").and_then(Value::as_bool) == Some(true) {
-                extras.push("timed out");
-            }
-            if d.get("truncated").and_then(Value::as_bool) == Some(true) {
-                extras.push("output truncated");
-            }
-            let suffix = if extras.is_empty() {
-                String::new()
-            } else {
-                format!(" ({})", extras.join(", "))
-            };
-            Some(format!("  ↳ exit {}{suffix}", number("exitStatus")))
-        }
-        "file.write" => Some(format!(
-            "  ↳ {} {}, now {} bytes",
-            text("mode"),
-            text("path"),
-            number("bytesAfter")
-        )),
-        "error" if event.call.is_some() => Some(format!("  ↳ error: {}", text("message"))),
-        "context.condensation" => Some(format!(
-            "(context condensed, {}: {} → {} turns)",
-            text("reason"),
-            number("turnsBefore"),
-            number("turnsAfter")
-        )),
-        _ => None,
-    }
-}
-
-/// `text` cut to 100 characters with an ellipsis.
-fn shortened(text: &str) -> String {
-    if text.chars().count() > 100 {
-        format!("{}…", text.chars().take(100).collect::<String>())
-    } else {
-        text.to_string()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::{Event, Turn};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use serde_json::Value;
 
-    fn event(kind: &str, details: Value) -> Event {
+    fn event(kind: &str, text: Option<&str>) -> Event {
         Event {
             kind: kind.into(),
             call: Some("c".into()),
-            details,
+            details: Value::Null,
+            text: text.map(str::to_string),
+        }
+    }
+
+    fn turn(phase: &str, number: u64, seconds: Option<f64>, outcome: Option<&str>) -> Turn {
+        Turn {
+            phase: phase.into(),
+            number,
+            seconds,
+            outcome: outcome.map(str::to_string),
         }
     }
 
@@ -563,45 +544,51 @@ mod tests {
     }
 
     #[test]
-    fn events_render_like_the_terminal_chat() {
-        let call = event(
+    fn events_show_the_line_wisp_words_and_turns_mark_the_status() {
+        let mut app = App::default();
+        app.handle(Outbound::Event(event(
             "tool.call",
-            serde_json::json!({"tool":"run_command","arguments":"{\"command\":\"git status\"}"}),
-        );
+            Some("⚙ run_command git status"),
+        )));
+        app.handle(Outbound::Event(event("prompt", None)));
+        app.handle(Outbound::Event(event(
+            "error",
+            Some("  ↳ error: no such file"),
+        )));
+        let lines = app.take_pending();
         assert_eq!(
-            event_line(&call).as_deref(),
-            Some("⚙ run_command git status")
+            lines
+                .iter()
+                .map(|line| (line.text.as_str(), line.kind))
+                .collect::<Vec<_>>(),
+            vec![
+                ("⚙ run_command git status", LineKind::Tool),
+                ("  ↳ error: no such file", LineKind::Error)
+            ]
         );
-        let edit = event(
-            "tool.call",
-            serde_json::json!({"tool":"edit_file","arguments":"{\"path\":\"a.txt\",\"mode\":\"append\"}"}),
-        );
+        app.handle(Outbound::Turn(turn("start", 3, None, None)));
+        assert!(app.busy);
+        assert_eq!(app.turn, Some(TurnState::Running(3)));
+        app.handle(Outbound::Delta {
+            text: "done".into(),
+        });
+        app.handle(Outbound::Turn(turn("end", 3, Some(2.25), Some("ok"))));
+        assert_eq!(app.take_pending()[0].text, "done");
         assert_eq!(
-            event_line(&edit).as_deref(),
-            Some("⚙ edit_file append a.txt")
+            app.turn,
+            Some(TurnState::Ended {
+                seconds: 2.25,
+                failed: false
+            })
         );
-        let outcome = event(
-            "command.outcome",
-            serde_json::json!({"exitStatus":1,"timedOut":true}),
-        );
+        app.handle(Outbound::Turn(turn("end", 4, Some(0.5), Some("error"))));
         assert_eq!(
-            event_line(&outcome).as_deref(),
-            Some("  ↳ exit 1 (timed out)")
+            app.turn,
+            Some(TurnState::Ended {
+                seconds: 0.5,
+                failed: true
+            })
         );
-        let result = event(
-            "tool.result",
-            serde_json::json!({"tool":"read_file","output":"1\tx\n2\ty","bytes":7,"seconds":0.04}),
-        );
-        assert_eq!(
-            event_line(&result).as_deref(),
-            Some("  ↳ 7 bytes in 0.0 s: 1\tx")
-        );
-        let skipped = event(
-            "tool.result",
-            serde_json::json!({"tool":"run_command","output":"exit status: 0"}),
-        );
-        assert_eq!(event_line(&skipped), None);
-        assert_eq!(event_line(&event("prompt", serde_json::json!({}))), None);
     }
 
     #[test]

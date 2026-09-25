@@ -11,6 +11,7 @@ import WispTestSupport
         let stdout = Mutex<[String]>([])
         let notes = Mutex<[String]>([])
         let prompts = Mutex<[ChatStatus]>([])
+        let turns = Mutex<[ChatTurn]>([])
         let lines: Mutex<[String]>
 
         init(lines: [String]) { self.lines = Mutex(lines) }
@@ -21,7 +22,18 @@ import WispTestSupport
                 print: { text in self.stdout.withLock { $0.append(text + "\n") } },
                 write: { text in self.stdout.withLock { $0.append(text) } },
                 note: { text in self.notes.withLock { $0.append(text) } },
-                prompt: { status in self.prompts.withLock { $0.append(status) } })
+                prompt: { status in self.prompts.withLock { $0.append(status) } },
+                turn: { mark in self.turns.withLock { $0.append(mark) } })
+        }
+
+        /// The turn marks with their times dropped: `(start, number)` or `(end, number, failed)`.
+        var marks: [String] {
+            turns.withLock { $0 }.map { mark in
+                switch mark {
+                case .start(let turn): "start \(turn)"
+                case .end(let turn, _, let failed): "end \(turn)\(failed ? " failed" : "")"
+                }
+            }
         }
 
         var output: String { stdout.withLock { $0.joined() } }
@@ -185,6 +197,8 @@ import WispTestSupport
         var loop = ChatLoop(agent: agent, store: store, saveName: "session", context: Self.context, io: capture.io)
         try await loop.run()
         #expect(capture.noted.contains { $0.hasPrefix("error: ") }, "\(capture.noted)")
+        // Each message is one turn, marked at both ends; the failed one says so.
+        #expect(capture.marks == ["start 1", "end 1 failed", "start 2", "end 2"], "\(capture.marks)")
         #expect(capture.output.hasSuffix("done\n"), "\(capture.output)")
         #expect(capture.noted.last == "saved 'session'")
         #expect(try store.list() == ["session"])
