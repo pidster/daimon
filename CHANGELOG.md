@@ -12,6 +12,9 @@ Added:
   with the turn's number, time, and outcome, and every `event` line carries `text`, the line the
   terminal chat shows for it. `wisp-tui` shows the running turn and the last one's time in its status
   line, and words tool activity exactly as `wisp chat` does.
+- `wisp-tui` asks for approval in a bordered dialog in place of the input: the command, the line it is
+  part of, the directory, every reason, the pattern, and the keys, with the answer kept in the
+  scrollback as one line.
 
 Fixed:
 

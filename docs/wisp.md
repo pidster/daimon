@@ -66,6 +66,13 @@ lines are added above the band by scrolling a region rather than redrawing it. T
 when something changes it (a line from wisp, a key, a paste, a resize), never while idle. Keys other than a dialog's answers are ignored while an approval is asked and
 while a turn runs.
 
+An approval takes the input's place in the band: a rounded border in the level's colour, titled with
+the level, around the command (wrapped to four rows), the whole line when the command is one part of
+it, the directory, each reason, the pattern the answer is remembered under, and the keys, as `wisp
+chat` offers them. Lines too long for the dialog end in an ellipsis. The answer is recorded in the
+scrollback as one line, `⚠ approved for this session: git push` or `⚠ refused: …`, and the band gives
+the rows back to the input. Ctrl-C or Ctrl-D refuses.
+
 What a session shows, and where it goes:
 
 - A banner with the version, model, tool count, and audit session, then a status line above every

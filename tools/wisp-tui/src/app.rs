@@ -1,10 +1,11 @@
 //! The front end's state and rendering: finished lines go above into the terminal's own scrollback,
-//! the band at the bottom holds the reply in progress, an approval dialog, the input, and the status.
+//! the band at the bottom holds the reply in progress, the input or an approval dialog, and the status.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Block, BorderType, Padding, Paragraph};
+use unicode_width::UnicodeWidthChar;
 
 use crate::editor::{Edit, Editor};
 use crate::palette;
@@ -166,9 +167,6 @@ impl App {
             }
             Outbound::Approval(approval) => {
                 self.flush_partial();
-                for reason in &approval.reasons {
-                    self.push(&format!("  - {reason}"), LineKind::Note);
-                }
                 self.approval = Some(approval);
             }
             Outbound::Exit => self.exited = true,
@@ -208,7 +206,7 @@ impl App {
                 _ => return Action::None,
             };
             let id = approval.id.clone();
-            self.push(&format!("  → {decision}"), LineKind::Note);
+            self.push(&answered(&approval.command, decision), LineKind::Note);
             self.approval = None;
             return Action::Send(Inbound::Answer {
                 id,
@@ -285,6 +283,7 @@ impl App {
     /// Ctrl-C or Ctrl-D: cancel a dialog first, otherwise quit.
     pub fn interrupt(&mut self) -> Action {
         if let Some(approval) = self.approval.take() {
+            self.push(&answered(&approval.command, "no"), LineKind::Note);
             return Action::Send(Inbound::Answer {
                 id: approval.id,
                 decision: "no".into(),
@@ -300,7 +299,14 @@ impl App {
 
     /// The band's height for a terminal `width` cells wide: the base, plus a row for each further row
     /// the input's text needs, up to `MAX_INPUT_ROWS`.
+    /// While a dialog is asked it takes the input's place: the reply row, the dialog, and the status.
     pub fn band_height(&self, width: u16) -> u16 {
+        if let Some(approval) = &self.approval {
+            let rows = dialog_lines(approval, dialog_width(width)).len();
+            return u16::try_from(rows)
+                .unwrap_or(u16::MAX)
+                .saturating_add(DIALOG_FRAME + 2);
+        }
         BAND_HEIGHT + self.input_rows(width).saturating_sub(1)
     }
 
@@ -333,7 +339,28 @@ impl App {
             0,
             Line::from(Span::styled(self.partial.clone(), palette::body())),
         );
-        plain(frame, 1, self.dialog_line());
+        if let Some(approval) = &self.approval {
+            let lines = dialog_lines(approval, dialog_width(area.width));
+            let height = u16::try_from(lines.len())
+                .unwrap_or(u16::MAX)
+                .saturating_add(DIALOG_FRAME);
+            let block = Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(palette::level(&approval.level))
+                .title(Span::styled(
+                    format!(" approve · {} ", approval.level),
+                    palette::level(&approval.level),
+                ))
+                .padding(Padding::horizontal(1));
+            let dialog = Rect {
+                y: area.y + 1,
+                height: height.min(area.height.saturating_sub(2)),
+                ..inset
+            };
+            frame.render_widget(Paragraph::new(lines).block(block), dialog);
+            plain(frame, area.height.saturating_sub(1), self.status_line());
+            return;
+        }
         let strip = |frame: &mut Frame, index: u16, glyph: &str| {
             if index < area.height {
                 let text = glyph.repeat(usize::from(area.width));
@@ -373,25 +400,6 @@ impl App {
         }
         strip(frame, status_row - 1, "▀");
         plain(frame, status_row, self.status_line());
-    }
-
-    fn dialog_line(&self) -> Line<'static> {
-        let Some(approval) = &self.approval else {
-            return Line::default();
-        };
-        Line::from(vec![
-            Span::styled("⚠ approve ", palette::amber()),
-            Span::styled(
-                format!("[{}] ", approval.level),
-                palette::level(&approval.level),
-            ),
-            Span::styled(approval.command.clone(), palette::user()),
-            Span::styled(
-                format!("  remembered as {}  ", approval.pattern),
-                palette::muted(),
-            ),
-            Span::styled("[y]once [s]ession [p]roject [a]lways [n]o", palette::body()),
-        ])
     }
 
     /// The input's rows in `width` cells, at most `visible` of them, and the cursor's row among those
@@ -492,6 +500,90 @@ impl App {
         }
         Line::from(spans)
     }
+}
+
+/// Rows a dialog's border and nothing else take: the top and bottom edges.
+const DIALOG_FRAME: u16 = 2;
+/// Rows a long command may wrap to in the dialog before it is cut.
+const COMMAND_ROWS: usize = 4;
+/// Reasons the dialog lists; the classifier rarely gives more.
+const DIALOG_REASONS: usize = 4;
+
+/// Cells of text across a dialog in a band `width` wide: less the margins, the borders, and the
+/// padding inside them.
+fn dialog_width(width: u16) -> usize {
+    usize::from(width.saturating_sub(MARGIN * 2 + 4)).max(1)
+}
+
+/// What a dialog says, each line fitted to `width` cells: the command, wrapped; the line it is part
+/// of, when it is one part of one; the directory; the reasons; the pattern the answer is remembered
+/// under; and the keys, worded as `wisp chat` words them.
+fn dialog_lines(approval: &Approval, width: usize) -> Vec<Line<'static>> {
+    let mut command = Editor::default();
+    command.set(&approval.command);
+    let rows = command.rows(width).rows;
+    let mut lines: Vec<Line<'static>> = rows
+        .iter()
+        .take(COMMAND_ROWS)
+        .enumerate()
+        .map(|(index, row)| {
+            let text = if index + 1 == COMMAND_ROWS && rows.len() > COMMAND_ROWS {
+                fit(&format!("{row}…"), width)
+            } else {
+                row.clone()
+            };
+            Line::from(Span::styled(text, palette::user()))
+        })
+        .collect();
+    let muted = |text: String| Line::from(Span::styled(fit(&text, width), palette::muted()));
+    if approval.line != approval.command {
+        lines.push(muted(format!("part of: {}", approval.line)));
+    }
+    lines.push(muted(format!("in {}", approval.directory)));
+    for reason in approval.reasons.iter().take(DIALOG_REASONS) {
+        lines.push(Line::from(Span::styled(
+            fit(&format!("- {reason}"), width),
+            palette::body(),
+        )));
+    }
+    lines.push(muted(format!("remembered as {}", approval.pattern)));
+    lines.push(Line::from(Span::styled(
+        fit("[y]once [s]ession [p]roject 30d [a]lways 30d [n]o", width),
+        palette::body(),
+    )));
+    lines
+}
+
+/// `text` cut to `width` cells, ending in an ellipsis when cut.
+fn fit(text: &str, width: usize) -> String {
+    let cells: usize = text.chars().map(|c| c.width().unwrap_or(0)).sum();
+    if cells <= width {
+        return text.to_string();
+    }
+    let mut out = String::new();
+    let mut used = 0;
+    for c in text.chars() {
+        let w = c.width().unwrap_or(0);
+        if used + w + 1 > width {
+            break;
+        }
+        out.push(c);
+        used += w;
+    }
+    out.push('…');
+    out
+}
+
+/// The scrollback's record of an answered dialog.
+fn answered(command: &str, decision: &str) -> String {
+    let what = match decision {
+        "once" => "approved for this turn",
+        "session" => "approved for this session",
+        "project" => "approved in this project for 30 days",
+        "always" => "approved everywhere for 30 days",
+        _ => "refused",
+    };
+    format!("⚠ {what}: {command}")
 }
 
 #[cfg(test)]
@@ -626,7 +718,8 @@ mod tests {
             level: "dangerous".into(),
             reasons: vec!["changes repository state".into()],
         }));
-        assert_eq!(app.take_pending()[0].text, "  - changes repository state");
+        // The reasons are in the dialog, not the scrollback.
+        assert!(app.take_pending().is_empty());
         assert_eq!(app.type_char('q'), Action::None);
         assert_eq!(
             app.type_char('S'),
@@ -636,7 +729,100 @@ mod tests {
             })
         );
         assert!(app.approval.is_none());
+        assert_eq!(
+            app.take_pending()[0].text,
+            "⚠ approved for this session: git push"
+        );
         assert_eq!(app.interrupt(), Action::Quit);
+    }
+
+    fn approval(command: &str, line: &str, reasons: &[&str]) -> Approval {
+        Approval {
+            id: "a".into(),
+            command: command.into(),
+            line: line.into(),
+            pattern: "git push *".into(),
+            directory: "/repo".into(),
+            level: "dangerous".into(),
+            reasons: reasons.iter().map(|r| (*r).to_string()).collect(),
+        }
+    }
+
+    fn drawn(app: &App, width: u16) -> Vec<String> {
+        let height = app.band_height(width);
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("test terminal");
+        terminal
+            .draw(|frame| app.render(frame, frame.area()))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        (0..height)
+            .map(|y| {
+                (0..width)
+                    .map(|x| buffer[(x, y)].symbol().to_string())
+                    .collect::<String>()
+                    .trim_end()
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_dialog_takes_the_input_place_with_everything_inside_a_border() {
+        let mut app = App {
+            status: Some(Status {
+                model: "system".into(),
+                ..Status::default()
+            }),
+            busy: true,
+            ..Default::default()
+        };
+        app.handle(Outbound::Approval(approval(
+            "git push",
+            "git add -A && git push",
+            &["changes repository state", "reaches the network"],
+        )));
+        // Reply row, border, command, line, directory, two reasons, pattern, keys, border, status.
+        assert_eq!(app.band_height(60), 11);
+        let rows = drawn(&app, 60);
+        assert!(rows[1].starts_with(" ╭ approve · dangerous "), "{rows:?}");
+        assert_eq!(rows[2].trim_end_matches([' ', '│']), " │ git push");
+        assert!(rows[3].contains("part of: git add -A && git push"));
+        assert!(rows[4].contains("in /repo"));
+        assert!(rows[5].contains("- changes repository state"));
+        assert!(rows[6].contains("- reaches the network"));
+        assert!(rows[7].contains("remembered as git push *"));
+        assert!(rows[8].contains("[y]once [s]ession [p]roject 30d [a]lways 30d [n]o"));
+        assert!(rows[9].starts_with(" ╰"));
+        assert!(rows[10].contains("system"));
+        // A command that is its whole line has no "part of" row: command, directory, pattern, keys.
+        let only_command = approval("git push", "git push", &[]);
+        assert_eq!(dialog_lines(&only_command, 50).len(), 4);
+        // Answering gives the band back to the input.
+        app.type_char('n');
+        app.busy = false;
+        assert_eq!(app.band_height(60), BAND_HEIGHT);
+        assert_eq!(app.take_pending()[0].text, "⚠ refused: git push");
+    }
+
+    #[test]
+    fn a_long_command_wraps_and_long_lines_are_cut_to_fit() {
+        let long = approval(&"x".repeat(50), "y", &[&"r".repeat(40)]);
+        let lines = dialog_lines(&long, 20);
+        let text = |line: &Line| {
+            line.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        };
+        assert_eq!(text(&lines[0]), "x".repeat(20));
+        assert_eq!(text(&lines[2]), "x".repeat(10));
+        assert_eq!(text(&lines[5]), format!("- {}…", "r".repeat(17)));
+        let huge = approval(&"z".repeat(200), "z", &[]);
+        let cut = dialog_lines(&huge, 20);
+        assert_eq!(text(&cut[3]), format!("{}…", "z".repeat(19)));
+        assert!(text(&cut[4]).starts_with("part of"));
+        assert_eq!(fit("日本語", 5), "日本…");
+        assert_eq!(fit("short", 5), "short");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! `wisp-tui`: a terminal front end for `wisp chat --json`. The conversation scrolls in the
-//! terminal's own scrollback; a four-row band at the bottom holds the reply in progress, an approval
-//! dialog when there is one, the input line, and the status line (ratatui's inline viewport).
+//! terminal's own scrollback; a band at the bottom (ratatui's inline viewport) holds the reply in
+//! progress, the input or an approval dialog in its place, and the status line, and grows to fit them.
 //!
 //! Usage: `wisp-tui [chat arguments…]`; every argument is passed to `wisp chat`. `WISP_BIN` names the
 //! wisp binary (default `wisp` on `PATH`).
