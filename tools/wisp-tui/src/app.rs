@@ -11,14 +11,20 @@ use crate::editor::{Edit, Editor};
 use crate::palette;
 use crate::protocol::{Approval, Event, Inbound, Outbound, Status};
 
-/// Rows the band occupies: reply in progress, dialog, a half-height strip, the input, a half-height
-/// strip, status. The strips are rows of half-block glyphs in the tint, which read as half a line of
-/// padding above and below the input; a terminal cannot tint less than a row.
+/// Rows the band occupies with a one-row input: reply in progress, dialog, a half-height strip, the
+/// input, a half-height strip, status. The strips are rows of half-block glyphs in the tint, which read
+/// as half a line of padding above and below the input; a terminal cannot tint less than a row. The
+/// input grows by a row for each further row its text needs, up to `MAX_INPUT_ROWS`.
 pub const BAND_HEIGHT: u16 = 6;
-/// The band row the input text sits on.
+/// The band row the input's first row sits on.
 pub const INPUT_ROW: u16 = 3;
-/// The band row the status sits on.
+/// The band row the status sits on with a one-row input; it is always the band's last row.
+#[cfg(test)]
 pub const STATUS_ROW: u16 = 5;
+/// Rows the input grows to at most; longer text scrolls within them, keeping the cursor's row in sight.
+pub const MAX_INPUT_ROWS: u16 = 6;
+/// Cells the prompt (`› `) takes; continuation rows are indented to match.
+const PROMPT_CELLS: usize = 2;
 /// Cells of margin on each side of the band and of every committed line.
 pub const MARGIN: u16 = 1;
 /// The input row's placeholder when nothing is typed.
@@ -260,6 +266,21 @@ impl App {
         Action::Quit
     }
 
+    /// The band's height for a terminal `width` cells wide: the base, plus a row for each further row
+    /// the input's text needs, up to `MAX_INPUT_ROWS`.
+    pub fn band_height(&self, width: u16) -> u16 {
+        BAND_HEIGHT + self.input_rows(width).saturating_sub(1)
+    }
+
+    /// Rows the input needs at `width`, from 1 to `MAX_INPUT_ROWS`.
+    fn input_rows(&self, width: u16) -> u16 {
+        let inner = usize::from(width.saturating_sub(MARGIN * 2)).saturating_sub(PROMPT_CELLS);
+        let rows = self.editor.rows(inner).rows.len();
+        u16::try_from(rows)
+            .unwrap_or(MAX_INPUT_ROWS)
+            .clamp(1, MAX_INPUT_ROWS)
+    }
+
     /// Draws the band into `area`. Text is inset by the margin everywhere; the input's tint runs edge
     /// to edge with half-block strips above and below it.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -290,30 +311,36 @@ impl App {
                 );
             }
         };
+        // The input has the rows the band leaves between its fixed rows: reply, dialog, the two strips,
+        // and the status.
+        let input_rows = area.height.saturating_sub(BAND_HEIGHT - 1).max(1);
+        let status_row = INPUT_ROW + input_rows + 1;
         strip(frame, INPUT_ROW - 1, "▄");
-        if INPUT_ROW < area.height {
+        let (lines, cursor) = self.input_lines(usize::from(inset.width), usize::from(input_rows));
+        for (offset, line) in (0..input_rows).zip(lines) {
+            let index = INPUT_ROW + offset;
+            if index >= area.height {
+                break;
+            }
             frame.render_widget(
                 Paragraph::new("").style(palette::input_background()),
-                row(INPUT_ROW, area),
+                row(index, area),
             );
-            let (line, column) = self.input_line(usize::from(inset.width));
             frame.render_widget(
                 Paragraph::new(line).style(palette::input_background()),
-                row(INPUT_ROW, inset),
+                row(index, inset),
             );
-            // The terminal's own cursor marks where typing goes, while typing is taken.
-            if let Some(column) = column {
-                let x = inset
-                    .x
-                    .saturating_add(u16::try_from(column).unwrap_or(u16::MAX));
-                frame.set_cursor_position((
-                    x.min(area.right().saturating_sub(1)),
-                    area.y + INPUT_ROW,
-                ));
-            }
         }
-        strip(frame, INPUT_ROW + 1, "▀");
-        plain(frame, STATUS_ROW, self.status_line());
+        // The terminal's own cursor marks where typing goes, while typing is taken.
+        if let Some((line, column)) = cursor {
+            let x = inset
+                .x
+                .saturating_add(u16::try_from(column).unwrap_or(u16::MAX));
+            let y = area.y + INPUT_ROW + u16::try_from(line).unwrap_or(0);
+            frame.set_cursor_position((x.min(area.right().saturating_sub(1)), y));
+        }
+        strip(frame, status_row - 1, "▀");
+        plain(frame, status_row, self.status_line());
     }
 
     fn dialog_line(&self) -> Line<'static> {
@@ -335,24 +362,47 @@ impl App {
         ])
     }
 
-    /// The input row in `width` cells, and the cursor's column when typing is taken. The text scrolls
-    /// sideways to keep the cursor in sight; newlines show as `⏎`.
-    fn input_line(&self, width: usize) -> (Line<'static>, Option<usize>) {
-        const PROMPT_CELLS: usize = 2;
+    /// The input's rows in `width` cells, at most `visible` of them, and the cursor's row among those
+    /// shown and its column, when typing is taken. The first row carries the prompt and the rest are
+    /// indented to match; a tall input shows the rows around the cursor.
+    fn input_lines(
+        &self,
+        width: usize,
+        visible: usize,
+    ) -> (Vec<Line<'static>>, Option<(usize, usize)>) {
         let prompt = if self.busy { "…" } else { "›" };
-        let (text, column) = self.editor.view(width.saturating_sub(PROMPT_CELLS));
-        let shown = if self.editor.is_empty() && !self.busy {
-            Span::styled(PLACEHOLDER, palette::muted())
-        } else {
-            Span::styled(text, palette::user())
-        };
+        if self.editor.is_empty() && !self.busy {
+            let placeholder = Line::from(vec![
+                Span::styled(format!("{prompt} "), palette::prompt()),
+                Span::styled(PLACEHOLDER, palette::muted()),
+            ]);
+            let typing = self.approval.is_none();
+            return (vec![placeholder], typing.then_some((0, PROMPT_CELLS)));
+        }
+        let layout = self.editor.rows(width.saturating_sub(PROMPT_CELLS));
+        let first = layout.first_shown(visible);
+        let lines = layout
+            .rows
+            .iter()
+            .enumerate()
+            .skip(first)
+            .take(visible)
+            .map(|(index, text)| {
+                let lead = if index == 0 {
+                    format!("{prompt} ")
+                } else {
+                    " ".repeat(PROMPT_CELLS)
+                };
+                Line::from(vec![
+                    Span::styled(lead, palette::prompt()),
+                    Span::styled(text.clone(), palette::user()),
+                ])
+            })
+            .collect();
         let typing = self.approval.is_none() && !self.busy;
         (
-            Line::from(vec![
-                Span::styled(format!("{prompt} "), palette::prompt()),
-                shown,
-            ]),
-            typing.then_some(PROMPT_CELLS + column),
+            lines,
+            typing.then_some((layout.row - first, PROMPT_CELLS + layout.column)),
         )
     }
 
@@ -686,13 +736,57 @@ mod tests {
         // The margin, the prompt's two cells, then "hello ".
         let position = terminal.get_cursor_position().expect("cursor");
         assert_eq!((position.x, position.y), (MARGIN + 2 + 6, INPUT_ROW));
-        // Longer than the row: the text scrolls so the end, and the cursor, stay in sight.
+        // Longer than the row: the text wraps, and a one-row band shows the cursor's row.
         app.editor.set(&"x".repeat(100));
         terminal
             .draw(|frame| app.render(frame, frame.area()))
             .expect("draw");
         let position = terminal.get_cursor_position().expect("cursor");
-        assert_eq!(position.x, 40 - MARGIN - 1);
+        // 36 cells a row after the margins and the prompt: 100 = 36 + 36 + 28.
+        assert_eq!((position.x, position.y), (MARGIN + 2 + 28, INPUT_ROW));
+    }
+
+    #[test]
+    fn the_band_grows_with_the_input_and_draws_every_row() {
+        let mut app = App {
+            status: Some(Status {
+                model: "system".into(),
+                ..Status::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(app.band_height(40), BAND_HEIGHT);
+        app.editor.set("first line\nsecond\nthird");
+        assert_eq!(app.band_height(40), BAND_HEIGHT + 2);
+        app.editor.set(&"line\n".repeat(20));
+        assert_eq!(app.band_height(40), BAND_HEIGHT + MAX_INPUT_ROWS - 1);
+        app.editor.set("first line\nsecond\nthird");
+        let height = app.band_height(40);
+        let backend = TestBackend::new(40, height);
+        let mut terminal = Terminal::new(backend).expect("test terminal");
+        terminal
+            .draw(|frame| app.render(frame, frame.area()))
+            .expect("draw");
+        let buffer = terminal.backend().buffer();
+        let row = |index: u16| -> String {
+            (0..40)
+                .map(|x| buffer[(x, index)].symbol().to_string())
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        };
+        assert_eq!(row(INPUT_ROW), " › first line");
+        assert_eq!(row(INPUT_ROW + 1), "   second");
+        assert_eq!(row(INPUT_ROW + 2), "   third");
+        assert_eq!(buffer[(0, INPUT_ROW + 2)].bg, palette::DEEP);
+        assert_eq!(buffer[(0, INPUT_ROW + 3)].symbol(), "▀");
+        assert!(
+            row(height - 1).starts_with(" system"),
+            "status: {}",
+            row(height - 1)
+        );
+        let position = terminal.get_cursor_position().expect("cursor");
+        assert_eq!((position.x, position.y), (MARGIN + 2 + 5, INPUT_ROW + 2));
     }
 
     #[test]

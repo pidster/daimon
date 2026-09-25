@@ -52,11 +52,14 @@ in both.
 | Backspace, Delete | Delete the character before or at the cursor. |
 | Ctrl-W, Alt-Backspace | Delete back to the previous whitespace. |
 | Ctrl-U, Ctrl-K | Delete to the start or to the end. |
-| Alt-Enter | A newline, for a message of several lines; shown as `⏎`. |
+| Alt-Enter | A newline, for a message of several lines. |
 | Paste | Inserted whole (bracketed paste), newlines kept, so pasting never sends. |
 
-A line longer than the row scrolls sideways to keep the cursor in sight, and the terminal's own cursor
-marks where typing goes. Keys other than a dialog's answers are ignored while an approval is asked and
+The input grows a row for each line or wrapped line of the message, up to six rows; beyond that it
+scrolls within them to keep the cursor's row in sight, and it shrinks back when the message is sent. The
+terminal's own cursor marks where typing goes. ratatui fixes an inline band's height when it is made, so
+the band is redrawn at the new height; after it shrinks it can sit a row or two above the bottom of the
+terminal until the next output closes the gap. Keys other than a dialog's answers are ignored while an approval is asked and
 while a turn runs.
 
 What a session shows, and where it goes:

@@ -17,6 +17,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event::{
     self, DisableBracketedPaste, EnableBracketedPaste, Event as TermEvent, KeyCode, KeyEventKind,
     KeyModifiers,
@@ -25,7 +26,7 @@ use ratatui::crossterm::execute;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Widget, Wrap};
-use ratatui::{TerminalOptions, Viewport};
+use ratatui::{Terminal, TerminalOptions, Viewport};
 
 use app::{Action, App, BAND_HEIGHT, HistoryLine, LineKind, MARGIN};
 use editor::Edit;
@@ -126,6 +127,7 @@ fn run(
     stdin: &mut impl Write,
 ) -> Result<()> {
     let mut app = App::default();
+    let mut height = BAND_HEIGHT;
     terminal.draw(|frame| app.render(frame, frame.area()))?;
     loop {
         let incoming = match rx.recv_timeout(Duration::from_millis(250)) {
@@ -171,6 +173,11 @@ fn run(
         let width = terminal.size()?.width;
         for line in app.take_pending() {
             insert(terminal, &line, width)?;
+        }
+        let wanted = app.band_height(width);
+        if wanted != height {
+            regrow(terminal, wanted)?;
+            height = wanted;
         }
         terminal.draw(|frame| app.render(frame, frame.area()))?;
         if app.exited {
@@ -230,6 +237,23 @@ fn command_for(code: KeyCode, modifiers: KeyModifiers) -> Key {
         KeyCode::Down => Key::RecallNext,
         _ => Key::Nothing,
     }
+}
+
+/// Gives the band a new height. ratatui fixes an inline viewport's height when the terminal is made, so
+/// the band is cleared, the cursor put at its top, and a terminal made afresh there: growing reserves
+/// the new rows by scrolling when the band is at the bottom; shrinking leaves the band where it starts,
+/// and the lines inserted above it later close the gap below.
+fn regrow(terminal: &mut ratatui::DefaultTerminal, height: u16) -> Result<()> {
+    let top = terminal.get_frame().area().as_position();
+    terminal.clear()?;
+    terminal.set_cursor_position(top)?;
+    *terminal = Terminal::with_options(
+        CrosstermBackend::new(std::io::stdout()),
+        TerminalOptions {
+            viewport: Viewport::Inline(height),
+        },
+    )?;
+    Ok(())
 }
 
 /// Writes one history line into scrollback above the band, wrapped to the width.

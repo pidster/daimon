@@ -4,6 +4,14 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `wisp-tui`'s input grows with the message: a row for each line or wrapped line, up to six, scrolling
+  within them beyond that, and shrinking back when the message is sent. Long lines now wrap instead of
+  scrolling sideways.
+
 ## 0.10.2
 
 Added:

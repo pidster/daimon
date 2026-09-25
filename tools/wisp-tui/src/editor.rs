@@ -155,30 +155,72 @@ impl Editor {
         index
     }
 
-    /// The part of the text to show in `width` cells so the cursor is visible, and the cursor's column
-    /// within it. Newlines show as `⏎`; wide characters take two cells. The view keeps the cursor at the
-    /// right edge when the text runs past it, so the most recent typing stays in sight.
-    pub fn view(&self, width: usize) -> (String, usize) {
-        let shown = |c: char| if c == '\n' { '⏎' } else { c };
-        let cells = |c: char| shown(c).width().unwrap_or(0);
+    /// The text laid out in rows of `width` cells: a new row at each newline and wherever the next
+    /// character would not fit, wide characters taking two cells. Returns the rows and the cursor's row
+    /// and column; a cursor at the end of a full row moves to the start of a new one, so it always has a
+    /// cell.
+    pub fn rows(&self, width: usize) -> Layout {
         let width = width.max(1);
-        // Walk back from the cursor until the window is full, leaving a cell for the cursor itself.
-        let mut start = self.cursor;
-        let mut used = 0;
-        while start > 0 && used + cells(self.chars[start - 1]) < width {
-            start -= 1;
-            used += cells(self.chars[start]);
+        let mut rows = vec![String::new()];
+        let mut column = 0;
+        let mut cursor = None;
+        for (index, &c) in self.chars.iter().enumerate() {
+            if c == '\n' {
+                if index == self.cursor {
+                    cursor = Some((rows.len() - 1, column));
+                }
+                rows.push(String::new());
+                column = 0;
+                continue;
+            }
+            let cells = c.width().unwrap_or(0);
+            if column + cells > width {
+                rows.push(String::new());
+                column = 0;
+            }
+            if index == self.cursor {
+                cursor = Some((rows.len() - 1, column));
+            }
+            if let Some(last) = rows.last_mut() {
+                last.push(c);
+            }
+            column += cells;
         }
-        let column = used;
-        let mut end = self.cursor;
-        while end < self.chars.len() && used + cells(self.chars[end]) <= width {
-            used += cells(self.chars[end]);
-            end += 1;
+        let (row, column) = cursor.unwrap_or_else(|| {
+            if column >= width {
+                rows.push(String::new());
+                (rows.len() - 1, 0)
+            } else {
+                (rows.len() - 1, column)
+            }
+        });
+        Layout { rows, row, column }
+    }
+}
+
+/// The input laid out for display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Layout {
+    /// The rows, at least one.
+    pub rows: Vec<String>,
+    /// The row the cursor is on.
+    pub row: usize,
+    /// The cursor's column in cells.
+    pub column: usize,
+}
+
+impl Layout {
+    /// The first row to show when only `visible` rows fit: 0 while everything fits, else a window that
+    /// ends at the cursor's row, so the line being typed stays in sight.
+    pub fn first_shown(&self, visible: usize) -> usize {
+        let visible = visible.max(1);
+        if self.rows.len() <= visible {
+            0
+        } else {
+            (self.row + 1)
+                .saturating_sub(visible)
+                .min(self.rows.len() - visible)
         }
-        (
-            self.chars[start..end].iter().map(|c| shown(*c)).collect(),
-            column,
-        )
     }
 }
 
@@ -250,18 +292,51 @@ mod tests {
     }
 
     #[test]
-    fn the_view_keeps_the_cursor_in_sight() {
-        assert_eq!(editor("hello", 5).view(10), ("hello".into(), 5));
-        assert_eq!(editor("hello", 2).view(10), ("hello".into(), 2));
-        // Longer than the width: the window ends at the cursor, with a cell left for it.
-        let (text, column) = editor("abcdefghij", 10).view(5);
-        assert_eq!((text.as_str(), column), ("ghij", 4));
-        // Near the start, the window runs on past the cursor as far as it fits.
-        let (text, column) = editor("abcdefghij", 3).view(5);
-        assert_eq!((text.as_str(), column), ("abcde", 3));
-        // Newlines are shown as a mark; wide characters take two cells.
-        assert_eq!(editor("a\nb", 3).view(10), ("a⏎b".into(), 3));
-        assert_eq!(editor("日本", 2).view(10), ("日本".into(), 4));
-        assert_eq!(editor("", 0).view(0), (String::new(), 0));
+    fn text_is_laid_out_in_rows_with_the_cursor_placed() {
+        let layout = |text: &str, cursor: usize, width: usize| editor(text, cursor).rows(width);
+        let single = layout("hello", 5, 10);
+        assert_eq!(
+            (single.rows, single.row, single.column),
+            (vec!["hello".to_string()], 0, 5)
+        );
+        let lines = layout("one\ntwo", 7, 10);
+        assert_eq!(
+            (lines.rows, lines.row, lines.column),
+            (vec!["one".into(), "two".into()], 1, 3)
+        );
+        // A cursor on the newline is at the end of its line.
+        let on_newline = layout("one\ntwo", 3, 10);
+        assert_eq!((on_newline.row, on_newline.column), (0, 3));
+        // Long lines wrap at the width; a cursor at the end of a full row moves to a new one.
+        let wrapped = layout("abcdefgh", 8, 4);
+        assert_eq!(
+            (wrapped.rows, wrapped.row, wrapped.column),
+            (vec!["abcd".into(), "efgh".into(), String::new()], 2, 0)
+        );
+        let mid = layout("abcdefgh", 5, 4);
+        assert_eq!((mid.row, mid.column), (1, 1));
+        // Wide characters take two cells and wrap whole.
+        let wide = layout("a日本", 3, 4);
+        assert_eq!(
+            (wide.rows, wide.row, wide.column),
+            (vec!["a日".into(), "本".into()], 1, 2)
+        );
+        let empty = layout("", 0, 0);
+        assert_eq!(
+            (empty.rows, empty.row, empty.column),
+            (vec![String::new()], 0, 0)
+        );
+    }
+
+    #[test]
+    fn a_tall_input_shows_the_rows_around_the_cursor() {
+        let tall = editor("1\n2\n3\n4\n5\n6\n7\n8", 15).rows(10);
+        assert_eq!(tall.rows.len(), 8);
+        assert_eq!(tall.first_shown(3), 5);
+        let top = editor("1\n2\n3\n4\n5\n6\n7\n8", 0).rows(10);
+        assert_eq!(top.first_shown(3), 0);
+        let middle = editor("1\n2\n3\n4\n5\n6\n7\n8", 8).rows(10);
+        assert_eq!((middle.row, middle.first_shown(3)), (4, 2));
+        assert_eq!(editor("short", 5).rows(10).first_shown(3), 0);
     }
 }
