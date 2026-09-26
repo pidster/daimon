@@ -85,7 +85,13 @@ obscurely. An agent can also start from a saved `Transcript`.
 `RuleRiskClassifier` and `ModelRiskClassifier`) and, at or above the configured threshold, asks an
 `Approver` (`TerminalApprover`, `DenyingApprover`, `AutoApprover`, or the MCP `ElicitationApprover`).
 `CommandRunner` consults the gate after the policy check. See [approval.md](approval.md) and
-[ADR 0011](decisions/0011-risk-classifier-and-approval.md).
+[ADR 0011](decisions/0011-risk-classifier-and-approval.md). The model beside the rules is
+`ModelRiskClassifier` (the on-device language model) or `CoreMLRiskClassifier` (a Core ML text
+classifier under contract 1 or 2), chosen by `approval.classifier`, and a session wraps whichever it
+uses in `TimedRiskClassifier` and `CachingRiskClassifier`. `RiskClassifierTraining` trains a contract-2
+model with Create ML from `RiskExample`s (the bundled `Resources/risk-examples.tsv`, a file, or
+`RiskExamples.fromAudit`), and `RiskMeasurement` measures any classifier's accuracy and latency; `wisp
+classifier` is their CLI ([ADR 0038](decisions/0038-fast-specialised-classifiers.md)).
 
 ### Audit and diagnostics
 

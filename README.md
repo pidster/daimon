@@ -12,12 +12,14 @@ It has two faces:
 
 - **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it;
   watch a build and hear when it breaks (`wisp watch`); scan a commit for secrets or redact a log before
-  you share it (`wisp scan`, `wisp redact`).
+  you share it (`wisp scan`, `wisp redact`); draft a commit message (`wisp draft`); train a fast risk
+  classifier for its approval gate from your own history (`wisp classifier train --from-audit`).
   On a terminal the chat runs in `wisp-tui`: the conversation scrolls in your terminal's own history
   above a pinned input and status line.
 - **An MCP server.** Other agent harnesses such as Claude Code or Codex can hand it self-contained work to do
-  locally: run a build and return only its failures, condense a log or a large JSON file, scan or redact
-  text, summarise a diff or draft its commit message, classify some text.
+  locally: run a build and return only its failures, condense a log or a large JSON file, reduce a
+  dependency audit or a profile, find flaky tests across runs, scan or redact text, summarise a diff or
+  draft its commit message, classify some text.
 
 It is deliberately a *microharness*: the smallest correct agent loop, not a framework. What makes it worth
 using is the care around that loop. Every command the model wants to run passes a deny list, runs inside a

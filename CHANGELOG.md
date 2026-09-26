@@ -17,15 +17,13 @@ Added:
   scrollback as one line.
 - `wisp-tui` renders the Markdown in replies: headings, bullets, inline code, bold, and italics, with
   fenced code blocks kept as they are in the code colour.
-
 - `wisp classifier train` trains a risk classifier on this Mac in well under a second, from the
   bundled examples or your own, and `wisp classifier measure` reports any classifier's accuracy and
-  speed on labelled commands. A trained classifier answers in about 0.05 ms, against about 2.3 s for
+  speed on labelled commands. A trained classifier answers in about 0.05 ms, against 1.3 to 2.3 s for
   the on-device model; use it with `approval.classifier: coreml`. The Core ML classifier now loads its
   model once instead of on every command, and reads contract 2 models.
 - `wisp classifier train --from-audit` also learns from this Mac's audit log: the on-device model's
   verdicts on the commands you have run, secrets redacted, a refused command at least `moderate`.
-
 - `triage` reads failures in the formats compilers and test runners print (Swift, clang, XCTest,
   rustc, swift-testing, cargo test, pytest, go test) exactly, and asks the model only about output those
   do not explain, so build and test output in a known format is triaged at once.
