@@ -48,8 +48,9 @@ git diff --cached | wisp scan   # credentials in a commit, before it is made
 ```
 
 Running tests is a "moderate" action, so `chat` asks you before doing it; plain `wisp "…"` cannot ask
-and refuses unless you pass `--yes`. State lives in `~/.wisp`: an optional `config.json`, saved chat
-transcripts, remembered approvals, and the audit log. Upgrade with `brew upgrade wisp`, remove with
+and refuses unless you pass `--yes`. State lives in `~/.wisp`: an optional `config.json` (change it
+with `/config set` in chat or `wisp config set`), saved chat transcripts, remembered approvals, and the
+audit log. Upgrade with `brew upgrade wisp`, remove with
 `brew uninstall wisp` and `rm -rf ~/.wisp`.
 
 To let another harness use it, register it as an MCP server. For Claude Code, in `.mcp.json`:

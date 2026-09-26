@@ -63,8 +63,9 @@ Accepted 2026-09-22 ([ADR 0029](decisions/0029-tui-front-end.md)). Input history
 motions, readline's deletions, bracketed paste, and Alt-Enter for a newline. The input grows to six rows
 for a multi-line message, done 2026-09-25. The `turn` event and the rendered `text` on
 events, done 2026-09-25 (ADR 0029, amendment), a bordered approval dialog with the reasons inside it,
-and Markdown rendering of replies as they are committed, the same day. Nothing further is planned for
-the front end; tables and links in replies are shown as typed.
+and Markdown rendering of replies as they are committed, the same day. Done 2026-09-26: `/config` from
+chat with a picker for choices and Tab completion ([ADR 0040](decisions/0040-config-from-chat.md)).
+Nothing further is planned for the front end; tables and links in replies are shown as typed.
 
 ## When wisp can be signed
 

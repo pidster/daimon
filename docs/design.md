@@ -273,7 +273,12 @@ rules alone, and a classifier's fallback verdict carries `RiskAssessment.failure
 failure. `ChatLoop.history` keeps the latest 100 typed lines for `/history`; `wisp-tui` keeps its own
 list for Up and Down. `wisp chat --json` is the same loop with its IO mapped onto a JSON Lines protocol
 (`ChatProtocol`, `LineRouter`, `JSONApprover`), so a front end in another process, `tools/wisp-tui`,
-can own the screen while the session stays here.
+can own the screen while the session stays here. `/config` and `wisp config set` go through
+`ConfigSettings` (the settings that can change, and what each takes) and `ConfigEdit` (one path set or
+removed, the result validated as start-up would before it is written); a chat command that needs an
+answer asks a `ChatChoice` through `ChatLoop.IO.choose`, a numbered list in the plain chat and a
+`choice` line in `--json`; and `ChatCompletion` gives Tab's candidates from the same catalogue, answered
+beside the loop through `LineRouter.onComplete` ([ADR 0040](decisions/0040-config-from-chat.md)).
 
 ## Error handling
 
