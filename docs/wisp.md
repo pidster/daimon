@@ -54,6 +54,7 @@ in both.
 | Ctrl-U, Ctrl-K | Delete to the start or to the end. |
 | Alt-Enter | A newline, for a message of several lines. |
 | Paste | Inserted whole (bracketed paste), newlines kept, so pasting never sends. |
+| Tab | Complete the slash command being typed: the command, `/config`'s words, a setting, a setting's values, a model after `/model`, a view after `/inspect`. One match fills in; several fill in what they share and show above the input, and Tab again cycles through them. |
 
 The input grows a row for each line or wrapped line of the message, up to six rows; beyond that it
 scrolls within them to keep the cursor's row in sight. It shrinks back only once the input is empty, as
@@ -174,12 +175,16 @@ Out, to the front end:
 | `output` | `text` | A whole line, as `/help` or `/last` print; an empty one ends a reply. |
 | `event` | `kind`, `call`, `turn`, `details`, `text` | Every audit event of the conversation, as `logging.md` describes them. `text` is the unstyled line the terminal chat shows for it, null when it shows none; a front end shows `text` so every face words tool activity alike, and reads the raw fields only for a view of its own. |
 | `approval` | `id`, `command`, `line`, `pattern`, `directory`, `level`, `reasons` | A command needs a decision; answer with the `id` within `approval.timeoutSeconds` or it is refused. |
+| `completions` | `id`, `from`, `candidates` | The answer to a `complete` request: the words that could replace the text from character `from` to the cursor, sorted. |
 | `choice` | `id`, `title`, `options` (each `value`, `label`, `detail`), `current`, `acceptsText` | A chat command asks something, such as `/config set` without a value; answer with `choose` within `approval.timeoutSeconds`, or nothing changes. |
 | `exit` | | The loop has ended. |
 
 In, from the front end: `{"type":"message","text":"…"}` for a chat line, slash commands included, and
 `{"type":"answer","id":"…","decision":"once|session|project|always|no"}` for an approval, and
-`{"type":"choose","id":"…","value":"…"}` for a choice, with `value` null or absent for no answer. A line that
+`{"type":"choose","id":"…","value":"…"}` for a choice, with `value` null or absent for no answer, and
+`{"type":"complete","id":"…","text":"…","cursor":N}` to ask for completions of the input at character
+`N`, answered by `completions` even while a turn is not running; completion comes from the same list of
+settings and values as `/config`, and the models this Mac can run are looked up once per session. A line that
 is not a JSON object is taken as a message, so the protocol can be driven by hand:
 
 ```

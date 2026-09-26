@@ -17,6 +17,9 @@ Added:
   models this Mac can run and the trained Core ML models on disk. `wisp-tui` shows a picker in place of
   the input (arrows, Enter, Esc, or type a value); the plain chat shows a numbered list. `wisp chat
   --json` gains `choice` and `choose` for it.
+- Tab completes slash commands in `wisp-tui`: the command, `/config`'s words, settings and their values,
+  models after `/model`, and views after `/inspect`; several matches show above the input and Tab
+  cycles through them. `wisp chat --json` gains `complete` and `completions`.
 
 Fixed:
 

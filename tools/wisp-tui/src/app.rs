@@ -75,6 +75,34 @@ pub enum Action {
     Quit,
 }
 
+/// Several completions for the word before the cursor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Suggestions {
+    /// Where the word starts, in characters.
+    pub from: usize,
+    /// The candidates.
+    pub candidates: Vec<String>,
+    /// The candidate the next Tab puts in.
+    pub next: usize,
+}
+
+/// The longest start every word shares.
+fn common_prefix(words: &[String]) -> String {
+    let Some(first) = words.first() else {
+        return String::new();
+    };
+    let mut prefix: Vec<char> = first.chars().collect();
+    for word in &words[1..] {
+        let shared = prefix
+            .iter()
+            .zip(word.chars())
+            .take_while(|(a, b)| **a == *b)
+            .count();
+        prefix.truncate(shared);
+    }
+    prefix.into_iter().collect()
+}
+
 /// What the status line says about turns.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TurnState {
@@ -104,6 +132,13 @@ pub struct App {
     pub approval: Option<Approval>,
     /// A choice awaiting an answer.
     pub picker: Option<Picker>,
+    /// The id of the completion asked for and not yet answered.
+    pub completing: Option<String>,
+    /// Completion requests sent, for their ids.
+    pub completions_asked: u64,
+    /// Candidates from the last completion with more than one, shown above the input and cycled by
+    /// Tab; any other edit clears them.
+    pub suggestions: Option<Suggestions>,
     /// Whether a turn is in progress (input is held until the next status).
     pub busy: bool,
     /// The turn under way, or how the last one ended, for the status line.
@@ -184,6 +219,11 @@ impl App {
                 self.flush_partial();
                 self.picker = Some(Picker::new(choice));
             }
+            Outbound::Completions {
+                id,
+                from,
+                candidates,
+            } => self.completed(&id, from, candidates),
             Outbound::Exit => self.exited = true,
             Outbound::Unknown => {}
         }
@@ -258,6 +298,58 @@ impl App {
     pub fn edit(&mut self, edit: &Edit) {
         if self.typing() {
             self.editor.apply(edit);
+            self.suggestions = None;
+            self.completing = None;
+        }
+    }
+
+    /// Tab: cycles through the suggestions on show, or asks wisp to complete the slash command being
+    /// typed.
+    pub fn complete(&mut self) -> Action {
+        if !self.typing() || self.picker.is_some() {
+            return Action::None;
+        }
+        if let Some(suggestions) = &mut self.suggestions {
+            let candidate = suggestions.candidates[suggestions.next].clone();
+            suggestions.next = (suggestions.next + 1) % suggestions.candidates.len();
+            self.editor.replace(suggestions.from, &candidate);
+            return Action::None;
+        }
+        let text = self.editor.text();
+        if !text.starts_with('/') {
+            return Action::None;
+        }
+        self.completions_asked += 1;
+        let id = format!("k{}", self.completions_asked);
+        self.completing = Some(id.clone());
+        Action::Send(Inbound::Complete {
+            id,
+            text,
+            cursor: self.editor.cursor(),
+        })
+    }
+
+    /// Applies completions if they answer the request still open: one fills in with a space after it,
+    /// several fill in what they share and show above the input.
+    fn completed(&mut self, id: &str, from: usize, candidates: Vec<String>) {
+        if self.completing.as_deref() != Some(id) {
+            return;
+        }
+        self.completing = None;
+        match candidates.len() {
+            0 => {}
+            1 => self.editor.replace(from, &format!("{} ", candidates[0])),
+            _ => {
+                let shared = common_prefix(&candidates);
+                if shared.chars().count() > self.editor.cursor().saturating_sub(from) {
+                    self.editor.replace(from, &shared);
+                }
+                self.suggestions = Some(Suggestions {
+                    from,
+                    candidates,
+                    next: 0,
+                });
+            }
         }
     }
 
@@ -291,6 +383,7 @@ impl App {
         if text.is_empty() {
             return Action::None;
         }
+        self.suggestions = None;
         self.push(&format!("› {text}"), LineKind::User);
         if self.recall.last() != Some(&text) {
             self.recall.push(text.clone());
@@ -447,6 +540,16 @@ impl App {
             0,
             Line::from(Span::styled(self.partial.clone(), palette::body())),
         );
+        if let Some(suggestions) = &self.suggestions {
+            plain(
+                frame,
+                1,
+                Line::from(Span::styled(
+                    suggestions.candidates.join("  "),
+                    palette::muted(),
+                )),
+            );
+        }
         if let Some(picker) = &self.picker {
             self.render_picker(frame, picker, area, inset);
             plain(frame, area.height.saturating_sub(1), self.status_line());
@@ -877,6 +980,71 @@ mod tests {
             Action::None,
             "Esc with nothing open does nothing"
         );
+    }
+
+    fn completions(id: &str, from: usize, candidates: &[&str]) -> Outbound {
+        Outbound::Completions {
+            id: id.into(),
+            from,
+            candidates: candidates.iter().map(|c| (*c).to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn tab_asks_wisp_and_fills_in_one_match_or_what_several_share() {
+        let mut app = App {
+            status: Some(Status::default()),
+            ..Default::default()
+        };
+        app.editor.set("hello");
+        assert_eq!(
+            app.complete(),
+            Action::None,
+            "only a slash command completes"
+        );
+        app.editor.set("/con");
+        assert_eq!(
+            app.complete(),
+            Action::Send(Inbound::Complete {
+                id: "k1".into(),
+                text: "/con".into(),
+                cursor: 4
+            })
+        );
+        app.handle(completions("k1", 0, &["/config"]));
+        assert_eq!(app.editor.text(), "/config ");
+        // Several fill in what they share, show above the input, and Tab cycles through them.
+        app.editor.set("/config set approval.c");
+        app.complete();
+        app.handle(completions(
+            "k2",
+            12,
+            &["approval.classifier", "approval.coremlModel"],
+        ));
+        assert_eq!(app.editor.text(), "/config set approval.c");
+        let rows = drawn(&app, 80);
+        assert!(
+            rows[1].contains("approval.classifier  approval.coremlModel"),
+            "{rows:?}"
+        );
+        app.complete();
+        assert_eq!(app.editor.text(), "/config set approval.classifier");
+        app.complete();
+        assert_eq!(app.editor.text(), "/config set approval.coremlModel");
+        app.complete();
+        assert_eq!(app.editor.text(), "/config set approval.classifier");
+        // Typing clears them; a late answer to an older request is ignored.
+        app.type_char(' ');
+        assert!(app.suggestions.is_none());
+        app.complete();
+        app.handle(completions("k1", 0, &["/stale"]));
+        assert_eq!(app.editor.text(), "/config set approval.classifier ");
+        app.handle(completions("k3", 32, &["coreml", "rules"]));
+        assert_eq!(
+            common_prefix(&["coreml".into(), "coremlx".into()]),
+            "coreml"
+        );
+        assert_eq!(common_prefix(&[]), "");
     }
 
     #[test]

@@ -19,6 +19,8 @@ public enum ChatProtocol {
         case message(String)
         /// An answer to an approval request: `once`, `session`, `project`, `always`, or `no`.
         case answer(id: String, decision: String)
+        /// A request to complete the input line at a character index.
+        case complete(id: String, text: String, cursor: Int?)
 
         /// Parses one line; text that is not a typed JSON object is a message.
         public init(line: String) {
@@ -32,6 +34,10 @@ public enum ChatProtocol {
             switch type {
             case "answer":
                 self = .answer(id: object["id"]?.stringValue ?? "", decision: object["decision"]?.stringValue ?? "no")
+            case "complete":
+                self = .complete(
+                    id: object["id"]?.stringValue ?? "", text: object["text"]?.stringValue ?? "",
+                    cursor: object["cursor"]?.intValue)
             case "choose":
                 self = .answer(id: object["id"]?.stringValue ?? "", decision: object["value"]?.stringValue ?? "")
             default:
@@ -105,6 +111,11 @@ public enum ChatProtocol {
         return answer.flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    /// The `completions` line's fields.
+    public static func completions(id: String, _ result: ChatCompletion.Result) -> [String: JSONValue] {
+        ["id": .string(id), "from": .int(result.from), "candidates": .array(result.candidates.map { .string($0) })]
+    }
+
     /// The `approval` line's fields.
     public static func approval(id: String, _ request: ApprovalRequest) -> [String: JSONValue] {
         [
@@ -127,6 +138,13 @@ public final class LineRouter: Sendable {
     }
     private let state = Mutex(State())
     private let available = DispatchSemaphore(value: 0)
+    private let completer = Mutex<(@Sendable (String, String, Int?) -> Void)?>(nil)
+
+    /// Sets what answers `complete` requests: called with the id, the text, and the cursor, off the
+    /// chat loop, which may be waiting for input meanwhile.
+    public func onComplete(_ handle: @escaping @Sendable (String, String, Int?) -> Void) {
+        completer.withLock { $0 = handle }
+    }
 
     /// Creates an empty router.
     public init() {}
@@ -137,6 +155,8 @@ public final class LineRouter: Sendable {
         case .message(let text):
             state.withLock { $0.messages.append(text) }
             available.signal()
+        case .complete(let id, let text, let cursor):
+            completer.withLock { $0 }?(id, text, cursor)
         case .answer(let id, let decision):
             let waiter = state.withLock { state -> CheckedContinuation<String, Never>? in
                 if let waiter = state.waiting.removeValue(forKey: id) { return waiter }

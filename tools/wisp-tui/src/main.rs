@@ -149,6 +149,7 @@ fn run(
                 let action = match command_for(key.code, key.modifiers) {
                     Key::Interrupt => app.interrupt(),
                     Key::Cancel => app.cancel(),
+                    Key::Complete => app.complete(),
                     Key::Submit => app.submit(),
                     Key::Type(c) => app.type_char(c),
                     Key::Edit(edit) => {
@@ -219,6 +220,8 @@ enum Key {
     Interrupt,
     /// Esc: leave an open choice unanswered.
     Cancel,
+    /// Tab: complete the slash command being typed.
+    Complete,
     /// Send the input.
     Submit,
     /// A character: typed into the input, or an answer to a dialog.
@@ -262,6 +265,7 @@ fn command_for(code: KeyCode, modifiers: KeyModifiers) -> Key {
         KeyCode::Home => Key::Edit(Edit::Home),
         KeyCode::End => Key::Edit(Edit::End),
         KeyCode::Esc => Key::Cancel,
+        KeyCode::Tab => Key::Complete,
         KeyCode::Up => Key::RecallPrevious,
         KeyCode::Down => Key::RecallNext,
         _ => Key::Nothing,
@@ -456,6 +460,8 @@ mod tests {
         assert_eq!(command_for(KeyCode::Up, none), Key::RecallPrevious);
         assert_eq!(command_for(KeyCode::Down, none), Key::RecallNext);
         assert_eq!(command_for(KeyCode::F(1), none), Key::Nothing);
+        assert_eq!(command_for(KeyCode::Tab, none), Key::Complete);
+        assert_eq!(command_for(KeyCode::Esc, none), Key::Cancel);
     }
 
     #[test]

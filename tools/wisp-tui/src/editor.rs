@@ -63,6 +63,19 @@ impl Editor {
         self.cursor = self.chars.len();
     }
 
+    /// The cursor, as a character index.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// Replaces the characters from `from` to the cursor with `text`, leaving the cursor after it; a
+    /// `from` past the cursor inserts at the cursor.
+    pub fn replace(&mut self, from: usize, text: &str) {
+        let from = from.min(self.cursor);
+        self.chars.splice(from..self.cursor, text.chars());
+        self.cursor = from + text.chars().count();
+    }
+
     /// Takes the text, leaving the editor empty.
     pub fn take(&mut self) -> String {
         let text = self.text();
@@ -276,6 +289,16 @@ mod tests {
         );
         assert_eq!(after("abc def", 4, &Edit::KillToStart), ("def".into(), 0));
         assert_eq!(after("abc def", 3, &Edit::KillToEnd), ("abc".into(), 3));
+    }
+
+    #[test]
+    fn a_word_is_replaced_up_to_the_cursor() {
+        let mut ed = editor("/con rest", 4);
+        ed.replace(0, "/config ");
+        assert_eq!((ed.text(), ed.cursor()), ("/config  rest".into(), 8));
+        let mut past = editor("ab", 1);
+        past.replace(5, "x");
+        assert_eq!((past.text(), past.cursor()), ("axb".into(), 2));
     }
 
     #[test]

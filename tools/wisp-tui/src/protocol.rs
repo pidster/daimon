@@ -32,6 +32,16 @@ pub enum Outbound {
     Approval(Approval),
     /// A choice a chat command asks, such as `/config set`.
     Choice(Choice),
+    /// Candidates for a `complete` request.
+    Completions {
+        /// The request's id.
+        id: String,
+        /// The character index where the word being completed starts.
+        from: usize,
+        /// The words that fit.
+        #[serde(default)]
+        candidates: Vec<String>,
+    },
     /// wisp is exiting.
     Exit,
     /// Anything this version does not know.
@@ -151,6 +161,15 @@ pub enum Inbound {
         /// The text.
         text: String,
     },
+    /// A request for completions of the input line at a character index.
+    Complete {
+        /// The id the answer carries.
+        id: String,
+        /// The input line.
+        text: String,
+        /// The cursor, in characters.
+        cursor: usize,
+    },
     /// An answer to a choice; `None` is no answer.
     Choose {
         /// The choice's id.
@@ -244,6 +263,25 @@ mod tests {
             }
             .line(),
             "{\"type\":\"choose\",\"id\":\"c\",\"value\":null}\n"
+        );
+        assert_eq!(
+            Outbound::parse(
+                r#"{"type":"completions","id":"k1","from":0,"candidates":["/config"]}"#
+            ),
+            Outbound::Completions {
+                id: "k1".into(),
+                from: 0,
+                candidates: vec!["/config".into()]
+            }
+        );
+        assert_eq!(
+            Inbound::Complete {
+                id: "k1".into(),
+                text: "/con".into(),
+                cursor: 4
+            }
+            .line(),
+            "{\"type\":\"complete\",\"id\":\"k1\",\"text\":\"/con\",\"cursor\":4}\n"
         );
         assert_eq!(Outbound::parse(r#"{"type":"exit"}"#), Outbound::Exit);
         assert_eq!(Outbound::parse(r#"{"type":"future"}"#), Outbound::Unknown);

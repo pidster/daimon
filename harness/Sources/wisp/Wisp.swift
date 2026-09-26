@@ -387,6 +387,16 @@ struct Chat: AsyncParsableCommand {
         let send: @Sendable (String) -> Void = { line in
             out.withLock { $0.write(Data((line + "\n").utf8)) }
         }
+        // Completion answers beside the loop, which may be waiting for input; the slow options (the
+        // models, which ask each backend) are fetched once per session.
+        let options = CompletionOptions(fetch: Chat.configOptions(session: session))
+        router.onComplete { id, text, cursor in
+            Task {
+                let known = await options.all()
+                let result = ChatCompletion.complete(text, cursor: cursor) { known[$0.path] ?? [] }
+                send(ChatProtocol.encode("completions", ChatProtocol.completions(id: id, result)))
+            }
+        }
         let reader = Thread {
             while let line = readLine() { router.receive(line) }
             router.close()
@@ -1103,5 +1113,28 @@ struct ClassifierCommand: AsyncParsableCommand {
             for line in report.lines { print("  \(line)") }
             if !report.holdsTheHardRequirement { throw ExitCode.failure }
         }
+    }
+}
+
+/// The options completion offers per setting, fetched on first use and kept for the session.
+final class CompletionOptions: Sendable {
+    private let fetch: @Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option]
+    private let cache = Mutex<[String: [String]]?>(nil)
+
+    /// Creates a cache over `fetch`.
+    init(fetch: @escaping @Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option]) {
+        self.fetch = fetch
+    }
+
+    /// Every setting's options by path, fetching them the first time.
+    func all() async -> [String: [String]] {
+        if let cached = cache.withLock({ $0 }) { return cached }
+        var found: [String: [String]] = [:]
+        for setting in ConfigSettings.all {
+            let values = await fetch(setting).map(\.value)
+            if !values.isEmpty { found[setting.path] = values }
+        }
+        cache.withLock { $0 = found }
+        return found
     }
 }
