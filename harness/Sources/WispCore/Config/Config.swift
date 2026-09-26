@@ -145,7 +145,7 @@ public struct Config: Codable, Equatable, Sendable {
     public struct ApprovalConfig: Codable, Equatable, Sendable {
         /// Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`.
         public var threshold: ApprovalThreshold?
-        /// Which classifier runs beside the rules: `rules`, `system-model` (default), or `coreml`.
+        /// Which classifier runs beside the rules: `rules`, `system-model`, or `coreml` (default).
         public var classifier: RiskClassifierChoice?
         /// The pre-0.2 switch: `false` means `classifier: rules`. Read only when `classifier` is absent.
         public var useModel: Bool?
@@ -253,7 +253,9 @@ public struct Config: Codable, Equatable, Sendable {
             auditLimits: FileAuditSink.Limits(
                 maxFileBytes: audit?.maxFileBytes ?? 10 * 1024 * 1024, keepFiles: audit?.keepFiles ?? 5),
             approvalThreshold: approval?.threshold ?? .default,
-            approvalClassifier: approval?.classifier ?? ((approval?.useModel ?? true) ? .default : .rules),
+            // The pre-0.2 switch still means what it meant: `true` the on-device model, `false` the rules.
+            approvalClassifier: approval?.classifier
+                ?? approval?.useModel.map { $0 ? .systemModel : .rules } ?? .default,
             coremlModel: approval?.coremlModel, coremlMinimumConfidence: approval?.coremlMinimumConfidence ?? 0.6,
             approvalTimeout: (approval?.timeoutSeconds ?? 600) == 0 ? nil : .seconds(approval?.timeoutSeconds ?? 600),
             approvalLifetime: .seconds((approval?.persistDays ?? 30) * 24 * 3600),

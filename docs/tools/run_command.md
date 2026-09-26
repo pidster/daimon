@@ -60,8 +60,8 @@ so it can try something else.
 ### Risk classification and approval
 
 A line is split into its simple commands (chains, pipes, subshells, substitutions), and each part is
-classified `safe`, `moderate`, or `dangerous` by rules plus a classifier (the on-device model or a Core ML
-classifier; commands on the rules' read-only list skip it); at `moderate` or above a
+classified `safe`, `moderate`, or `dangerous` by rules plus a classifier (by default the Core ML classifier the release ships, or
+the on-device model; commands on the rules' read-only list skip it); at `moderate` or above a
 human is asked for that part, with the line shown for context, and approvals are remembered by program
 (`head *`): on the terminal in `chat`, through MCP elicitation in
 `mcp`, and refused in non-interactive `respond` unless `--yes`. Denials come back as

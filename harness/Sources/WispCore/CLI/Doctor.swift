@@ -98,7 +98,10 @@ public struct Doctor: Sendable {
             return Finding(name: "classifier", ok: false, detail: problem)
         }
         return Finding(
-            name: "classifier", ok: true, detail: "coreml model \(resolvedConfig.coremlModel ?? "?") prepares")
+            name: "classifier", ok: true,
+            detail:
+                "coreml model \(resolvedConfig.coremlModel ?? ClassifierStore.reference(ClassifierStore.defaultVersion()) + " (shipped)") prepares"
+        )
     }
 
     private func configuredModel() -> Finding {

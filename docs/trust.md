@@ -38,7 +38,8 @@ ML classifier), whatever the session runs on ([ADR 0013](decisions/0013-model-se
 ## When you are asked
 
 Every simple command in a line is classified `safe`, `moderate`, or `dangerous` by rules plus an
-on-device classifier, the model or a trained Core ML classifier (`approval.classifier`); a short list of
+on-device classifier, by default the Core ML classifier the release ships, or the on-device model
+(`approval.classifier`); a short list of
 read-only commands the rules know, such as `ls` or `git status`, is `safe` without asking a classifier
 ([approval](approval.md)). At `moderate` and above a person is asked: on the terminal in
 `chat`, through a dialog in your MCP client, and never in plain `wisp "…"`, which refuses instead

@@ -37,6 +37,13 @@ done
 [ -z "$missing" ] || { echo "not in the docs index:$missing (see docs/release.md, step 0)" >&2; exit 1; }
 [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || { echo "not on main" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean" >&2; exit 1; }
+START="$(git rev-parse HEAD)"
+# The binary is built from the working tree, so the tree and HEAD must stay as preflight found them
+# until the release is published: 0.13.0 shipped an edit made while its evals ran.
+unchanged() {
+    [ "$(git rev-parse HEAD)" = "$START" ] || { echo "HEAD moved during the release ($START to $(git rev-parse HEAD)); rerun" >&2; exit 1; }
+    [ -z "$(git status --porcelain)" ] || { echo "the working tree changed during the release; the build would not match $TAG:" >&2; git status --short >&2; exit 1; }
+}
 grep -q "^version = \"$VERSION\"" tools/wisp-tui/Cargo.toml || { echo "tools/wisp-tui/Cargo.toml version is not $VERSION" >&2; exit 1; }
 command -v cargo >/dev/null || { echo "cargo is needed to build wisp-tui" >&2; exit 1; }
 CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/Sources/WispCore/Audit/AuditEvent.swift)"
@@ -60,6 +67,7 @@ if [ -n "$(git status --porcelain harness/Sources/WispCore/Resources/measurement
 fi
 
 echo "==> build"
+unchanged
 (cd harness && swift build -c release)
 (cd tools && cargo build --release -q -p wisp-tui)
 BIN="harness/.build/release/wisp"
@@ -84,6 +92,7 @@ SHA="$(cut -d' ' -f1 "$OUT/$TARBALL.sha256")"
 ls -la "$OUT/$TARBALL"; echo "sha256 $SHA"
 
 echo "==> publish"
+unchanged
 remote git tag -a "$TAG" -m "wisp $VERSION"
 remote git push origin "$TAG"
 remote gh release create "$TAG" "$OUT/$TARBALL" "$OUT/$TARBALL.sha256" --title "wisp $VERSION" \

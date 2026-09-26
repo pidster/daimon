@@ -127,11 +127,11 @@ private struct Boom: WispTool {
         try Data(#"{"maxThreads":4}"#.utf8).write(to: home.configFile)
         let probes = Doctor.Probes(systemModel: { nil }, configuredModel: { _, _, _ in nil })
         var findings = Doctor(home: home, probes: probes).run()
-        #expect(findings[3].ok && findings[3].detail.hasSuffix("parses"))
-        #expect(Doctor(home: home, model: .ollama("q"), probes: probes).run()[2].detail == "ollama:q available")
+        #expect(findings[4].ok && findings[4].detail.hasSuffix("parses"))
+        #expect(Doctor(home: home, model: .ollama("q"), probes: probes).run()[3].detail == "ollama:q available")
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: root.path)
         findings = Doctor(home: home, probes: probes).run()
-        #expect(!findings[4].ok && findings[4].detail.contains("not writable"))
+        #expect(!findings[5].ok && findings[5].detail.contains("not writable"))
     }
 
     @Test func auditEventDecoderRejectsBadTimesAndRotatedNamesAreOrdered() throws {

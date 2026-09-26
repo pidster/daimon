@@ -220,7 +220,7 @@ import Testing
 
     @Test func configResolvesApproval() throws {
         #expect(Config().resolved.approvalThreshold == .level(.moderate))
-        #expect(Config().resolved.approvalUsesModel)
+        #expect(!Config().resolved.approvalUsesModel && Config().resolved.approvalClassifier == .coreml)
         #expect(Config(approval: .init(threshold: .never)).resolved.approvalThreshold == .never)
         #expect(
             Config(approval: .init(threshold: .level(.dangerous), useModel: false)).resolved.approvalThreshold

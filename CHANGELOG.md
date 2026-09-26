@@ -4,6 +4,22 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Changed:
+
+- The default risk classifier is the fast Core ML classifier this release ships (`approval.classifier:
+  coreml`), not the on-device model: on 996 real commands it rates more commands exactly (817 against
+  664), prompts on half as many safe ones, and answers in under a millisecond however busy the Mac is.
+  A configuration that sets `approval.classifier` keeps its choice, and `approval.useModel: true` still
+  means the on-device model. `wisp doctor` checks the classifier and names the shipped version.
+
+Fixed:
+
+- 0.13.0's published binary already had this default, but its source, notes, and docs did not; this
+  release is the build that matches them. `scripts/release` now refuses to publish when the working
+  tree or `HEAD` changes while it runs.
+
 ## 0.13.0
 
 Added:

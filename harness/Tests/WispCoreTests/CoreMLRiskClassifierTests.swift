@@ -148,8 +148,9 @@ import Testing
         let home = Home(root: FileManager.default.temporaryDirectory.appending(path: "wisp-cml-\(UUID().uuidString)"))
         try home.ensure()
         defer { try? FileManager.default.removeItem(at: home.root) }
-        #expect(Config().resolved.approvalClassifier == .systemModel)
+        #expect(Config().resolved.approvalClassifier == .coreml)
         #expect(Config(approval: .init(useModel: false)).resolved.approvalClassifier == .rules)
+        #expect(Config(approval: .init(useModel: true)).resolved.approvalClassifier == .systemModel)
         #expect(Config(approval: .init(classifier: .coreml, useModel: false)).resolved.approvalClassifier == .coreml)
         let file = home.configFile
         try Data(
@@ -180,8 +181,10 @@ import Testing
         let healthy = Doctor(home: home, config: good, probes: .live).run()
         #expect(healthy.contains { $0.name == "classifier" && $0.ok })
         #expect(
-            Doctor(home: home, config: Config().resolved, probes: .live).run().contains { $0.name == "classifier" }
-                == false)
+            Doctor(home: home, config: Config(approval: .init(classifier: .rules)).resolved, probes: .live).run()
+                .contains { $0.name == "classifier" } == false)
+        let shipped = Doctor(home: home, config: Config().resolved, probes: .live).run()
+        #expect(shipped.contains { $0.name == "classifier" && $0.ok && $0.detail.contains("-default (shipped)") })
         let views = Introspection(home: home, config: good)
         #expect(views.configuration.objectValue?["approval"]?.objectValue?["classifier"] == "coreml")
     }

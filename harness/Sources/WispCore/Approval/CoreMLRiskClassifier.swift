@@ -7,13 +7,15 @@ import Synchronization
 public enum RiskClassifierChoice: String, Codable, Sendable, CaseIterable {
     /// The rule set only: fast and deterministic.
     case rules
-    /// The rules plus Apple's on-device model; the default.
+    /// The rules plus Apple's on-device model.
     case systemModel = "system-model"
-    /// The rules plus a Core ML text classifier from `approval.coremlModel`.
+    /// The rules plus a Core ML text classifier from `approval.coremlModel`, or the version this build
+    /// ships when none is named; the default.
     case coreml
 
-    /// The default.
-    public static let `default` = RiskClassifierChoice.systemModel
+    /// The default: the fast classifier each release ships, which answers in under a millisecond however
+    /// busy the Mac is ([ADR 0041](../../../../docs/decisions/0041-shipped-classifier-is-the-default.md)).
+    public static let `default` = RiskClassifierChoice.coreml
 }
 
 /// A Core ML text classifier over the command line, run beside the rules

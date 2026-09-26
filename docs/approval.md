@@ -145,8 +145,8 @@ not an audit log is attached, and the refusals `respond` reports are those of th
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `threshold` | `moderate` | Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`. |
-| `classifier` | `system-model` | What runs beside the rules: `rules` (nothing; fast and deterministic), `system-model` (Apple's on-device model, about 2.3 s a command), or `coreml` (a Core ML text classifier, below, such as one `wisp classifier train` makes, about 0.05 ms a command). Independent of `model`. |
-| `useModel` | `true` | The pre-0.2 switch; `false` means `classifier: rules`. Read only when `classifier` is absent. |
+| `classifier` | `coreml` | What runs beside the rules: `coreml` (a Core ML text classifier, below: the version this release ships unless `coremlModel` names another, under a millisecond a command; [ADR 0041](decisions/0041-shipped-classifier-is-the-default.md)), `system-model` (Apple's on-device model, about 2 s a command, more when the Mac is busy), or `rules` (nothing; fast and deterministic). Independent of `model`. |
+| `useModel` | none | The pre-0.2 switch; `true` means `classifier: system-model`, `false` means `classifier: rules`. Read only when `classifier` is absent. |
 | `coremlModel` | the shipped default, `risk@X.Y.Z-default` | For `coreml`: a version, `risk@<version>`, from `~/.wisp/classifiers/risk`, or the `.mlmodel` or `.mlmodelc`, absolute, `~`, or under `<home>/models/coreml`. |
 | `coremlMinimumConfidence` | `0.6` | For `coreml`: below this top-label probability the verdict is raised to at least `moderate`. |
 | `timeoutSeconds` | `600` | How long an approval may go unanswered before it counts as declined; `0` waits forever. |
@@ -226,11 +226,12 @@ slowest). It exits 1 when a dangerous command is rated safe. Given a version it 
 records the result in its manifest, so `list` shows each version's latest score; `--classifier` and
 `--coreml-model` override the config otherwise. Measure a trained model on commands it did not learn from.
 
-Measured on 2026-09-26 over the 123-command eval set, the rules beside each: the default `system-model`
-rated 108 exactly at 1.3 to 2.3 s a command, with one dangerous command rated `moderate`; a classifier
-trained from the bundled examples rated 100 at 0.06 ms, and one trained with a Mac's audit log added up
-to 104, neither rating any command below its level. The trained classifier's misses are over-ratings, commands like `git status` rated
-`moderate`, which ask for approval needlessly; that is why it is not yet the default.
+Measured on 2026-09-26 over 996 real commands held out from all training, the rules beside each: the
+shipped default, trained on drafted and real commands, rated 817 exactly at 0.24 ms a command, with 129
+over and 50 under; `system-model` rated 664 at 2.5 s (P50), with 261 over and 71 under. The shipped
+default rated four dangerous commands safe, and `system-model` one. That is why the shipped default is
+the default ([ADR 0041](decisions/0041-shipped-classifier-is-the-default.md)), and why the dangerous
+commands need a larger test set.
 [measurements.md](measurements.md) has the current figures.
 
 ## Audit

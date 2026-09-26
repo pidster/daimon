@@ -121,14 +121,11 @@ contract 2, and latency in every classifier measurement. Next, in order:
   trained from `training/risk/train.tsv`, drafted and real commands. The rules know a short list of
   read-only commands, which skip the model, and rate printing a credential dangerous (ADR 0038,
   amendments).
-- **A trained classifier good enough to be the default.** The bar (ADR 0038): beside the rules, as many
-  commands rated exactly as `system-model` beside the rules, none under. On 2026-09-26, over 123: 108
-  for the default, 100 trained from the bundled examples, up to 104 with one Mac's audit log added. The
-  trained ones rate nothing below its level; the default rated one dangerous command `moderate`.
-  On the 996 real test commands, the shipped default trained from real commands rates 817 exactly
-  beside the rules, against 732 for the rules alone, but rates four of the 25 dangerous commands safe;
-  and `system-model` is still `approval.classifier`'s default (ADR 0038, amendment "trained on real
-  commands").
+- ~~**A trained classifier good enough to be the default.**~~ Done 2026-09-26 (ADR 0041). On the 996
+  real test commands, the shipped default, trained from drafted and real commands, rates 817 exactly
+  beside the rules (`system-model`: 664) at under a millisecond a command, and became
+  `approval.classifier`'s default. It rates four of the 25 dangerous commands safe (`system-model`:
+  one), three of them undecidable from the text; a dangerous-only test slice is next.
 - **Other providers.** Embedding nearest-neighbour over labelled examples (`NLEmbedding` or an Ollama
   embedding model), and an external process speaking JSON Lines, like the binaries in `tools/`.
 - **Other tasks.** Secret and personal-data detection for `redact`, log-line categories for

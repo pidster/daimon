@@ -87,8 +87,9 @@ obscurely. An agent can also start from a saved `Transcript`.
 `Approver` (`TerminalApprover`, `DenyingApprover`, `AutoApprover`, or the MCP `ElicitationApprover`).
 `CommandRunner` consults the gate after the policy check. See [approval.md](approval.md) and
 [ADR 0011](decisions/0011-risk-classifier-and-approval.md). The model beside the rules is
-`ModelRiskClassifier` (the on-device language model) or `CoreMLRiskClassifier` (a Core ML text
-classifier under contract 1 or 2), chosen by `approval.classifier`, and a session wraps whichever it
+`CoreMLRiskClassifier` (a Core ML text classifier under contract 1 or 2; the default, with the version
+the release ships, ADR 0041) or `ModelRiskClassifier` (the on-device language model), chosen by
+`approval.classifier`, and a session wraps whichever it
 uses in `TimedRiskClassifier` and `CachingRiskClassifier`. `RiskClassifierTraining` trains a contract-2
 model with Create ML from `RiskExample`s (the bundled `Resources/risk-examples.tsv`, a file, or
 `RiskExamples.fromAudit`), and `RiskMeasurement` measures any classifier's accuracy and latency; `wisp
@@ -193,7 +194,7 @@ tools do not share one control path: `run_command` passes the policy patterns, t
 ([ADR 0030](decisions/0030-notifications.md)).
 
 `RunCommandTool` is the generic exec tool. It delegates to `CommandRunner`, which checks the
-`CommandPolicy` patterns, consults `ApprovalGate` (rules plus on-device model classifier, ask at
+`CommandPolicy` patterns, consults `ApprovalGate` (rules plus a classifier, the shipped Core ML one by default, ask at
 `moderate` and above through an `Approver` per entry point), then spawns `/bin/sh -c` in its own process
 group (`posix_spawn`) under `sandbox-exec` with a profile rooted at the launch directory, captures stdout
 and stderr separately, kills the whole group on timeout, and keeps only the tail of each stream. The
