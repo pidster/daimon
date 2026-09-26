@@ -1031,7 +1031,7 @@ struct ClassifierCommand: AsyncParsableCommand {
             + "in well under a millisecond, the on-device language model in one to two seconds. Versions live in "
             + "~/.wisp/classifiers/risk: the default each release ships, never changed, and those trained here, "
             + "never overwritten.",
-        subcommands: [List.self, Train.self, Measure.self, Use.self, Remove.self, Ship.self, Split.self])
+        subcommands: [List.self, Train.self, Measure.self, Use.self, Remove.self, Ship.self, Split.self, Baseline.self])
 
     /// The store under wisp's home.
     static var store: ClassifierStore { ClassifierStore(home: Wisp.home) }
@@ -1208,6 +1208,32 @@ struct ClassifierCommand: AsyncParsableCommand {
                 throw ValidationError("\(failure)")
             }
             print("removed \(reference)")
+        }
+    }
+
+    /// Labels each line as wisp's rules do today, for comparing a trained classifier with them.
+    struct Baseline: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract:
+                "Print the label wisp's rules give each line: failures by KnownFailures, log-severity by LogDigest.",
+            shouldDisplay: false)
+
+        @Option(name: .long, help: "failures or log-severity.")
+        var task: String
+
+        @Option(name: .long, help: "Labelled lines; the output is the rules' label, a tab, and the line.")
+        var examples: String
+
+        func run() async throws {
+            for example in TrainingSplit.parse(try String(contentsOfFile: examples, encoding: .utf8)) {
+                let label: String
+                switch task {
+                case "failures": label = KnownFailures.scan(example.text).findings.first?.kind ?? "none"
+                case "log-severity": label = LogDigest.severity(of: example.text).rawValue
+                default: throw ValidationError("no baseline for \(task)")
+                }
+                print("\(label)\t\(example.text)")
+            }
         }
     }
 

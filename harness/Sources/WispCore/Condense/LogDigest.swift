@@ -151,7 +151,7 @@ public struct LogDigest: Sendable {
     ]
 
     /// The severity a line's words suggest.
-    static func severity(of line: String) -> Severity {
+    public static func severity(of line: String) -> Severity {
         for (severity, pattern) in severityPatterns
         where (try? RegexCache.regex(pattern))?.matches(anywhereIn: line) == true {
             return severity

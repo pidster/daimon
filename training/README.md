@@ -19,6 +19,9 @@ or the same words for lines under three words. `wisp classifier split` deals who
 families into parts, each label in proportion, the same way every time for a given seed, and
 `TrainingSetsTests` fails if any two parts of a task, or the shipped risk examples and the risk dev set,
 share an example exactly, after normalising, by family, or by near match. No overlap is allowed.
+`wisp classifier baseline --task failures|log-severity --examples <file>` prints the label today's
+rules give each line (`KnownFailures` for failures, `LogDigest`'s keywords for log severity), so a
+trained classifier can be compared with what it would replace.
 
 | Task | train | dev | test | Labels |
 | --- | --- | --- | --- | --- |
