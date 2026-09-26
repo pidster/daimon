@@ -53,8 +53,12 @@ public enum RiskClassifierTraining {
         let texts = examples.map { CoreMLRiskClassifier.Contract.preprocess($0.command) }
         let labels = examples.map(\.level.rawValue)
         let byLabel = Dictionary(grouping: zip(labels, texts), by: \.0).mapValues { $0.map(\.1) }
+        // Create ML holds back a random slice of the training data for its own validation unless told not
+        // to, which made two trainings on the same examples disagree on about 4% of predictions and threw
+        // examples away; wisp measures on its own held-out sets, so every example trains and the same
+        // examples always give the same model.
         let model = try MLTextClassifier(
-            trainingData: byLabel, parameters: .init(algorithm: .maxEnt(revision: 1)))
+            trainingData: byLabel, parameters: .init(validation: .none, algorithm: .maxEnt(revision: 1)))
         let correct = zip(texts, labels).filter { text, label in (try? model.prediction(from: text)) == label }.count
         let metadata = MLModelMetadata(
             author: "wisp classifier train", shortDescription: "wisp risk classifier, \(examples.count) examples",

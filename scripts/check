@@ -132,7 +132,7 @@ eval_() {
 
 # classifier-default: train the risk classifier this version ships, from the bundled examples, into
 # the embedded resource; run after WispVersion.current is bumped, and commit the resource with the bump.
-# Training is not deterministic, so the shipped file is what the release carries, measured by the eval.
+# The shipped file is what the release carries, measured by the eval.
 classifier_default() {
     echo "==> shipped classifier"
     (cd harness && swift build $SWIFT_SANDBOX -q && .build/debug/wisp classifier ship \

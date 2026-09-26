@@ -14,6 +14,12 @@ Added:
   overwrites one; `wisp classifier list`, `use`, and `remove` manage them, and `measure` records each
   result in the version's manifest. Versions live in `~/.wisp/classifiers/risk`.
 
+Fixed:
+
+- Training a risk classifier uses every example and gives the same classifier from the same examples:
+  Create ML held back a random slice of them for its own validation, so two trainings disagreed on about
+  4% of commands.
+
 ## 0.12.0
 
 Added:

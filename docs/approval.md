@@ -181,7 +181,7 @@ examples), the version in use when it was trained, and every measurement taken o
 ships a default, `risk@X.Y.Z-default`, trained once from the bundled examples when the release is
 prepared, measured by the eval, embedded in the binary, and written into the store on first use; it is
 never changed. `train` always adds a new version, `risk@X.Y.Z-local.<n>`, and never overwrites one;
-training is not deterministic, so two versions trained on the same examples can differ. `use` points
+the same examples always train the same classifier. `use` points
 `approval.classifier` at `coreml` and `approval.coremlModel` at the version, through the same checked,
 audited change as `/config set`; `remove` deletes a version trained here, but not the default and not
 the one in use. With `approval.classifier: coreml` and no `approval.coremlModel`, the release's default

@@ -100,6 +100,22 @@ import WispTestSupport
         #expect(EntryPoint(rawValue: "classifier") == .classifier)
     }
 
+    @Test func theSameExamplesAlwaysTrainTheSameClassifier() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-same-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let first = dir.appending(path: "a.mlmodel")
+        let second = dir.appending(path: "b.mlmodel")
+        _ = try RiskClassifierTraining.train(RiskExamples.bundled, writingTo: first, version: "v")
+        _ = try RiskClassifierTraining.train(RiskExamples.bundled.reversed(), writingTo: second, version: "v")
+        let a = CoreMLRiskClassifier(url: first, minimumConfidence: 0)
+        let b = CoreMLRiskClassifier(url: second, minimumConfidence: 0)
+        for example in RiskExamples.bundled {
+            let left = await a.classify(command: example.command, workingDirectory: "/tmp").level
+            let right = await b.classify(command: example.command, workingDirectory: "/tmp").level
+            #expect(left == right, "\(example.command)")
+        }
+    }
+
     @Test func trainingRefusesALevelWithNoExamples() {
         let url = scratch("none.mlmodel")
         #expect(throws: RiskClassifierTraining.Failure.missingLevel(.moderate)) {

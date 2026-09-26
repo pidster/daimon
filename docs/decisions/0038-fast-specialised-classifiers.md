@@ -134,3 +134,20 @@ same bundled examples on 2026-09-26 gave three different files, rating 99 and 10
   through the checked config change of ADR 0040; `remove` deletes one, but not the default and not the
   one in use; `measure` records its result in the manifest; `list` shows them all.
 
+## Amendment, 2026-09-26: training is deterministic; the variation was Create ML's hidden split
+
+The earlier amendment said training is not deterministic. That was wrong about the cause: Create ML's
+text classifier holds back a random slice of the training data for its own validation unless told not
+to, so two trainings on the same examples disagreed on 40 of 1,002 predictions, and every classifier
+trained so far learned from a random few percent less than it was given. With `validation: .none`,
+the same examples give the same predictions in any order (a unit test checks it), and every example
+trains; wisp measures on its own held-out sets instead. The shipped default is still committed as a
+file, which keeps a release's classifier plainly fixed, but it could now be reproduced from its
+examples.
+
+Every measurement before this change carried that noise, the learning curve and the comparisons of
+training sets included. Measured again, one run each: the bundled 292 rate 100 of the 123 eval commands
+exactly and 73 of 141 held-out commands neither set trained on; the reviewed set's 804 rate 102 and 76,
+with more under-ratings. So the larger set is not yet measurably better. The eval set has also served
+as both validation and test; the comparisons are repeated on a three-way split per task.
+
