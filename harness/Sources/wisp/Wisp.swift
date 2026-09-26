@@ -1215,10 +1215,11 @@ struct ClassifierCommand: AsyncParsableCommand {
     struct Baseline: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             abstract:
-                "Print the label wisp's rules give each line: failures by KnownFailures, log-severity by LogDigest.",
+                "Print the label wisp's rules give each line: risk by the risk rules (none when no rule matches), "
+                + "failures by KnownFailures, log-severity by LogDigest.",
             shouldDisplay: false)
 
-        @Option(name: .long, help: "failures or log-severity.")
+        @Option(name: .long, help: "risk, failures, or log-severity.")
         var task: String
 
         @Option(name: .long, help: "Labelled lines; the output is the rules' label, a tab, and the line.")
@@ -1228,6 +1229,10 @@ struct ClassifierCommand: AsyncParsableCommand {
             for example in TrainingSplit.parse(try String(contentsOfFile: examples, encoding: .utf8)) {
                 let label: String
                 switch task {
+                case "risk":
+                    let verdict = await RuleRiskClassifier.standard.classify(
+                        command: example.text, workingDirectory: ".")
+                    label = verdict.reasons == [RuleRiskClassifier.noSignals] ? "none" : verdict.level.rawValue
                 case "failures": label = KnownFailures.scan(example.text).findings.first?.kind ?? "none"
                 case "log-severity": label = LogDigest.severity(of: example.text).rawValue
                 default: throw ValidationError("no baseline for \(task)")

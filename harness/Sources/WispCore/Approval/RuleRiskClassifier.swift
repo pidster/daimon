@@ -132,6 +132,10 @@ public struct RuleRiskClassifier: RiskClassifier {
         Rule(start + #"(kill|pkill)\b"#, .moderate, "signals a process"),
     ]
 
+    /// The one reason given when no rule matches, so a caller can tell "safe by a rule" from "no rule
+    /// knew the command".
+    public static let noSignals = "no risk signals in the command text"
+
     /// Applies every rule and returns the highest level with all matching reasons.
     public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
         var level = RiskLevel.safe
@@ -140,7 +144,7 @@ public struct RuleRiskClassifier: RiskClassifier {
             level = max(level, rule.level)
             if !reasons.contains(rule.reason) { reasons.append(rule.reason) }
         }
-        if reasons.isEmpty { reasons = ["no risk signals in the command text"] }
+        if reasons.isEmpty { reasons = [Self.noSignals] }
         return RiskAssessment(level: level, reasons: reasons, sources: ["rules"])
     }
 }
