@@ -1,0 +1,544 @@
+# The train part of failures-flat.tsv, split by family with seed 1
+# (wisp classifier split); see training/README.md for the labels and rules.
+crash	fatal error: all goroutines are asleep - deadlock!
+none	remote: Resolving deltas: 100% (48/48), done.
+none	✔ Suite ErrorMappingTests passed after 0.041 seconds.
+error	ERROR tests/test_db.py::test_connect - psycopg.OperationalError: connection refused
+test-failure	# fail 1
+none	Running unittests src/lib.rs (target/debug/deps/ingest-4f1c2a9be0d3e71a)
+warning	warning "react-query > use-sync-external-store@1.2.0" has unmet peer dependency "react@^16.8.0 || ^17.0.0 || ^18.0.0".
+crash	exited with code 137 (OOMKilled)
+test-failure	[ERROR]   OrderServiceTest.refundsPartialOrder:61 expected: <150> but was: <100>
+crash	terminate called after throwing an instance of 'std::bad_alloc'
+crash	Container api exited with code 139
+warning	go: warning: "all" matched no packages
+error	error: emit-module command failed with exit code 1 (use -v to see invocation)
+error	clang: error: linker command failed with exit code 1 (use -v to see invocation)
+test-failure	FAIL    github.com/example/billing/internal/invoice    0.214s
+error	ERROR collecting tests/unit/test_cli.py
+warning	Sources/App/AppDelegate.swift:88:9: warning: will never be executed
+error	make: *** [Makefile:42: build/obj/server.o] Error 1
+none	test retry::tests::gives_up_after_three_failures ... ok
+error	npm error code ELIFECYCLE
+warning	warning: [deprecation] getActiveNetworkInfo() in ConnectivityManager has been deprecated
+warning	/Users/dev/proj/.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:291: PydanticDeprecatedSince20: Support for class-based `config` is deprecated
+none	tests/unit/test_errors.py::test_error_handling_returns_422 PASSED        [ 12%]
+error	error[E0382]: borrow of moved value: `config`
+error	src/report/render.py:9: error: Unused "type: ignore" comment  [unused-ignore]
+none	[INFO] Tests run: 58, Failures: 0, Errors: 0, Skipped: 2
+test-failure	/Users/dev/src/engine/tests/ring_test.cc:41: Failure
+none	expected error returned: ErrUnauthorized (ok)
+crash	PHP Fatal error:  Uncaught Error: Call to undefined function mb_strlen() in /srv/app/src/Text.php:14
+warning	/Users/dev/src/app/Sources/Net/Client.swift:61:13: warning: initialization of immutable value 'status' was never used; consider replacing with assignment to '_' or removing it
+test-failure	❯ src/utils/money.test.ts > formatCents > handles negative values
+error	gpg: signing failed: Inappropriate ioctl for device
+error	go: github.com/example/kit@v1.4.0: reading github.com/example/kit/go.mod at revision v1.4.0: unknown revision v1.4.0
+none	Done in 4.21s.
+test-failure	Error: expect(received).toHaveBeenCalledTimes(expected)
+error	##[error]The operation was canceled.
+test-failure	Failure/Error: expect(invoice.total).to eq(108.0)
+crash	Fatal error: Duplicate keys of type 'OrderID' were found in a Dictionary.
+none	Running tests with --no-fail-fast
+none	Testing error paths... done
+error	npm ERR! Missing script: "lint:ci"
+error	vet: internal/ledger/post.go:33:2: unreachable code
+none	Plan: 3 to add, 1 to change, 0 to destroy.
+error	[ERROR] /Users/dev/svc/src/main/java/com/example/svc/OrderService.java:[54,31] cannot find symbol
+none	note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+none	##[endgroup]
+test-failure	thrown: "Exceeded timeout of 5000 ms for a test.
+none	Bundle complete! 42 Gemfile dependencies, 118 gems now installed.
+test-failure	83% tests passed, 2 tests failed out of 12
+none	100% tests passed, 0 tests failed out of 12
+warning	warning: redundant clone
+warning	warning: unused manifest key: package.autobins
+none	at Module._compile (node:internal/modules/cjs/loader:1554:14)
+none	3 files changed, 41 insertions(+), 12 deletions(-)
+none	cc -O2 -Wall -c src/codec.c -o build/codec.o
+crash	zsh: killed     node --max-old-space-size=512 scripts/import.js
+error	ERROR tests/integration/test_payments.py - ModuleNotFoundError: No module named 'stripe_mock'
+error	./handlers/user.go:41:15: undefined: validateEmail
+warning	ld: warning: ignoring duplicate libraries: '-lz'
+crash	==51230==ERROR: LeakSanitizer: detected memory leaks
+none	✓ src/utils/money.test.ts (12 tests) 18ms
+warning	warning: 'swift-crypto': Invalid Resource 'README.md': File not found.
+crash	FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+crash	App/FeedViewController.swift:128: Fatal error: Index out of range
+crash	Swift/ContiguousArrayBuffer.swift:691: Fatal error: Index out of range
+none	Snapshots:   4 passed, 4 total
+error	fatal: unable to access 'https://github.com/example/kit.git/': Could not resolve host: github.com
+none	Resolve Package Graph
+none	at async Promise.all (index 3)
+error	src/report/render.py:42: error: Argument 1 to "format_row" has incompatible type "int"; expected "str"  [arg-type]
+test-failure	tests/test_codec.py:88: AssertionError
+none	got: 100.0
+test-failure	3 tests, 1 failure
+none	> Task :lint NO-SOURCE
+crash	Thread 3: EXC_BAD_ACCESS (code=1, address=0x10)
+test-failure	✕ rejects an expired coupon (7 ms)
+none	--- PASS: TestErrorWrapping (0.00s)
+none	- Expected  - 1
+none	Expected equality of these values:
+error	mix compile failed due to --warnings-as-errors
+warning	WARN  Issues with peer dependencies found
+none	Tests  241 passed (241)
+warning	/Users/dev/web/src/App.tsx 44:11  warning  React Hook useEffect has a missing dependency: 'load'  react-hooks/exhaustive-deps
+warning	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+warning	[WARNING] Some problems were encountered while building the effective model for com.example:svc:jar:1.8.0-SNAPSHOT
+error	error: Signing for "NotesWidget" requires a development team. Select a development team in the Signing & Capabilities editor.
+none	/Users/dev/src/cli/main.go:22 +0x1c
+none	tests/test_parse.py::test_legacy XFAIL (known bug)
+none	|                 ^^^^^^^^ expected `f64`, found `u32`
+none	Successfully installed idna-3.10 requests-2.32.3 urllib3-2.2.3
+none	=> [internal] load build definition from Dockerfile
+none	[ERROR] Failures:
+test-failure	Snapshot Summary › 1 snapshot failed from 1 test suite. Inspect your code changes or run `npm test -- -u` to update them.
+test-failure	Test failed: Expected <nil> but got <"timeout">
+error	ERROR: failed to solve: node:22-alpnie: failed to resolve source metadata for docker.io/library/node:22-alpnie: not found
+none	= note: `#[warn(dead_code)]` on by default
+warning	⚠ Compiled with warnings in 4.1s
+none	make: 'build/engine' is up to date.
+crash	==48121==ERROR: AddressSanitizer: heap-use-after-free on address 0x602000000a10 at pc 0x0001004c3f10
+none	--> src/ledger.rs:88:13
+none	Updating crates.io index
+error	app/models.py:17:5: F821 Undefined name `Decimal`
+error	curl: (22) The requested URL returned error: 404
+warning	/usr/local/bin/brew: warning: Treating `node@18` as a formula. For the cask, use homebrew/cask/node@18 or specify the `--cask` flag.
+error	make: *** No targets specified and no makefile found.  Stop.
+test-failure	panic: test timed out after 30s
+crash	fatal error: concurrent map writes
+error	failed to compute cache key: failed to calculate checksum of ref 3f2c: "/dist": not found
+test-failure	✘ Test decodesEmptyPayload() recorded an issue at PayloadTests.swift:31:7: Expectation failed: (decoded.items.count → 1) == 0
+none	ok      github.com/example/billing/internal/invoice    0.182s
+none	58 examples, 0 failures
+warning	w: file:///Users/dev/android/app/src/main/java/com/example/Feed.kt:22:9 Variable 'unused' is never used
+warning	warning: variable does not need to be mutable
+crash	error: process didn't exit successfully: `target/debug/ingest --file data.csv` (signal: 11, SIGSEGV: invalid memory reference)
+test-failure	[FAIL] InvoiceSpec > "rounds totals to cents"
+warning	include/config.h:7:9: warning: 'DEBUG' macro redefined [-Wmacro-redefined]
+warning	src/store.ts:9:7 - warning: 'unusedSelector' is assigned a value but never used.
+crash	Aborted (core dumped)
+none	[       OK ] RingBufferTest.FailsOnNullInput (0 ms)
+warning	Sources/Store/Cache.swift:12:7: warning: 'withUnsafeBytes' is deprecated: use `withUnsafeBytes<R>(_: (UnsafeRawBufferPointer) throws -> R) rethrows -> R` instead
+error	error[E0599]: no method named `unwrap_or_default` found for enum `Result` in the current scope
+crash	Fatal error: Unexpectedly found nil while unwrapping an Optional value
+none	left: 1250
+crash	Restarting after unexpected exit, crash, or test timeout in SyncTests.testLargeMerge(); summary will include totals from previous launches.
+crash	Swift runtime failure: arithmetic overflow
+test-failure	✕ renders the header with the user name (38 ms)
+error	fatal: not a git repository (or any of the parent directories): .git
+none	Building for debugging...
+none	at Object.<anonymous> (/Users/dev/web/scripts/seed.js:22:18)
+none	[14/88] Compiling Kit Box.swift
+none	9a1f0b3 Stop the build failing when the cache directory is missing
+none	CodeSign /Users/dev/Library/Developer/Xcode/DerivedData/Notes-abcd/Build/Products/Debug/Notes.app (in target 'Notes' from project 'Notes')
+crash	Error: EMFILE: too many open files, watch '/Users/dev/web/src'
+error	Command PhaseScriptExecution failed with a nonzero exit code
+none	hint: Using 'master' as the name for the initial branch. This default branch name is subject to change.
+none	No changes. Your infrastructure matches the configuration.
+none	[12/40] Compiling App ErrorView.swift
+crash	FATAL EXCEPTION: main
+none	> Task :app:compileDebugKotlin
+none	Progress: resolved 802, reused 790, downloaded 12, added 12, done
+error	Sources/Store/Cache.swift:44:9: error: cannot assign to value: 'count' is a 'let' constant
+crash	[BUG] Segmentation fault at 0x0000000000000008
+test-failure	Executed 88 tests, with 3 failures (0 unexpected) in 4.211 (4.230) seconds
+none	Executed 142 tests, with 0 failures (0 unexpected) in 2.803 (2.861) seconds
+none	Post job cleanup.
+none	##[group]Run swift test --parallel
+warning	Note: Some input files use unchecked or unsafe operations.
+none	Locking 212 packages to latest compatible versions
+none	webpack 5.94.0 compiled successfully in 2211 ms
+none	dist/assets/index-4f9c1b2e.js   212.41 kB │ gzip: 68.12 kB
+crash	UnicodeDecodeError: 'utf-8' codec can't decode byte 0x92 in position 418: invalid start byte
+error	Sources/Core/Queue.swift:201:17: error: sending 'job' risks causing data races
+test-failure	--- FAIL: TestRetryBackoff (2.00s)
+none	Downloaded tokio v1.40.0
+none	-- Build files have been written to: /Users/dev/src/engine/build
+none	Installed 3 packages in 9ms
+none	Compiling thiserror-impl v1.0.63
+crash	Trace/BPT trap: 5
+warning	Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+error	Error: error configuring S3 Backend: no valid credential sources for S3 Backend found.
+warning	WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+error	error: failed to push some refs to 'github.com:example/kit.git'
+test-failure	1 failed
+error	× No solution found when resolving dependencies:
+none	> web@0.4.0 build
+crash	Bus error: 10
+none	Switched to a new branch 'fix/error-toast'
+test-failure	Tests:       3 failed, 97 passed, 100 total
+error	error: failed to select a version for the requirement `serde = "^9.1"`
+crash	Exception Type:  EXC_CRASH (SIGABRT)
+warning	Warning: No 'version' field in package.json
+none	File "/Users/dev/proj/app/importer.py", line 41, in load_rows
+error	FAILED: src/CMakeFiles/engine.dir/render.cpp.o
+crash	[signal SIGSEGV: segmentation violation code=0x2 addr=0x18 pc=0x1045a3c]
+test-failure	FeedViewModelTest > loadsNextPage FAILED
+none	src/components/ErrorBoundary.tsx
+none	src/lib/errors.ts
+error	black....................................................................Failed
+none	ruff.....................................................................Passed
+error	OrderService.java:19: error: incompatible types: possible lossy conversion from long to int
+warning	warning: this `match` can be collapsed into the outer `if let`
+crash	** (exit) exited in: GenServer.call(App.Cache, {:get, :user}, 5000)
+none	[INFO] BUILD SUCCESS
+warning	Browserslist: caniuse-lite is outdated. Please run: npx update-browserslist-db@latest
+error	Execution failed for task ':app:compileDebugKotlin'.
+crash	zsh: segmentation fault  ./build/bin/engine --scene demo.json
+none	... 23 more
+error	error: this `if` has identical blocks
+warning	- SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "API_TOKEN") (line 9)
+error	/Users/dev/web/src/pages/index.jsx 12:9  error  'useEffect' is not defined  no-undef
+error	Found 3 errors in 2 files (checked 48 source files)
+error	sh: 1: jq: not found
+crash	Exception Type:  EXC_BAD_ACCESS (SIGSEGV)
+warning	warning  in ./src/index.css  Autoprefixer: Replace color-adjust to print-color-adjust.
+error	zsh: command not found: pyhton3
+error	[ERROR] BUILD FAILURE
+test-failure	AssertionError: expected 2 to equal 4
+none	64 files inspected, no offenses detected
+test-failure	Test Files  1 failed | 18 passed (19)
+warning	warning: the following packages contain code that will be rejected by a future version of Rust: nom v5.1.2
+none	[ RUN      ] RingBufferTest.RejectsOverflow
+error	cp: target/release/wisp-tui: No such file or directory
+test-failure	✘ Test "migration adds column" recorded an issue: Expectation failed: columns.contains("archived_at")
+error	/Users/dev/src/app/Sources/Net/Client.swift:118:22: error: cannot convert value of type 'Data?' to expected argument type 'Data'
+test-failure	[ERROR] Tests run: 14, Failures: 2, Errors: 0, Skipped: 1, Time elapsed: 0.482 s <<< FAILURE! -- in com.example.svc.OrderServiceTest
+test-failure	12 - net_retry (Failed)
+error	go: updates to go.mod needed; to update it: go mod tidy
+none	Computing version for https://github.com/apple/swift-argument-parser.git
+none	found 0 vulnerabilities
+none	goroutine 1 [running]:
+test-failure	Stack trace: AssertionError: Timed out retrying after 4000ms: Expected to find element: `[data-test=checkout]`, but never found it.
+none	Build succeeded    9/14/26, 9:18 AM    12.4 seconds
+none	Listening on http://127.0.0.1:5173/
+test-failure	✘ Test cancelsInFlightRequest() failed after 0.214 seconds with 2 issues.
+none	> vite build
+test-failure	E       AssertionError: assert 3 == 4
+none	frame #3: 0x0000000100003f10 engine`main + 60 at main.c:18
+error	error: externally-managed-environment
+none	Test Case '-[NotesTests.SyncTests testFastForward]' passed (0.004 seconds).
+crash	#  SIGSEGV (0xb) at pc=0x000000010a3f2b40, pid=5512, tid=0x0000000000002303
+none	Collecting requests>=2.31
+none	Test Suite 'SyncTests' started at 2026-09-14 09:12:03.100.
+warning	warning: variable "conn" is unused (if the variable is not meant to be used, prefix it with an underscore)
+none	Build complete! (14.21s)
+crash	* thread #1, queue = 'com.apple.main-thread', stop reason = EXC_BREAKPOINT (code=1, subcode=0x19a3c5e10)
+none	Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
+error	lib/hash.cpp:88:23: error: no matching function for call to 'hash_combine'
+warning	internal/cache/lru.go:22:2: SA4006: this value of `err` is never used (staticcheck)
+none	Binary Images:
+crash	RecursionError: maximum recursion depth exceeded while calling a Python object
+crash	Precondition failed: buffer must be non-empty: file Kit/Ring.swift, line 40
+test-failure	Tests/KitTests/BoxTests.swift:19: error: -[KitTests.BoxTests testUnboxNil] : XCTAssertNil failed: "Optional(3)"
+warning	##[warning]Node.js 16 actions are deprecated. Please update the following actions to use Node.js 20: actions/checkout@v3.
+error	src/api/client.ts(34,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+none	--------------------------------------------------------------------------------
+none	Fetching https://github.com/apple/swift-collections.git from cache
+none	✓ 1520 modules transformed.
+test-failure	Test Suites: 1 failed, 24 passed, 25 total
+none	CompileSwift normal arm64 /Users/dev/src/NotesApp/Notes/NoteStore.swift (in target 'Notes' from project 'Notes')
+none	Scenario: Guest checkout fails  # features/checkout.feature:12
+test-failure	error: test failed, to rerun pass `--lib`
+warning	/Users/dev/src/NotesApp/Notes.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 27.0.
+crash	[1]    40213 floating point exception  ./stats --window 0
+error	error: package `clap_builder v4.5.9` cannot be built because it requires rustc 1.74 or newer
+warning	FLAKY 2/3 [   1.204s] net::tests::reconnects
+test-failure	Mismatched snapshot in `src/__tests__/Header.test.tsx`
+crash	RangeError: Maximum call stack size exceeded
+crash	AddressSanitizer:DEADLYSIGNAL
+warning	src/net/socket.c:140:3: warning: implicit declaration of function 'close' is invalid in C99 [-Wimplicit-function-declaration]
+test-failure	✗ returns 404 for unknown id (12 ms)
+warning	1 warning found (use docker --debug to expand):
+none	1   libsystem_kernel.dylib            0x18c2f5a24 __pthread_kill + 8
+test-failure	FAIL: test_round_trip (tests.test_codec.CodecTests.test_round_trip)
+none	PASS  src/utils/failover.test.ts (5.1 s)
+crash	thread 'tokio-runtime-worker' panicked at 'called `Option::unwrap()` on a `None` value', src/worker.rs:88:22
+none	Sources/Net/Client.swift:30:10: note: 'upload(for:from:)' declared here
+warning	CMake Warning (dev) at CMakeLists.txt:5 (project):
+warning	│ Warning: Argument is deprecated
+error	✖ 2 problems (2 errors, 0 warnings)
+warning	✖ 5 problems (0 errors, 5 warnings)
+none	[==========] 44 tests from 7 test suites ran. (18 ms total)
+error	npm ERR! 404 Not Found - GET https://registry.npmjs.org/@example%2fui-kitt - Not found
+none	[INFO] Building svc 1.8.0-SNAPSHOT
+error	ERROR: No matching distribution found for numpyy
+crash	Illegal instruction: 4
+none	>       assert cache.keys() == ["b", "c"]
+none	OK (skipped=2)
+warning	WARNING: pip is configured with locations that require TLS/SSL, however the ssl module in Python is not available.
+test-failure	thread 'ledger::tests::rounds_half_even' panicked at src/ledger.rs:212:9:
+crash	thread 'main' panicked at src/bin/ingest.rs:57:34:
+crash	thread 'main' panicked at library/core/src/panicking.rs:221:5:
+none	Compiling anyhow v1.0.86
+error	ninja: build stopped: subcommand failed.
+none	PASS  src/components/__tests__/ErrorBoundary.test.tsx
+warning	[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+none	============================ 120 passed in 4.02s =============================
+error	ERR_PNPM_NO_MATCHING_VERSION  No matching version found for react-dom@19.9.0
+none	#7 CACHED
+test-failure	58 examples, 2 failures, 1 pending
+test-failure	1) UserTest#test_email_normalised [test/models/user_test.rb:22]:
+none	Packages: +12
+none	failures:
+none	2 pending
+none	#5 [builder 3/7] RUN npm ci --omit=dev
+warning	src/main.ts:4:1 lint/style/useConst ━━━━━━━━ This let declares a variable that is only assigned once.
+test-failure	1 scenario (1 failed)
+warning	UserWarning: X does not have valid feature names, but LogisticRegression was fitted with feature names
+none	Test Files  19 passed (19)
+test-failure	invoice_test.go:48: got 12.5, want 0
+test-failure	tests/test_cache.py::test_eviction_order FAILED                          [ 42%]
+test-failure	OrderRepositoryIT > findsByCustomer() FAILED
+error	E   ImportError: cannot import name 'soft_unicode' from 'markupsafe'
+none	Requirement already satisfied: certifi in ./.venv/lib/python3.13/site-packages (2024.8.30)
+error	error: pathspec 'relase/2.4' did not match any file(s) known to git
+warning	ld: warning: object file (/opt/homebrew/lib/libpng.a(png.o)) was built for newer macOS version (15.0) than being linked (14.0)
+none	ok      github.com/example/billing/internal/ledger    (cached)
+warning	npm WARN config production Use `--omit=dev` instead.
+none	Waiting for the debugger to attach...
+test-failure	FAIL src/components/__tests__/Cart.test.tsx
+none	---
+error	error: the package manifest at '/Users/dev/src/kit/Package.swift' cannot be accessed (/Users/dev/src/kit/Package.swift doesn't exist in file system)
+none	added 1284 packages, and audited 1285 packages in 22s
+test-failure	org.opentest4j.AssertionFailedError: expected: <150> but was: <100>
+crash	Termination Reason: Namespace SIGNAL, Code 6 Abort trap: 6
+error	ld: symbol(s) not found for architecture x86_64
+warning	npm WARN EBADENGINE Unsupported engine { package: 'vite@6.0.1', required: { node: '^18.0.0 || >=20.0.0' }, current: { node: 'v16.20.2' } }
+test-failure	✘ Suite TokenRefreshTests failed after 0.9 seconds with 3 issues.
+crash	AttributeError: 'NoneType' object has no attribute 'split'
+test-failure	not ok 7 - rejects malformed header
+none	PASS
+none	=================================== FAILURES ===================================
+crash	Program received signal SIGSEGV, Segmentation fault.
+none	27 actionable tasks: 9 executed, 18 up-to-date
+warning	Warning: Value for undeclared variable
+warning	app/controllers/orders_controller.rb:31:5: C: Style/GuardClause: Use a guard clause (return unless order) instead of wrapping the code inside a conditional expression.
+none	?       github.com/example/billing/cmd/billing    [no test files]
+crash	Abort trap: 6
+error	src/hooks/useCart.ts:18:24 - error TS2339: Property 'total' does not exist on type 'CartState'.
+error	Undefined symbols for architecture arm64:
+warning	warning: function `legacy_parse` is never used
+none	#12 exporting to image
+none	◇ Suite RetryPolicyTests started.
+error	Done linting! Found 2 violations, 2 serious in 64 files.
+none	Done linting! Found 0 violations, 0 serious in 64 files.
+crash	Unhandled exception. System.InvalidOperationException: Sequence contains no elements
+test-failure	OrderServiceTest > refundsPartialOrder() FAILED
+error	ERROR: failed to solve: process "/bin/sh -c pip install -r requirements.txt" did not complete successfully: exit code: 1
+none	[310/310] Linking CXX executable bin/engine
+crash	thread 'main' panicked at src/config.rs:31:10: failed to read config.toml: Os { code: 2, kind: NotFound }
+none	[42/310] Building CXX object src/CMakeFiles/engine.dir/render.cpp.o
+none	14 passing (212ms)
+none	HEAD is now at 9a1f0b3 Fail fast when the config is missing
+test-failure	testing.go:1465: race detected during execution of test
+warning	Sources/Kit/Log.swift:5:1: warning: File Length Violation: File should contain 400 lines or less: currently contains 512 (file_length)
+crash	*** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[__NSCFNumber length]: unrecognized selector sent to instance 0x8c1a'
+warning	WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError'
+none	Time:        6.312 s
+test-failure	_______________________________ test_refund_math _______________________________
+warning	[WARNING] The requested profile "ci" could not be activated because it does not exist.
+crash	Uncaught ReferenceError: process is not defined
+warning	warning: profiles for the non root package will be ignored, specify profiles at the workspace root
+test-failure	[FAIL] tests/e2e/login.spec.ts:22:5 › login › shows error on bad password
+none	rows = [parse(r) for r in reader]
+none	elapsed: 00:01:12
+none	ok 6 - returns an error object for bad input
+none	Ran all test suites.
+crash	[UnhandledPromiseRejection: This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). The promise rejected with the reason "ECONNREFUSED".]
+crash	zsh: abort      swift run wisp-bench
+none	✔ Test failsGracefullyOnEmptyInput() passed after 0.002 seconds.
+none	Test Case '-[NotesTests.SyncTests testUpload]' skipped (0.001 seconds).
+none	Successfully tagged api:latest
+test-failure	FAILED tests/api/test_orders.py::TestRefunds::test_partial_refund[eur] - assert 410 == 200
+warning	Sources/Kit/Box.swift:14:1: warning: Trailing Whitespace Violation: Lines should not have trailing whitespace (trailing_whitespace)
+crash	fatal runtime error: stack overflow
+crash	error: Exited with unexpected signal code 5
+error	error: No profiles for 'com.example.notes' were found: Xcode couldn't find any iOS App Development provisioning profiles matching 'com.example.notes'.
+error	make[2]: *** No rule to make target 'src/proto/api.pb.h', needed by 'src/net.o'.  Stop.
+none	Terraform has been successfully initialized!
+none	◇ Test rejectsMalformedHeader() started.
+none	def test_eviction_order(cache):
+crash	xctest (48812) encountered an error (Early unexpected exit, operation never finished bootstrapping - no restart will be attempted. (Underlying Error: The test runner crashed while preparing to run tests: Notes at <external symbol>))
+crash	Fatal Python error: Segmentation fault
+test-failure	❌ testSortsByDueDate, XCTAssertEqual failed: ("[3, 1, 2]") is not equal to ("[1, 2, 3]")
+error	./main.go:9:2: "strings" imported and not used
+error	npm ERR! code ERESOLVE
+crash	Segmentation fault: 11
+test-failure	✘ Test "parses ISO dates with offsets" recorded an issue at DateParsingTests.swift:58:9: Caught error: invalidFormat("2026-13-01")
+warning	Sources/Kit/Env.swift:3:5: warning: Identifier Name Violation: Variable name 'x' should be between 3 and 40 characters long (identifier_name)
+none	Compiled successfully in 1.8s
+crash	Segmentation fault (core dumped)
+error	An error occurred while installing pg (1.5.6), and Bundler cannot continue.
+none	# ./spec/models/invoice_spec.rb:37:in `block (3 levels) in <top (required)>'
+none	Test Suite 'All tests' passed at 2026-09-14 09:20:44.310.
+warning	Sources/App/Feed.swift:40:21: warning: main actor-isolated property 'items' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode
+warning	warning: struct `LegacyRow` is never constructed
+test-failure	Summary [   3.101s] 214 tests run: 212 passed, 2 failed, 0 skipped
+test-failure	session::tests::expires_after_ttl
+none	session::tests::expires_after_ttl: test
+none	✔ Test run with 212 tests in 31 suites passed after 6.113 seconds.
+error	error: failed to run custom build command for `openssl-sys v0.9.102`
+warning	warning: use of deprecated function `chrono::NaiveDateTime::from_timestamp`: use `DateTime::from_timestamp` instead
+error	app/views.py:88:1: E501 Line too long (104 > 88)
+test-failure	[FAILED] tests::integration::export_csv
+test-failure	tests/test_api.py ..F..s.E                                                [ 64%]
+test-failure	test result: FAILED. 41 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+warning	============ 64 passed, 2 warnings in 3.41s ============
+none	platform darwin -- Python 3.13.1, pytest-8.3.3, pluggy-1.5.0
+warning	warning: unexpected `cfg` condition name: `tokio_unstable`
+none	up to date, audited 412 packages in 1s
+none	at com.example.svc.OrderService.refund(OrderService.java:61)
+none	at java.base/java.lang.Thread.run(Thread.java:1583)
+test-failure	Assertion failed: (queue_len(q) == 0), function test_drain, file test_queue.c, line 88.
+crash	Assertion failed: (ptr != NULL), function pool_release, file pool.c, line 71.
+test-failure	expect(received).toBe(expected) // Object.is equality
+warning	3 high severity vulnerabilities
+none	Checking ingest v0.4.1 (/Users/dev/src/ingest)
+test-failure	Test Case '-[NotesTests.SyncTests testMergeConflict]' failed (0.031 seconds).
+none	rootdir: /Users/dev/proj
+none	[INFO] Total time:  18.402 s
+error	error: no matching package named `serde-json` found
+crash	sqlite3.OperationalError: database is locked
+error	** ARCHIVE FAILED **
+crash	IndexError: list index out of range
+error	bash: ./deploy.sh: Permission denied
+warning	warning: 'reflection-metadata' is an experimental feature and may be removed
+error	Sources/UI/Theme.swift:12:31: error: type 'Color' has no member 'accentGreen'
+test-failure	MISMATCH: golden file testdata/report.golden differs at line 14
+none	All checks passed!
+warning	/Users/dev/.rbenv/versions/3.3.4/lib/ruby/3.3.0/net/protocol.rb:68: warning: already initialized constant Net::ProtocRetryError
+error	** BUILD FAILED **
+error	[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project svc: Compilation failure
+error	ERROR: Could not find a version that satisfies the requirement torch==2.9.9 (from versions: 2.3.0, 2.4.1)
+none	--- PASS: TestFailoverPicksSecondary (0.12s)
+none	|
+crash	Received signal 6 (SIGABRT), dumping core
+error	ERROR: Coverage failure: total of 74 is less than fail-under=80
+crash	/Users/dev/app/lib/importer.rb:40:in `block in run': undefined method `strip' for nil (NoMethodError)
+test-failure	--- FAIL: TestInvoiceTotals (0.01s)
+none	/bin/sh -c /Users/dev/Library/Developer/Xcode/DerivedData/Notes-abcd/Build/Intermediates.noindex/Notes.build/Script-7F3A.sh
+test-failure	Test 'NotesUITests.testCreateNote()' failed on 'iPhone 17 Pro - iOS 27.0' (4.112 seconds)
+none	Downloading urllib3-2.2.3-py3-none-any.whl (126 kB)
+warning	/Users/dev/proj/app/util.py:14: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version.
+crash	KeyError: 'customer_id'
+warning	lib/pool.cpp:40:9: warning: unused variable 'guard' [-Wunused-variable]
+error	error TS5023: Unknown compiler option 'strictNullCheck'.
+warning	ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+crash	objc[5521]: Attempt to use unknown class 0x600003e1c240.
+error	Error: Process completed with exit code 1.
+none	Inspecting 64 files
+crash	fish: Job 1, './a.out' terminated by signal SIGSEGV (Address boundary error)
+none	running 64 tests
+none	make: Nothing to be done for 'all'.
+test-failure	✗ checkout.spec.js › applies free shipping over 50
+none	Checked 212 files in 38ms. No fixes applied.
+test-failure	rspec ./spec/models/invoice_spec.rb:37 # Invoice#total includes tax
+test-failure	2 failing
+test-failure	ERROR: test_connects (tests.test_db.DbTests.test_connects)
+error	##[error]The job running on runner GitHub Actions 12 has exceeded the maximum execution time of 360 minutes.
+error	/bin/sh: line 1: cd: build/out: No such file or directory
+none	OrderServiceTest > rejectsFailedPayment() PASSED
+test-failure	/Users/dev/src/app/Tests/AppTests/LoginTests.swift:44: error: -[AppTests.LoginTests testRejectsExpiredToken] : XCTAssertEqual failed: ("200") is not equal to ("401")
+none	The following build commands failed:
+error	error: subprocess-exited-with-error
+none	[  PASSED  ] 44 tests.
+error	[!] CocoaPods could not find compatible versions for pod "Firebase/Analytics":
+error	error: unused variable: `retries`
+warning	^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+test-failure	● Cart › removes the last item and shows the empty state
+none	✓ retries failed requests twice (3 ms)
+crash	memory allocation of 17179869184 bytes failed
+error	Found 7 errors in 3 files.
+none	Node.js v22.9.0
+test-failure	✘ Test importsLegacyCSV() recorded an issue at ImportTests.swift:102:11: #expect(rows.count == 3) → rows.count was 2
+error	CONFLICT (content): Merge conflict in src/app.ts
+test-failure	Tests: 1 failed, 1 flaky, 60 passed (2.1m)
+none	3 files reformatted, 41 files left unchanged
+none	[40/40] Linking FailureReporter
+crash	Exception in thread "pool-2-thread-1" java.lang.OutOfMemoryError: Java heap space
+error	tar: Error opening archive: Failed to open 'dist.tgz'
+test-failure	✘ Test "retries a 503 once" recorded an issue at RetryPolicyTests.swift:77:5: Issue recorded: expected a retry, got none
+none	> Task :app:test UP-TO-DATE
+crash	panic: runtime error: index out of range [5] with length 5
+none	Tests:       100 passed, 100 total
+none	Compiling error-chain v0.12.4
+error	** (CompileError) lib/app/router.ex:14: undefined function plug/2
+error	fatal error: 'openssl/evp.h' file not found
+none	collected 120 items
+crash	error: process exited with signal SIGSEGV
+test-failure	[XPASS(strict)] tests/test_parse.py::test_legacy
+error	[vite]: Rollup failed to resolve import "lodash-es/debounce" from "src/search.ts".
+warning	RuntimeWarning: coroutine 'fetch_all' was never awaited
+none	Generated coverage report: 87.4% of lines covered
+test-failure	AssertionError: expected '-$0.50' to deeply equal '($0.50)'
+test-failure	expected 'pending' to equal 'shipped'
+test-failure	Test Suite 'SyncTests' failed at 2026-09-14 09:12:03.118.
+error	│ Error: Unsupported argument
+none	note: Building targets in dependency order
+none	[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ svc ---
+warning	[!] The `Notes [Debug]` target overrides the `ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES` build setting defined in `Pods/Target Support Files/Pods-Notes/Pods-Notes.debug.xcconfig'.
+error	Error: Unable to resolve action `example/deploy-action@v2`, repository not found
+none	Build of product 'wisp' complete! (3.08s)
+warning	Sources/Core/Worker.swift:30:18: warning: capture of 'self' with non-sendable type 'Worker' in a '@Sendable' closure
+error	YN0001: │ Error: esbuild@npm:0.21.5: The remote archive doesn't match the expected checksum
+test-failure	[ERROR] Tests run: 203, Failures: 2, Errors: 1, Skipped: 4
+warning	warning: 'kit': found 2 file(s) which are unhandled; explicitly declare them as resources or exclude from the target
+test-failure	(Run Finished) ✖  1 of 6 failed (17%)
+none	Duration  2.41s (transform 310ms, setup 0ms, collect 1.2s, tests 402ms)
+error	error: could not compile `ingest` (lib) due to 4 previous errors; 1 warning emitted
+test-failure	--- FAIL: ExampleFormat
+warning	npm WARN deprecated inflight@1.0.6: This module is not supported, and leaks memory.
+error	include/ring.h:14:1: error: unknown type name 'uint128_t'
+none	Success: no issues found in 48 source files
+error	error Command failed with exit code 2.
+none	** BUILD SUCCEEDED **
+test-failure	4 runs, 9 assertions, 1 failures, 0 errors, 0 skips
+none	14 runs, 31 assertions, 0 failures, 0 errors, 0 skips
+test-failure	** TEST FAILED **
+crash	panic: runtime error: invalid memory address or nil pointer dereference
+error	ld: library 'ssl' not found
+warning	(!) Some chunks are larger than 500 kB after minification. Consider:
+test-failure	42 tests completed, 3 failed
+crash	Fatal error: Can't remove last element from an empty collection
+none	=== RUN   TestErrorWrapping
+none	Watching for file changes...
+test-failure	AssertionError: b'\x00\x01' != b'\x00\x02'
+error	app/models/user.rb:12:3: E: Lint/Syntax: unexpected token kEND
+none	^^^^^^^^^^^^^^^^^^^^^^^^^^
+error	Sources/Parser/Lexer.swift:59:14: error: switch must be exhaustive
+none	test errors::tests::maps_io_error_to_exit_code ... ok
+none	go: downloading golang.org/x/sync v0.8.0
+test-failure	--- FAIL: TestInvoiceTotals/zero_quantity (0.00s)
+crash	zsh: bus error  ./tools/pack --level 9
+warning	warning: 2 deprecated options found in .swiftlint.yml: 'unused_import', 'redundant_optional_initialization'
+none	vite v6.0.1 building for production...
+warning	(node:48213) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+crash	MemoryError
+none	[INFO] Downloading from central: https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.pom
+test-failure	1) test creates a post (App.PostTest)
+crash	Killed: 9
+test-failure	Failure: test_parses_dates(DateTest) [test/date_test.rb:14]:
+none	Finished in 0.41207 seconds (files took 1.21 seconds to load)
+error	error[E0433]: failed to resolve: use of undeclared crate or module `tokio`
+error	Module not found: Error: Can't resolve './components/Hedaer' in '/Users/dev/web/src'
+none	# github.com/example/billing/internal/ledger
+error	FAILURE: Build failed with an exception.
+warning	warning: LF will be replaced by CRLF in docs/setup.md.
+crash	Illegal hardware instruction  ./sim --arch avx512
+none	The following tests FAILED:
+test-failure	[  FAILED  ] RingBufferTest.WrapsAround (1 ms)
+warning	ld: warning: -bind_at_load is deprecated on macOS
+error	cmd/api/server.go:77:21: cannot use port (variable of type string) as int value in argument to listen
+error	error: could not find `Cargo.toml` in `/Users/dev/src/scratch` or any parent directory
+crash	Traceback (most recent call last):
+none	#0 building with "desktop-linux" instance using docker driver
+none	BUILD SUCCESSFUL in 41s
+test-failure	✘ Test run with 212 tests in 31 suites failed after 8.402 seconds with 4 issues.
+warning	Warning: Each child in a list should have a unique "key" prop.
+none	============================= test session starts ==============================
+none	-- Configuring done (1.2s)
+none	Linting Swift files in current working directory
+error	Could not resolve all files for configuration ':app:debugRuntimeClasspath'.
+warning	src/codec.c:98:15: warning: comparison of integers of different signs: 'int' and 'size_t' [-Wsign-compare]

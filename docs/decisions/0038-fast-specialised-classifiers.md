@@ -151,3 +151,19 @@ exactly and 73 of 141 held-out commands neither set trained on; the reviewed set
 with more under-ratings. So the larger set is not yet measurably better. The eval set has also served
 as both validation and test; the comparisons are repeated on a three-way split per task.
 
+## Amendment, 2026-09-26: train, dev, and test kept apart
+
+The 123 eval commands had served both to choose (the tokenisation, the training sets) and to report,
+and they had been kept apart from the training examples only exactly. Each task in `training/` now has
+three parts: train, dev for choosing, and test, frozen, for reporting. No overlap is allowed between any
+two, checked by `TrainingSetsTests` exactly, after normalising, by family (the text with names, paths,
+numbers, hashes, URLs, and quoted strings replaced), and by near match (80% of words shared); `wisp
+classifier split` deals whole families into parts. The 123 commands are the risk dev set, and the test
+sets come from real data: commands run here and labelled by a person, real build and test output, and
+this Mac's logs.
+
+The stricter check found eight of the bundled examples in the same family as dev commands (`cat
+package.json` beside `cat README.md`, two force-push forms, a password lookup); they are removed and the
+shipped default retrained without them. It also found near-copies inside the log set, made when written
+levels were added, which the split now keeps on one side.
+

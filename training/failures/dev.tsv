@@ -1,0 +1,98 @@
+# The dev part of failures-flat.tsv, split by family with seed 1
+# (wisp classifier split); see training/README.md for the labels and rules.
+crash	Fatal error: 'try!' expression unexpectedly raised an error: Kit.DecodeError.truncated(offset: 12)
+crash	Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+none	Working copy of https://github.com/apple/swift-log.git resolved at 1.6.1
+none	Run actions/checkout@v4
+none	Cloning into 'kit'...
+warning	➤ YN0000: · Done with warnings in 1s 204ms
+none	Starting a Gradle Daemon (subsequent builds will be faster)
+crash	Caused by: java.net.BindException: Address already in use
+none	[INFO] Scanning for projects...
+crash	thread 'main' has overflowed its stack
+none	0 errors, 0 warnings
+error	error[E0277]: the trait bound `Request: Serialize` is not satisfied
+none	Run options: --seed 51120
+error	error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+none	main.main()
+none	Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.44s
+crash	Thread 0 Crashed::  Dispatch queue: com.apple.main-thread
+none	= help: consider removing the borrow: `path`
+warning	/Users/dev/src/NotesApp/Notes/Assets.xcassets: warning: The app icon set "AppIcon" has an unassigned child.
+error	> Could not find com.example:analytics:3.2.1.
+none	Finished `release` profile [optimized] target(s) in 1m 02s
+crash	panic: assignment to entry in nil map
+none	Fetching gem metadata from https://rubygems.org/.........
+error	Error: Cannot find module '@babel/preset-env'
+test-failure	test ledger::tests::rounds_half_even ... FAILED
+warning	warning: Run script build phase 'SwiftLint' will be run during every build because it does not specify any outputs.
+test-failure	retry_test.go:77: backoff exceeded budget: got 2.1s, want <= 2s
+error	FAIL    github.com/example/billing/internal/ledger [build failed]
+none	-- The C compiler identification is AppleClang 17.0.0.17000013
+test-failure	--- FAIL: TestMigrateUp/add_index (0.03s)
+none	12 |     let total = subtotal + tax;
+error	swift-format: /Users/dev/src/kit/Sources/Kit/Box.swift: error: expected '}' in struct
+warning	(node:5120) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+none	#12 naming to docker.io/library/api:dev done
+error	npm ERR! ERESOLVE unable to resolve dependency tree
+warning	warning: unused import: `std::collections::HashMap`
+test-failure	[  FAILED  ] 2 tests, listed below:
+none	** TEST SUCCEEDED **
+error	/tmp/build/Sources/Model/Order.swift:77:5: error: 'async' call in a function that does not support concurrency
+warning	Sources/App/Settings.swift:22:10: warning: no calls to throwing functions occur within 'try' expression
+error	e: file:///Users/dev/android/app/src/main/java/com/example/Feed.kt:88:13 Unresolved reference: FeedAdapter
+test-failure	FAIL [   0.412s] ingest::parse tests::handles_bom
+none	# pass  12
+error	Sources/App/main.swift:3:8: error: no such module 'Collections'
+none	Resolved 3 packages in 212ms
+warning	DEPRECATION WARNING: `ActiveRecord::Base.default_timezone` is deprecated and will be removed in Rails 8.1
+none	✓ built in 3.82s
+test-failure	================= 2 failed, 118 passed, 3 skipped in 12.08s =================
+none	check yaml...........................................(no files to check)Skipped
+crash	ZeroDivisionError: float division by zero
+test-failure	1) checkout flow applies coupon:
+error	error: Dependencies could not be resolved because root depends on 'swift-argument-parser' 2.0.0..<3.0.0.
+crash	json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+test-failure	FAILED tests/unit/test_slugify.py::test_unicode_titles - AssertionError: assert 'caf' == 'cafe'
+none	✓ shows the fallback when a child throws (14 ms)
+none	=========================== short test summary info ============================
+error	src/codec.c:212:10: error: use of undeclared identifier 'frame_len'
+crash	*** error for object 0x6000012a8000: pointer being freed was not allocated
+warning	warning: redirecting to https://github.com/example/kit.git/
+none	Test Case '-[NotesTests.SyncTests testMergeConflict]' started.
+error	Jest: "global" coverage threshold for lines (80%) not met: 74.12%
+test-failure	XCTAssertTrue failed - Save button did not appear
+none	make[1]: Entering directory '/Users/dev/src/engine/build'
+none	Doc-tests ingest
+none	Failing tests:
+warning	WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager.
+none	=============================== warnings summary ===============================
+crash	libc++abi: terminating due to uncaught exception of type std::out_of_range: vector
+test-failure	E       assert {'id': 7, 'state': 'open'} == {'id': 7, 'state': 'closed'}
+test-failure	FAILED (failures=2, errors=1)
+crash	Exception in thread "main" java.lang.NullPointerException: Cannot invoke "String.length()" because "name" is null
+none	Randomized with seed 40211
+crash	# A fatal error has been detected by the Java Runtime Environment:
+error	CMake Error at CMakeLists.txt:23 (find_package):
+none	tests/unit/test_retry.py::test_fail_fast_disabled PASSED                 [ 30%]
+error	error: linking with `cc` failed: exit status: 1
+test-failure	NotesTests.SyncTests/testMergeConflict()
+warning	warning: `ingest` (lib) generated 3 warnings (run `cargo fix --lib -p ingest` to apply 2 suggestions)
+error	CMake Error: The source directory "/Users/dev/src/engine/build" does not appear to contain CMakeLists.txt.
+none	[fix/error-toast 4c1d2e9] Handle upload errors in the retry path
+warning	tests/test_http.py::test_redirects: PytestUnraisableExceptionWarning: Exception ignored in: <socket.socket fd=12>
+error	bundler: failed to load command: rake (/Users/dev/.gem/bin/rake)
+crash	TypeError: Cannot read properties of undefined (reading 'map')
+none	Expected: 0
+none	expected: 108.0
+test-failure	assertion `left == right` failed
+error	xcodebuild: error: Unable to find a destination matching the provided destination specifier:
+warning	CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
+crash	The command '/bin/sh -c ./configure && make' returned a non-zero code: 139
+none	tests/test_io.py ........s......                                         [ 55%]
+none	[88/88] Linking wisp
+none	tests/test_codec.py::test_decode SKIPPED (requires network)                [ 40%]
+warning	FutureWarning: The default value of numeric_only in DataFrameGroupBy.mean is deprecated.
+error	Sources/App/Router.swift:9:1: error: Line Length Violation: Line should be 160 characters or less; currently it has 187 characters (line_length)
+none	test result: ok. 64 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.52s
+error	Error: Invalid reference

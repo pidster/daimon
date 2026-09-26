@@ -1008,7 +1008,7 @@ struct ClassifierCommand: AsyncParsableCommand {
             + "in well under a millisecond, the on-device language model in one to two seconds. Versions live in "
             + "~/.wisp/classifiers/risk: the default each release ships, never changed, and those trained here, "
             + "never overwritten.",
-        subcommands: [List.self, Train.self, Measure.self, Use.self, Remove.self, Ship.self])
+        subcommands: [List.self, Train.self, Measure.self, Use.self, Remove.self, Ship.self, Split.self])
 
     /// The store under wisp's home.
     static var store: ClassifierStore { ClassifierStore(home: Wisp.home) }
@@ -1176,6 +1176,55 @@ struct ClassifierCommand: AsyncParsableCommand {
                 throw ValidationError("\(failure)")
             }
             print("removed \(reference)")
+        }
+    }
+
+    /// Splits a labelled set into parts no family spans, for the training sets in `training/`.
+    struct Split: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Split a labelled set into train and dev (and test) parts by family.", shouldDisplay: false)
+
+        @Option(name: .long, help: "The labelled set to split.")
+        var input: String
+
+        @Option(name: .long, help: "The directory to write the parts into.")
+        var out: String
+
+        @Option(name: .long, help: "Part names and shares, such as train=0.85,dev=0.15.")
+        var parts: String = "train=0.85,dev=0.15"
+
+        @Option(name: .long, help: "A set whose overlaps are removed from the input first, such as a fixed dev set.")
+        var exclude: String?
+
+        @Option(name: .long, help: "The seed that deals the families.")
+        var seed: UInt64 = 1
+
+        func run() async throws {
+            var examples = TrainingSplit.parse(try String(contentsOfFile: input, encoding: .utf8))
+            if let exclude {
+                let fixed = TrainingSplit.parse(try String(contentsOfFile: exclude, encoding: .utf8))
+                let clashing = Set(TrainingSplit.overlaps(fixed, examples).map(\.second))
+                examples.removeAll { clashing.contains($0.text) }
+                print("removed \(clashing.count) examples that overlap \(exclude)")
+            }
+            let named = parts.split(separator: ",").compactMap { part -> (String, Double)? in
+                let pieces = part.split(separator: "=")
+                return pieces.count == 2 ? Double(pieces[1]).map { (String(pieces[0]), $0) } : nil
+            }
+            let split = TrainingSplit.split(examples, fractions: named.map(\.1), seed: seed)
+            try FileManager.default.createDirectory(atPath: out, withIntermediateDirectories: true)
+            for ((name, _), part) in zip(named, split) {
+                let header = [
+                    "The \(name) part of \(URL(filePath: input).lastPathComponent), split by family with seed \(seed)",
+                    "(wisp classifier split); see training/README.md for the labels and rules.",
+                ]
+                try Data(TrainingSplit.write(part, header: header).utf8).write(
+                    to: URL(filePath: out).appending(path: "\(name).tsv"))
+                let labels = Dictionary(grouping: part, by: \.label).mapValues(\.count).sorted { $0.key < $1.key }
+                print(
+                    "\(name): \(part.count) examples (\(labels.map { "\($0.value) \($0.key)" }.joined(separator: ", ")))"
+                )
+            }
         }
     }
 

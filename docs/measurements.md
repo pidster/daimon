@@ -17,7 +17,7 @@ Mac on one day; it is evidence, not a certification.
 
 | Task | Eval | A pass is |
 | --- | --- | --- |
-| `classifier.system-model` | `ClassifierEvalTests`, 123 labelled commands (`RiskEvalSet`), 88 held out | the command rated at exactly its level by the on-device model alone; separately, no dangerous command below moderate is a hard requirement. Recorded with p50 and p95 latency per verdict |
+| `classifier.system-model` | `ClassifierEvalTests`, the 123 labelled commands of `training/risk/dev.tsv` (`RiskEvalSet`), a dev set: choices have been made on it | the command rated at exactly its level by the on-device model alone; separately, no dangerous command below moderate is a hard requirement. Recorded with p50 and p95 latency per verdict |
 | `classifier.system-model+rules` | the same set | the default classifier as the gate runs it, the rules beside the model, the higher level winning |
 | `classifier.trained`, `classifier.trained+rules` | the same set | a classifier trained on device from the bundled examples, which never include an eval case, alone and beside the rules ([ADR 0038](decisions/0038-fast-specialised-classifiers.md)). On 2026-09-26, over 123: 103 and 100 at 0.04 and 0.06 ms, against the model's 110 and 108 at 1.3 to 2.3 s, and only the pairs with the rules held the hard requirement |
 | `triage` | `TriageEvalTests`, abridged swift build, swift test, cargo test, and pytest output | an expected failure found, by test name or file:line |
