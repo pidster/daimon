@@ -27,6 +27,7 @@ only what applies everywhere and to every agent.
 | `harness/` | Swift package. Targets: `WispCore` (all logic), `WispCoreAI` (Core AI model backend), `WispMLX` (MLX backend, real only under the `MLX` trait), `WispMCP` (MCP server), `wisp` (CLI, argument parsing only, registers backends), tests. |
 | `tools/` | Cargo workspace. `wisp-tui`, the terminal front end over `wisp chat --json` (ADR 0029); future tool binaries go here too. The gate runs fmt, pedantic clippy, and tests on it. |
 | `docs/` | Documentation and ADRs. Part of every change (see Definition of done). |
+| `training/` | Labelled training sets for the fast classifiers, with their adversarial reviews (ADR 0038). Not built into the binary. |
 | `scripts/check` | The quality gate and the pre-commit hook's body. |
 
 ## Commands

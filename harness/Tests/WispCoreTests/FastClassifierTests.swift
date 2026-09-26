@@ -29,6 +29,9 @@ import WispTestSupport
             try RiskExamples.parse("safe\t   ")
         }
         #expect("\(RiskExamples.Problem(line: 3, reason: "x"))" == "line 3: x")
+        #expect(
+            try RiskExamples.parse("dangerous\tcat ~/.git-cre\u{200B}dentials")
+                == [RiskExample(command: "cat ~/.git-credentials", level: .dangerous)])
         let file = scratch("examples.tsv")
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

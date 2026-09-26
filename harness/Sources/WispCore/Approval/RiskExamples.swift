@@ -39,8 +39,11 @@ public enum RiskExamples {
     public static func parse(_ text: String) throws -> [RiskExample] {
         var examples: [RiskExample] = []
         for (index, raw) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-            // Spaces and a carriage return around the line go; a tab is the separator, so it stays.
-            let line = raw.trimmingCharacters(in: CharacterSet(charactersIn: " \r"))
+            // Spaces and a carriage return around the line go; a tab is the separator, so it stays. A
+            // U+200B, which training files put inside secret-looking values so scanners do not take the
+            // file for a leak, is removed, so no classifier learns it.
+            let line = raw.replacingOccurrences(of: "\u{200B}", with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: " \r"))
             if line.isEmpty || line.hasPrefix("#") { continue }
             guard let tab = line.firstIndex(of: "\t") else {
                 throw Problem(line: index + 1, reason: "expected level<TAB>command")

@@ -1,0 +1,596 @@
+# Labels match LogDigest's severities: fault (the process or a component died), error, warning, info.
+# LogDigest reads a declared level only from log show's type column; every other line reaches the
+# classifier as it is, so lines here carry written levels (ERROR, [warn], level=info, glog's E0926)
+# as often as not, and a written level can be wrong about the line (tricky cases near the end).
+# debug is folded into info, since LogDigest has no debug level; lines where a process died are fault.
+# Drafting notes follow; where they mention debug or fold fault into error, the lines above supersede them.
+# Labelled log lines for a severity classifier: one per line, `label<TAB>line`. Lines starting with `#`
+# are comments. Every line is a log line that carries NO declared level: no INFO/WARN/ERROR/DEBUG/TRACE/
+# FATAL tokens used as a level, no level=/"level":/severity= fields, no <N> syslog priorities, no
+# `log show` type columns, no [warn]-style tags. Those are read by LogDigest's declared-level parsing;
+# this classifier handles the rest. Words such as "error" or "failed" inside a message are allowed.
+#
+# Labels:
+# error   - an operation failed and was not recovered: HTTP 5xx in access logs, unhandled exceptions and
+#           stack-trace heads, crashes, panics, fatal signals (LogDigest's `fault` severity folds into
+#           `error` here), connections refused or lost after retries are exhausted, data corruption,
+#           failed jobs, failed deploys, a failed health check that takes a service out, disk full, OOM
+#           kills, an auth backend down.
+# warning - degraded but continuing: a retry (attempt 2 of 5), a timeout that will be retried, slow
+#           queries or requests over a threshold, deprecation notices, 429 rate limiting, 401 and 403 in
+#           access logs (possible misuse), high disk/memory/pool usage, certificates expiring soon, config
+#           falling back to defaults, clock skew, replication lag, a circuit breaker opening.
+# info    - normal lifecycle and business events: start, stop, listening, 2xx and 3xx access lines,
+#           404 and other ordinary 4xx (400, 405, 409, 410, 422) access lines, health check OK, jobs
+#           completed, migrations applied, audit lines (user signed in, role granted), CI steps that
+#           start or finish successfully, scheduled tasks run, cache warmed.
+# debug   - internal detail meant for developers: SQL echo with bind parameters, cache hit/miss per key,
+#           header dumps, function entry/exit, variable or state dumps, config resolution traces,
+#           per-tick timers, lock acquire/release, byte counts per chunk, retry-policy arithmetic with no
+#           failure implied, gRPC/HTTP2 frame traces.
+#
+# Judgement rules:
+# - Access logs are judged by status: 5xx error; 401, 403, 429 warning; 404 and other 4xx info (clients
+#   asking for missing or malformed things is ordinary traffic); 1xx/2xx/3xx info.
+# - A retry that will be attempted again is a warning even when the line says "failed"; the final
+#   attempt giving up is an error.
+# - A failed health probe the orchestrator will retry is a warning; the one that kills or removes the
+#   container or instance is an error. A passing probe is info.
+# - "0 errors", "error rate 0.0%", "no errors found", "0 failed" are info.
+# - A failed login in an audit trail is a warning (possible misuse, the system is fine); an account
+#   lockout after repeated failures is also a warning; a successful sign-in is info.
+# - Graceful shutdown on SIGTERM is info; an exit by signal (SIGSEGV, SIGABRT, SIGKILL) is an error.
+# - A deprecation notice is a warning even when phrased neutrally.
+# - Lines that mention an exception or error only as a name in a trace of normal behaviour (a handler
+#   registered, an error counter read as zero, an error page served from cache) are debug or info.
+# - A stack-trace head (the exception line) is error; this set holds no bare frame lines.
+# - Kubernetes events: Scheduled/Pulled/Created/Started are info; BackOff and Unhealthy are warning;
+#   OOMKilled, FailedMount after timeout, and Evicted are error.
+# All hosts, addresses, names and ids are synthetic (example.com/.internal, 192.0.2.0/24,
+# 198.51.100.0/24, 203.0.113.0/24).
+#
+# error
+#
+# warning
+#
+# info
+#
+# debug
+error	203.0.113.14 - - [26/Sep/2026:10:14:02 +0000] "POST /api/v1/orders HTTP/1.1" 500 187 "-" "okhttp/4.12.0"
+error	198.51.100.7 - - [26/Sep/2026:10:15:44 +0000] "GET /checkout HTTP/2.0" 502 552 "https://shop.example.com/cart" "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6)"
+error	192.0.2.41 - - [26/Sep/2026:10:16:09 +0000] "GET /reports/export?format=csv HTTP/1.1" 504 167 "-" "curl/8.7.1"
+error	192.0.2.88 - alice [25/Sep/2026:23:59:59 +0100] "PUT /v2/users/4412/avatar HTTP/1.1" 503 0 "-" "ExampleApp/3.2 (iPhone; iOS 18.1)"
+error	{"ts":"2026-09-26T08:12:03.221Z","method":"GET","path":"/graphql","status":500,"duration_ms":31,"upstream":"api-7f9c"}
+error	2026/09/26 10:22:31 upstream prematurely closed connection while reading response header from upstream, client: 203.0.113.9, server: api.example.com, request: "GET /v1/feed HTTP/1.1", upstream: "http://10.0.3.14:8080/v1/feed"
+error	2026/09/26 10:22:35 connect() failed (111: Connection refused) while connecting to upstream, client: 198.51.100.23, server: shop.example.com, upstream: "http://127.0.0.1:9000/"
+error	2026/09/26 10:30:12 open() "/var/www/static/app.js" failed (13: Permission denied), client: 192.0.2.5, server: static.example.com
+error	[Sat Sep 26 10:41:07.113245 2026] [pid 2211:tid 140213] [client 198.51.100.8:50122] AH00898: Error reading from remote server returned by /api/
+error	[Sat Sep 26 10:41:59.004120 2026] [pid 2230:tid 140288] [client 192.0.2.61:50990] PHP: Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes) in /srv/app/vendor/lib/Parser.php on line 311
+error	Traceback (most recent call last):
+error	psycopg2.OperationalError: could not connect to server: Connection refused
+error	django.db.utils.IntegrityError: duplicate key value violates unique constraint "accounts_user_email_key"
+error	Internal Server Error: /api/invoices/2231/pdf
+error	ActionView::Template::Error (undefined method `name' for nil:NilClass):
+error	Completed 500 Internal Server Error in 212ms (ActiveRecord: 14.2ms | Allocations: 50123)
+error	ActiveRecord::ConnectionNotEstablished (connection to server at "db.internal" (10.0.2.8), port 5432 failed: the database system is shutting down)
+error	NoMethodError: undefined method `each' for nil (NoMethodError)
+error	Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
+error	Exception in thread "kafka-producer-network-thread | producer-1" org.apache.kafka.common.KafkaException: Failed to construct kafka producer
+error	org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'entityManagerFactory' defined in class path resource
+error	Application run failed
+error	java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms.
+error	Caused by: java.net.ConnectException: Connection refused
+error	TypeError: Cannot read properties of undefined (reading 'map')
+error	UnhandledPromiseRejection: This error originated either by throwing inside of an async function without a catch block
+error	Error: listen EADDRINUSE: address already in use :::3000
+fault	[nodemon] app crashed - waiting for file changes before starting...
+fault	panic: runtime error: invalid memory address or nil pointer dereference
+fault	panic: assignment to entry in nil map
+fault	fatal error: concurrent map writes
+fault	fatal error: all goroutines are asleep - deadlock!
+fault	2026/09/26 11:03:14 http: panic serving 198.51.100.12:51422: runtime error: index out of range [3] with length 3
+error	2026/09/26 11:04:02 failed to start server: listen tcp :8443: bind: permission denied
+fault	thread 'tokio-runtime-worker' panicked at src/handlers/upload.rs:88:31: called `Result::unwrap()` on an `Err` value: Os { code: 28, kind: StorageFull, message: "No space left on device" }
+fault	Fatal error: Unexpectedly found nil while unwrapping an Optional value
+fault	Swift/ContiguousArrayBuffer.swift:600: Fatal error: Index out of range
+fault	Server shutting down after an unrecoverable error: NIOPosix.NIOConnectionError(host: "db.internal", port: 5432, dnsAError: nil)
+error	** (DBConnection.ConnectionError) connection not available and request was dropped from queue after 2714ms
+error	** (exit) exited in: GenServer.call(MyApp.Cache, {:get, "user:9"}, 5000)
+error	GenServer MyApp.Billing.Worker terminating
+error	Sep 26 10:01:44 build-01 kernel: Out of memory: Killed process 31244 (java) total-vm:8123344kB, anon-rss:6021480kB
+error	Sep 26 10:01:44 build-01 kernel: EXT4-fs (sdb1): Remounting filesystem read-only
+error	Sep 26 10:07:12 web-03 kernel: nvme0n1: I/O 812 QID 3 timeout, aborting
+error	Sep 26 10:07:40 web-03 kernel: blk_update_request: I/O error, dev sda, sector 98713344 op 0x0:(READ)
+error	Sep 26 10:12:05 web-03 systemd[1]: api.service: Main process exited, code=killed, status=9/KILL
+fault	Sep 26 10:12:05 web-03 systemd[1]: api.service: Failed with result 'oom-kill'.
+error	Sep 26 10:15:21 worker-2 systemd[1]: Failed to start PostgreSQL 16 database server.
+error	Sep 26 10:15:21 worker-2 systemd[1]: nginx.service: Control process exited, code=exited, status=1/FAILURE
+error	Sep 26 09:44:10 mbp-dev com.apple.xpc.launchd[1] (com.example.syncd[8812]): Service exited due to SIGSEGV | sent by exc handler[8812]
+warning	Sep 26 09:44:11 mbp-dev com.apple.xpc.launchd[1] (com.example.agent): Service only ran for 0 seconds. Pushing respawn out by 10 seconds.
+fault	2026-09-26 09:51:03.114 ReportCrash[1432]: Saved crash report for Notes[1411] version 4.11 to Notes-2026-09-26-095103.ips
+fault	Thread 0 Crashed:: Dispatch queue: com.apple.main-thread
+error	Exception Type:  EXC_BAD_ACCESS (SIGSEGV)
+fault	Termination Reason: Namespace SIGNAL, Code 6 Abort trap: 6
+error	Assertion failed: (refcount > 0), function release_node, file tree.c, line 214.
+fault	Segmentation fault (core dumped)
+error	could not write to file "pg_wal/xlogtemp.4121": No space left on device
+error	invalid page in block 4410 of relation base/16384/24601
+error	database system was interrupted while in recovery at 2026-09-26 03:12:44 UTC
+error	MISCONF Redis is configured to save RDB snapshots, but it's currently unable to persist to disk.
+error	Background saving terminated with success=0 (error saving)
+error	Can't save in background: fork: Cannot allocate memory
+error	[MY-012592] [InnoDB] Operating system error number 28 in a file operation.
+error	[MY-010119] [Server] Aborting
+error	{"t":{"$date":"2026-09-26T10:40:01.002Z"},"c":"STORAGE","id":22435,"ctx":"conn18","msg":"WiredTiger error message","attr":{"error":-31802,"message":"WT_ERROR: non-specific WiredTiger error"}}
+error	[2026-09-26 10:44:13,221] [Controller id=2] Controller failed to elect leader for partition orders-7; no live replicas
+error	[2026-09-26T10:47:30,118][o.e.b.ElasticsearchUncaughtExceptionHandler] [node-es-2] uncaught exception in thread [main]
+error	cluster health status changed from [YELLOW] to [RED] (reason: [shards failed [[logs-2026.09.26][0]] ...])
+error	Process completed with exit code 1.
+error	Finished: FAILURE
+error	Build step 'Execute shell' marked build as failure
+error	🚨 Step "Deploy to production" exited with status 137
+error	Job "nightly-backup" run 4471 exited 2 after 3h12m; archive not uploaded
+fault	deploy of api@a91f3c2 to production aborted: 3 of 4 instances failed to become healthy; rolled back
+error	Deployment "checkout-web" exceeded its progress deadline
+error	OOMKilled  pod/ingest-worker-6b7c9-hx2lm  Container ingest was OOMKilled (exit code 137)
+error	Evicted  pod/cache-0  The node was low on resource: ephemeral-storage. Container redis was using 12Gi, which exceeds its request of 0.
+error	FailedMount  pod/db-0  Unable to attach or mount volumes: timed out waiting for the condition
+error	Liveness probe failed 3 consecutive times; container api killed and will be restarted
+error	Instance i-0abc12de345f67890 failed ELB health checks and was deregistered from target group web-prod
+error	cache node cache-4.internal unreachable after 5 attempts, giving up
+error	sync with upstream failed after 6 attempts (last: dial tcp 192.0.2.40:443: i/o timeout); aborting run
+warning	payment capture for order 88412 failed: card_declined; order marked unpaid
+error	webhook delivery to https://hooks.example.com/in abandoned after 10 attempts (last status 503)
+error	LDAP bind to ldap.corp.example.com:636 failed: Can't contact LDAP server; all logins are rejected
+error	OAuth token endpoint https://auth.example.com/oauth/token returned 503; sessions cannot be refreshed
+error	checksum mismatch for chunk 0x3fa2 in segment 000000010000004A00000017; segment discarded
+error	backup verification failed: restored row count 1,204,331 does not match source 1,204,902
+fault	migration 20260926_add_invoice_index aborted: lock timeout; schema left at 20260919_add_tax_code
+error	cannot allocate memory for shared buffers (requested 8589934592 bytes)
+error	docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed
+error	dockerd[1022]: container 5f2a9c health status changed to unhealthy; restart policy exhausted, container stopped
+error	cron[31921]: (backup) CMD (/usr/local/bin/backup.sh) exited with status 1
+error	rsync: [sender] write error: Broken pipe (32)
+error	rsync error: error in rsync protocol data stream (code 12) at io.c(228) [sender=3.2.7]
+error	tar: /Volumes/Backup/2026-09-26.tar: Cannot write: No space left on device
+error	ssl handshake with 198.51.100.44:443 failed: certificate has expired; request dropped
+error	Unhandled exception. System.InvalidOperationException: Sequence contains no elements
+error	Process terminating with default action of signal 11 (SIGSEGV)
+error	Killed: 9
+error	worker 14 died unexpectedly (signal 6), 212 in-flight jobs lost
+error	queue consumer stopped: poison message 7fe1c0 redelivered 25 times, moved to dead-letter and consumer halted
+error	S3 PutObject for logs/2026/09/26/app.log.gz returned 500 InternalError; upload not retried
+error	Service 'search' has no healthy endpoints; returning 503 to all callers
+error	app exited with code 1 before binding to $PORT; release failed
+error	Failed to acquire leader lease: etcdserver: request timed out; node stepping down and exiting
+error	certificate renewal for shop.example.com failed: acme: urn:ietf:params:acme:error:rateLimited; current certificate expired 2026-09-25
+warning	198.51.100.61 - - [26/Sep/2026:10:18:14 +0000] "POST /login HTTP/1.1" 401 38 "-" "python-requests/2.32.3"
+warning	203.0.113.200 - - [26/Sep/2026:10:18:22 +0000] "GET /admin/settings HTTP/1.1" 403 153 "-" "Mozilla/5.0 (X11; Linux x86_64)"
+warning	192.0.2.77 - - [26/Sep/2026:10:19:01 +0000] "GET /api/search?q=shoes HTTP/1.1" 429 61 "-" "ExampleCrawler/1.0"
+warning	{"ts":"2026-09-26T08:13:44.019Z","method":"DELETE","path":"/api/projects/77","status":403,"duration_ms":4,"user":"u_4412"}
+warning	10.0.4.12 - - [26/Sep/2026:10:20:15 +0000] "GET /.env HTTP/1.1" 403 146 "-" "Go-http-client/1.1"
+warning	2026/09/26 10:25:47 limiting requests, excess: 20.520 by zone "api", client: 203.0.113.50, server: api.example.com, request: "GET /v1/prices HTTP/1.1"
+warning	2026/09/26 10:26:02 an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/4/12/0000000124 while reading upstream
+warning	2026/09/26 10:26:40 upstream server temporarily disabled while connecting to upstream, client: 192.0.2.19, server: api.example.com
+warning	[Sat Sep 26 10:42:30.551020 2026] [pid 1990:tid 140102] AH00484: server reached MaxRequestWorkers setting, consider raising the MaxRequestWorkers setting
+warning	[Sat Sep 26 10:43:12.000431 2026] [pid 1990:tid 140102] AH01909: www.example.com:443:0 server certificate does NOT include an ID which matches the server name
+warning	retrying request to https://api.example.com/v2/sync (attempt 2 of 5) after failure: connection reset by peer
+warning	upload of part 14/40 failed, retrying in 4s
+warning	POST /v1/events timed out after 10s; will retry (1/3)
+warning	Redis connection lost, reconnecting in 500ms (attempt 3)
+warning	Kafka broker kafka-2.internal:9092 disconnected; attempting reconnect
+warning	Slow query (1843 ms): SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC
+warning	duration: 5231.402 ms  statement: UPDATE inventory SET reserved = reserved + 1 WHERE sku = 'SKU-2231'
+warning	request GET /dashboard took 7.4s (threshold 3s)
+warning	`ActiveRecord::Base.default_timezone` is deprecated and will be removed from Rails 8.1
+warning	RemovedInDjango60Warning: The USE_L10N setting is deprecated. Starting with Django 6.0, localized formatting of data will always be enabled.
+warning	(node:48122) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+warning	The 'spring.datasource.initialization-mode' property is deprecated; use 'spring.sql.init.mode' instead
+warning	Using a password on the command line interface can be insecure.
+warning	config key "cache.ttl" not set; falling back to default 300s
+warning	no locale data for "pt-AO"; falling back to "pt"
+warning	SMTP_HOST not set, emails will be written to the console instead of sent
+warning	HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1m12s).
+warning	clock skew of 2.8s detected against ntp.example.com; tokens may be rejected
+warning	replica lag is 47s behind primary db-primary.internal (threshold 30s)
+warning	Replication lag on shard 3 is 1m04s; reads routed to primary
+warning	circuit breaker "inventory-service" opened after 12 failures in 30s; requests will fail fast for 60s
+warning	disk usage on /var/lib/docker at 91% (threshold 85%)
+warning	heap usage 88% of 4096MB after full GC; consider increasing -Xmx
+warning	connection pool at 95% capacity (19/20 in use), 7 requests waiting
+warning	certificate for api.example.com expires in 9 days (2026-10-05T00:00:00Z)
+warning	TLS certificate for mail.example.com will expire in 72 hours; renewal has not succeeded yet
+warning	failed login for user m.okafor@example.com from 198.51.100.7 (bad password)
+warning	3 failed sign-in attempts for account u_2231 in 5 minutes; account locked for 15 minutes
+warning	sudo: dmitri : 3 incorrect password attempts ; TTY=ttys003 ; PWD=/Users/dmitri ; USER=root ; COMMAND=/bin/ls
+warning	sshd[9214]: Invalid user admin from 203.0.113.99 port 51432
+warning	sshd[9230]: Failed password for root from 203.0.113.99 port 51490 ssh2
+warning	Readiness probe failed: Get "http://10.244.1.7:8080/ready": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+warning	BackOff  pod/api-5d8f7b-q2x9z  Back-off restarting failed container api in pod api-5d8f7b-q2x9z
+warning	Unhealthy  pod/web-0  Liveness probe failed: HTTP probe failed with statuscode: 500
+warning	FailedScheduling  pod/batch-7x  0/6 nodes are available: 6 Insufficient memory. preemption: 0/6 nodes are available
+warning	health check for web-2 failed (1 of 3), will check again in 10s
+warning	Sep 26 10:03:11 build-01 kernel: TCP: request_sock_TCP: Possible SYN flooding on port 443. Sending cookies.
+warning	Sep 26 10:04:02 build-01 kernel: CPU3: Core temperature above threshold, cpu clock throttled (total events = 12)
+error	Sep 26 10:05:40 web-03 systemd[1]: api.service: Watchdog timeout (limit 30s)!
+warning	Sep 26 10:05:51 web-03 systemd-journald[412]: Journal file /var/log/journal/a1b2/system.journal is truncated, ignoring file.
+warning	Sep 26 09:40:22 mbp-dev com.apple.xpc.launchd[1] (com.example.helper): This service is defined to be constantly running and is inherently inefficient.
+warning	2026-09-26 09:40:31.228 mds[312]: (Volume.Normal) Indexing of /Volumes/Scratch is disabled because the volume is too slow
+warning	2026-09-26 09:41:02.991 WindowServer[188]: CGXDisplayDidWakeNotification: display took 2.4s to wake
+warning	checkpoints are occurring too frequently (18 seconds apart)
+warning	autovacuum: found orphan temp table "pg_temp_3"."tmp_import" in database "app"
+error	out of shared memory
+warning	You have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis.
+warning	Client id=412 addr=192.0.2.60:51122 scheduled to be closed ASAP for overcoming of output buffer limits.
+warning	[MY-010068] [Server] CA certificate ca.pem is self signed.
+warning	[MY-011810] [Server] Insecure configuration for --pid-file: Location '/tmp' in the path is accessible to all OS users.
+warning	{"t":{"$date":"2026-09-26T10:40:22.113Z"},"c":"COMMAND","id":51803,"ctx":"conn41","msg":"Slow query","attr":{"ns":"shop.orders","durationMillis":2211,"planSummary":"COLLSCAN"}}
+warning	[2026-09-26 10:45:01,013] [ReplicaFetcher replicaId=1, leaderId=3, fetcherId=0] Error sending fetch request (sessionId=1422, epoch=812) to node 3: retrying
+info	[2026-09-26 10:45:18,772] Consumer group payments-cg is rebalancing; 4 partitions revoked
+warning	[2026-09-26T10:48:02,114][o.e.c.r.a.DiskThresholdMonitor] [node-es-1] high disk watermark [90%] exceeded on [node-es-1]; shards will be relocated away from this node
+warning	[2026-09-26T10:48:40,201][o.e.m.j.JvmGcMonitorService] [node-es-3] [gc][young][41022][812] duration [1.4s], collections [1]/[1.9s], total [1.4s]/[3.1m]
+warning	Node.js 16 actions are deprecated. Please update the following actions to use Node.js 20: actions/checkout@v3
+info	Cache not found for input keys: npm-Linux-4f1c2e; building without cache
+warning	Test run took 14m02s, 6 minutes longer than the 7-day median
+warning	This job is flaky: passed on retry 2 of 3
+warning	Build is unstable: 2 tests quarantined as flaky
+warning	rate limit for GitHub API at 82/5000 remaining; slowing down
+warning	Received 429 from api.example.com, backing off for 30s
+warning	s3 upload throttled (SlowDown), backing off 1.6s before retrying
+warning	DNS lookup for search.internal took 4.2s
+warning	job invoice-reminders skipped: previous run still in progress (started 00:00, now 01:05)
+warning	dockerd[1022]: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
+warning	dockerd[1022]: failed to get layer size, retrying: context deadline exceeded
+warning	container api using 3.8GiB of 4GiB memory limit
+warning	queue "emails" depth 18,402 (alarm at 10,000)
+warning	consumer lag for topic clickstream exceeds 500k messages
+warning	job 7712 took 41 minutes, longer than its 30 minute budget; not cancelled
+warning	feature flag service unreachable, using last known flags from 10:02
+warning	sentry DSN not configured; exceptions will not be reported
+warning	Unknown column "legacy_id" in import file row 1; column ignored
+warning	ignored 14 rows with unparseable dates in orders_2026-09.csv
+warning	thumbnail generation skipped for asset 88a1: unsupported format image/heic
+warning	unable to reach telemetry endpoint, events buffered locally (412 queued)
+warning	Session cookie set without the Secure flag because the request was not HTTPS
+warning	API key for tenant acme-demo used from a new country (BR) for the first time
+warning	Permission change: bucket assets-staging made publicly readable by ci-bot
+warning	user r.patel@example.com exported 12,400 customer records (above review threshold of 10,000)
+warning	jwt verification skipped for /internal/metrics because AUTH_DISABLED=true
+warning	Detected 4 goroutines blocked on channel send for over 60s
+warning	Event loop blocked for 812ms
+warning	long GC pause: 612ms (young gen, 1.2GB collected)
+warning	fsync took 2104ms; disk may be overloaded
+warning	Open file descriptors at 61,200 of 65,536
+warning	Swap usage is 6.1GB; the host is under memory pressure
+warning	Battery below 10%; build agent mbp-ci-4 will sleep in 5 minutes
+warning	NTP sync lost for 3 hours on node-7
+warning	TimeoutError on GET /v1/rates after 5000ms; served stale value from cache
+warning	fallback: primary geocoder returned 502, used secondary for 1 request
+info	203.0.113.14 - - [26/Sep/2026:10:14:02 +0000] "GET /api/v1/orders?page=2 HTTP/1.1" 200 5123 "-" "okhttp/4.12.0"
+info	198.51.100.7 - - [26/Sep/2026:10:15:44 +0000] "GET /favicon.ico HTTP/2.0" 404 153 "https://shop.example.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6)"
+info	192.0.2.41 - - [26/Sep/2026:10:16:09 +0000] "GET /old-pricing HTTP/1.1" 301 169 "-" "curl/8.7.1"
+info	192.0.2.12 - - [26/Sep/2026:10:16:31 +0000] "GET /wp-login.php HTTP/1.1" 404 146 "-" "Mozilla/5.0 zgrab/0.x"
+info	10.0.4.9 - - [26/Sep/2026:10:16:40 +0000] "GET /healthz HTTP/1.1" 200 2 "-" "kube-probe/1.31"
+info	198.51.100.33 - - [26/Sep/2026:10:17:05 +0000] "POST /api/v1/carts/77/items HTTP/1.1" 201 412 "-" "ExampleApp/3.2 (Android 15)"
+info	198.51.100.33 - - [26/Sep/2026:10:17:09 +0000] "POST /api/v1/carts/77/items HTTP/1.1" 422 88 "-" "ExampleApp/3.2 (Android 15)"
+info	203.0.113.8 - - [26/Sep/2026:10:17:30 +0000] "GET /static/js/main.4f1c2e.js HTTP/1.1" 304 0 "https://shop.example.com/" "Mozilla/5.0"
+info	192.0.2.140 - - [26/Sep/2026:10:17:52 +0000] "PATCH /v2/projects/12 HTTP/1.1" 409 71 "-" "axios/1.7.7"
+info	{"ts":"2026-09-26T08:14:02.448Z","method":"GET","path":"/api/items/99","status":404,"duration_ms":3,"user":"u_881"}
+info	{"ts":"2026-09-26T08:14:07.101Z","method":"POST","path":"/api/login","status":200,"duration_ms":58}
+info	192.0.2.3 - - [26/Sep/2026:10:18:44 +0000] "OPTIONS /api/v1/prices HTTP/1.1" 204 0 "-" "Mozilla/5.0"
+info	{"request":{"method":"GET","uri":"/docs/"},"status":200,"size":8812,"duration":0.0041,"logger":"http.log.access.log0"}
+info	Started GET "/users/sign_in" for 198.51.100.4 at 2026-09-26 10:20:11 +0000
+info	Completed 200 OK in 38ms (Views: 21.4ms | ActiveRecord: 3.1ms | Allocations: 9120)
+info	Completed 404 Not Found in 6ms (ActiveRecord: 0.9ms)
+info	Puma starting in single mode...
+info	* Listening on http://0.0.0.0:3000
+info	Use Ctrl-C to stop
+info	Migrating to AddIndexToInvoicesNumber (20260926101200)
+info	== 20260926101200 AddIndexToInvoicesNumber: migrated (0.0412s) ======================
+info	Watching for file changes with StatReloader
+info	Starting development server at http://127.0.0.1:8000/
+info	"GET /api/health/ HTTP/1.1" 200 15
+info	"GET /static/admin/css/base.css HTTP/1.1" 404 1791
+info	Applying accounts.0014_user_last_seen... OK
+info	System check identified no issues (0 silenced).
+info	Server listening on port 4000
+info	Connected to MongoDB at mongodb://db.internal:27017/app
+info	webpack 5.94.0 compiled successfully in 2231 ms
+info	Compiled with 0 errors and 0 warnings
+info	Started ApiApplication in 6.912 seconds (process running for 7.44)
+info	Tomcat started on port 8080 (http) with context path '/'
+info	Initializing Spring DispatcherServlet 'dispatcherServlet'
+info	HikariPool-1 - Start completed.
+info	Shutting down ExecutorService 'applicationTaskExecutor'
+info	2026/09/26 11:00:00 starting api version=1.14.2 commit=a91f3c2
+info	2026/09/26 11:00:00 listening on :8080
+info	2026/09/26 11:15:02 received SIGTERM, shutting down gracefully (drain 30s)
+info	2026/09/26 11:15:07 all connections drained, bye
+info	Server starting on http://127.0.0.1:8080
+info	Vapor server started on http://0.0.0.0:8080
+info	Running MyAppWeb.Endpoint with Bandit 1.5.7 at 0.0.0.0:4000 (http)
+info	Access MyAppWeb.Endpoint at http://localhost:4000
+info	Sent 200 in 1ms
+info	Sep 26 10:00:01 web-03 CRON[4411]: (root) CMD (/usr/lib/php/sessionclean)
+info	Sep 26 10:00:02 web-03 systemd[1]: Started Daily apt download activities.
+info	Sep 26 10:00:05 web-03 systemd[1]: Starting Cleanup of Temporary Directories...
+info	Sep 26 10:00:05 web-03 systemd[1]: systemd-tmpfiles-clean.service: Deactivated successfully.
+info	Sep 26 10:02:30 web-03 systemd-logind[801]: New session 412 of user deploy.
+info	Sep 26 10:02:30 web-03 sshd[9112]: Accepted publickey for deploy from 192.0.2.10 port 50122 ssh2: ED25519 SHA256:ptB3Fne4d4UtuFleMl0oys+/o1Q3+737sNtoadef0YQ
+info	Sep 26 10:08:14 build-01 kernel: e1000e: enp0s31f6 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: None
+info	Sep 26 10:08:15 build-01 kernel: usb 1-2: new high-speed USB device number 5 using xhci_hcd
+info	Sep 26 09:30:00 mbp-dev com.apple.xpc.launchd[1] (com.example.backup): Successfully spawned backupd[4012] because interval
+info	2026-09-26 09:31:12.004 softwareupdated[488]: Found 0 available updates
+info	2026-09-26 09:31:40.622 backupd[4012]: Backup completed successfully.
+info	2026-09-26 09:32:02.111 powerd[112]: Process Xcode.1411 created assertion PreventUserIdleSystemSleep "building"
+info	database system is ready to accept connections
+info	checkpoint complete: wrote 1204 buffers (7.3%); 0 WAL file(s) added, 0 removed, 1 recycled; write=119.9 s, sync=0.012 s, total=120.1 s
+info	automatic vacuum of table "app.public.sessions": index scans: 1
+info	connection authorized: user=app database=app application_name=puma
+info	redo done at 0/4A01F2C8 system usage: CPU: user: 0.21 s, system: 0.08 s, elapsed: 0.34 s
+info	DB saved on disk
+info	Ready to accept connections tcp
+info	Background saving started by pid 8812
+info	Synchronization with replica 10.0.2.9:6379 succeeded
+info	[MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.4.2'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306
+info	{"t":{"$date":"2026-09-26T10:39:00.002Z"},"c":"NETWORK","id":23016,"ctx":"listener","msg":"Waiting for connections","attr":{"port":27017,"ssl":"off"}}
+info	[2026-09-26 10:44:00,101] [KafkaServer id=2] started (kafka.server.KafkaServer)
+info	[2026-09-26 10:46:31,445] Consumer group payments-cg finished rebalancing; assigned 4 partitions
+info	[2026-09-26T10:47:00,013][o.e.c.r.a.AllocationService] [node-es-1] Cluster health status changed from [YELLOW] to [GREEN] (reason: [shards started [[logs-2026.09.26][1]]]).
+info	Run actions/checkout@v4
+info	Post job cleanup.
+info	Job succeeded
+info	Finished: SUCCESS
+info	[Pipeline] stage (Build)
+info	~~~ Running tests on agent mac-mini-3.ci.example.com
+info	+++ :rspec: 1,204 examples, 0 failures
+info	Uploading artifact "coverage.xml" (412 KB) done
+info	All checks have passed
+info	Lint complete: no errors found in 312 files
+info	error rate over the last 5m: 0.0% (0/18,412 requests)
+info	0 failed, 0 errored, 1,804 passed in 3m11s
+info	Deployed api@a91f3c2 to production (4/4 instances healthy) in 3m02s
+info	Scheduled  pod/api-5d8f7b-q2x9z  Successfully assigned default/api-5d8f7b-q2x9z to node-4
+info	Pulled  pod/api-5d8f7b-q2x9z  Successfully pulled image "registry.example.com/api:1.14.2" in 2.1s
+info	Started  pod/api-5d8f7b-q2x9z  Started container api
+info	ScalingReplicaSet  deployment/api  Scaled up replica set api-5d8f7b to 4
+info	deployment "api" successfully rolled out
+info	health check passed: db=ok cache=ok queue=ok (12ms)
+info	nightly-backup finished: 38.2 GB in 41m, uploaded to s3://backups-example/2026-09-26/
+info	backup snapshot 2026-09-26T03:00Z verified and retained (30 kept)
+info	cache warmed: 12,402 product pages in 44s
+info	scheduled job send-digest ran for 1,203 subscribers
+info	cron: rotated 4 log files in /var/log/app
+info	user k.nakamura@example.com signed in from 198.51.100.17 (MFA passed)
+info	role "billing-admin" granted to u_7731 by u_1002
+info	API key key_2Fz9 created for project demo by j.silva@example.com
+info	password changed for account u_4412
+info	user u_881 signed out
+info	invoice INV-2026-0912 issued to customer c_441 for 129.00 EUR
+info	order 88413 shipped via DHL, tracking TRK-5K2Q-88413
+info	signup completed for tenant northwind-demo (plan: team)
+info	dockerd[1022]: Loading containers: done.
+info	dockerd[1022]: API listen on /run/docker.sock
+info	containerd: shim reaped, container 5f2a9c exited with status 0
+info	Container app-db-1  Healthy
+info	Successfully built 4f1c2e9a0b3d
+info	Successfully tagged registry.example.com/web:2.3.0
+info	Pulling fs layer
+info	Download complete
+info	compose: network app_default created
+info	Worker 3 picked up job 7712 (queue: reports)
+info	job 7712 completed in 18.2s
+info	Processed 5,000 of 20,000 records
+info	import complete: 20,000 rows, 0 errors, 14 duplicates merged
+info	exception tracker initialised (release 1.14.2, environment production)
+info	error pages precompiled: 404.html, 500.html
+info	Retry policy loaded: 5 attempts, exponential backoff 200ms-10s
+info	config reloaded from /etc/app/config.yaml (3 keys changed)
+info	feature flag new-checkout enabled for 10% of users
+info	Leader elected: node-2 (term 41)
+info	Joined cluster app-prod as member node-3.internal
+info	Tunnel established: https://app-dev.example.com -> localhost:3000
+info	Listening for transport dt_socket at address: 5005
+info	Now listening on: http://localhost:5000
+info	Application started. Press Ctrl+C to shut down.
+info	gunicorn: Booting worker with pid: 4412
+info	Stopped Vite dev server
+info	certificate for shop.example.com renewed, valid until 2026-12-25
+info	SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2  [["id", 7208], ["LIMIT", 1]]
+info	  Order Load (0.8ms)  SELECT "orders".* FROM "orders" WHERE "orders"."customer_id" = $1  [["customer_id", 441]]
+info	(0.002) SELECT "django_session"."session_key" FROM "django_session" WHERE "django_session"."expire_date" > '2026-09-26 10:20:11'; args=('2026-09-26 10:20:11',)
+info	Executing (default): SELECT `id`, `email` FROM `accounts` AS `Account` WHERE `Account`.`id` = 77;
+info	Hibernate: select p1_0.id,p1_0.name from product p1_0 where p1_0.sku=?
+info	binding parameter [1] as [VARCHAR] - [SKU-2231]
+info	query: INSERT INTO "audit_event"("kind", "actor") VALUES ($1, $2) RETURNING "id" -- PARAMETERS: ["login","u_4412"]
+info	Ecto.Adapters.SQL: QUERY OK source="users" db=0.4ms idle=812.3ms SELECT u0."id" FROM "users" AS u0 WHERE (u0."id" = $1) [4412]
+info	cache hit for key product:SKU-2231 (ttl 212s)
+info	cache miss for key user:9031:prefs, loading from db
+info	memcached get session:ab12cd -> 412 bytes
+info	redis GET rate:198.51.100.7 -> "14"
+info	Request headers: {"accept":"application/json","user-agent":"okhttp/4.12.0","x-request-id":"7f3a9c21"}
+info	Response headers: content-type=application/json; content-length=512; cache-control=no-store
+info	> GET /v1/prices HTTP/1.1
+info	< HTTP/1.1 200 OK
+info	* Connected to api.example.com (192.0.2.40) port 443
+info	* ALPN: server accepted h2
+info	entering OrderService.place(cartId=77, userId=4412)
+info	exiting OrderService.place -> Order(id=88413, total=129.00)
+info	--> resolveTenant(host="acme.example.com")
+info	<-- resolveTenant 0.3ms
+info	state after reduce: {cart: {items: 3, total: 129}, user: {id: 4412}, loading: false}
+info	payload = {'sku': 'SKU-2231', 'qty': 2, 'coupon': None}
+info	ctx=Context{requestId=7f3a9c21, tenant=acme, locale=en-GB}
+info	resolved config value db.pool.size=20 from env APP_DB_POOL_SIZE (overrides file value 10)
+info	config search path: ./config.local.yaml, ./config.yaml, /etc/app/config.yaml
+info	loaded 14 keys from /etc/app/config.yaml, 3 overridden by environment
+info	tick 41022: 12 timers due, 0 fired late, loop lag 0.4ms
+info	scheduler loop took 3.1ms (next wake in 996.9ms)
+info	acquired advisory lock 72311 for migration runner
+info	released lock orders:88413 after 12ms
+info	waiting for lock inventory:SKU-2231 (held by worker-2)
+info	read 16384 bytes from upstream (chunk 7, total 114688)
+info	wrote 4096 bytes to /var/lib/app/spool/0007.tmp
+info	flushing 212 buffered events to sink
+info	backoff for attempt 3 computed as 800ms (base 200ms, factor 2, jitter 0.12)
+info	next retry would be at 10:22:31.440 if needed
+info	exception handler registered for /api/* (JsonErrorHandler)
+info	registered error middleware at position 7
+info	error counter api.requests.errors read as 0 for window 10:20-10:21
+info	http2: Framer 0xc000412000: wrote HEADERS flags=END_HEADERS stream=3 len=41
+info	http2: Framer 0xc000412000: read DATA stream=3 len=512 data="{\"items\":[..."
+info	grpc: Server.processUnaryRPC: /inventory.v1.Inventory/Reserve received message size 88
+info	[core] [Channel #1 SubChannel #2] Subchannel picks a new address "10.0.3.14:9090" to connect
+info	goroutine 73 parked on chan receive in worker.go:88
+info	GC(12) Pause Young (Normal) (G1 Evacuation Pause) 212M->88M(512M) 4.112ms
+info	GC forced: 3.1MB -> 1.4MB, pause 0.2ms
+info	dispatching action cart/addItem with payload {"sku":"SKU-2231"}
+info	render <ProductCard id=2231> took 1.8ms
+info	matched route GET /v1/items/:id -> ItemsController#show
+info	middleware chain: requestId -> logger -> auth -> rateLimit -> router
+info	jwt claims: sub=u_3350 aud=api.example.com exp=1790423400 scope=read:orders
+info	token cache refreshed; 41 keys in JWKS
+info	parsed 212 lines from import.csv header=[sku, name, price]
+info	validation passed for field email (rule: format)
+info	DNS resolved search.internal -> [10.0.5.3, 10.0.5.4] in 2ms
+info	dialing tcp 10.0.3.14:8080
+info	opened new pool connection #7 to db.internal:5432 (pool 8/20)
+info	returning connection #7 to pool (in use 7/20)
+info	pool stats: active=4 idle=12 waiting=0 total=16
+info	Kafka consumer fetched 500 records from clickstream-3 offset 88412331
+info	produced message to orders partition 7 at offset 1204412
+info	committed offset 88412831 for clickstream-3
+info	ES bulk request: 1000 actions, 2.1MB, took 88ms
+info	serialising response with schema v3 (12 fields, 2 omitted as null)
+info	feature flag new-checkout evaluated true for u_6127 (bucket 7 of 100)
+info	experiment pricing-b assignment: variant=control reason=hash(u_881)=0.72
+info	template cache: compiled views/orders/show.html.erb (4.2ms)
+info	asset lookup /static/js/main.js -> dist/main.4f1c2e.js (manifest)
+info	watching 1896 files for changes (fsevents)
+info	file changed: src/components/Cart.tsx, rebuilding
+info	hmr update /src/components/Cart.tsx
+info	sandbox profile generated: 14 rules, allow-read /usr, allow-write /tmp/job-7712
+info	env PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/app LANG=C.UTF-8
+info	argv: ["/usr/local/bin/api", "--config", "/etc/app/config.yaml", "--port", "8080"]
+info	thread pool worker-3 idle for 30s, parking
+info	span started name=db.query trace=4bf92f3577b34da6 span=00f067aa0ba902b7
+info	span ended name=db.query duration=0.8ms
+info	metrics flushed: 212 series to statsd at 127.0.0.1:8125
+info	heartbeat sent to coordinator (seq 88412)
+info	received heartbeat ack from node-2 (rtt 0.6ms)
+info	raft: node-3 appended entries 1204410-1204412 at term 41
+info	etcd watch event PUT /config/app/flags rev=88412
+info	vapor: routing request GET /hello to closure at Routes.swift:14
+info	NIO: channel inactive, closing ChannelPipeline for 192.0.2.40:51122
+info	os_signpost begin "LoadThumbnail" id=0x1f4
+info	URLSession task <7F3A9C21-1B2C-4D5E-8F90-A1B2C3D4E5F6>.<3> resumed
+info	CoreData: sql: SELECT 0, t0.Z_PK FROM ZNOTE t0 WHERE t0.ZFOLDER = ? ORDER BY t0.ZMODIFIED DESC
+info	StoreKit: fetched 4 products in 212ms
+info	docker build: step 7/12 : RUN npm ci --omit=dev  ---> Using cache
+info	#12 [build 4/7] COPY package*.json ./ 0.1s
+info	Sending build context to Docker daemon  24.58MB
+info	Resolving dependencies for target api (412 packages, lockfile hit)
+info	restored cache key npm-Linux-7ab21c (212 MB) in 4.1s
+info	set-output name=version::1.14.2
+info	shell: /usr/bin/bash -e {0}
+info	env: CI=true NODE_ENV=test
+info	bundler: using rack 3.1.7
+info	Loaded plugin com.example.lint 2.1.0 from ~/.cache/plugins
+info	diff of computed plan: +2 ~1 -0 resources
+info	retrying is disabled for idempotency-key 7f3a9c21 (non-idempotent POST)
+info	Redis pipeline: 3 commands, 212 bytes written, 0.2ms
+info	MySQL: prepared statement 12 re-executed with params (5530, 'active')
+info	MongoDB command find on shop.orders filter={"customer": 441} limit=20 took 1ms
+info	Postgres parse <unnamed>: SELECT id FROM jobs WHERE state = $1 FOR UPDATE SKIP LOCKED
+warning	error rate 3.8% over the last 5m exceeds the 2% alert threshold
+warning	transient error from payments-api (502), retrying in 2s (attempt 1 of 4)
+warning	parse error in optional file ~/.apprc line 12; ignoring it and using defaults
+error	giving up on job 7712 after 5 retries: connection reset by peer
+error	max retries (3) exceeded for POST https://api.example.com/v1/charge; request failed
+info	entering critical section for account 881 (mutex held by worker-3)
+info	crash reporter enabled; uploads go to https://crash.example.com/submit
+info	job retry-failed-payments completed: 12 payments retried, 12 succeeded
+info	config: panic_on_oom=false fatal_on_missing_key=false
+info	suite ErrorHandlingTests passed (14 tests, 0.8s)
+warning	Sandbox: bash(5120) deny(1) file-write-create /Users/Shared/build/out.log
+warning	Sep 26 09:52:14 mbp-dev kernel[0]: Sandbox: sh(7021) deny(1) file-read-data /Library/Keychains/System.keychain
+error	Sep 26 09:44:10 mbp-dev com.apple.xpc.launchd[1] (com.example.syncd[8812]): Service exited with abnormal code: 1
+warning	2026-09-26 09:52:14.201 Xcode[1411]: Low disk space on the startup volume: 4.1 GB available
+error	https 2026-09-26T10:30:01.412345Z app/web-prod/50dc6c495c0c9188 198.51.100.21:51544 10.0.1.7:8080 0.001 30.002 -1 504 - 612 0 "GET https://api.example.com:443/v1/export HTTP/1.1" "curl/8.7.1"
+info	haproxy[1880]: 203.0.113.30:41220 [26/Sep/2026:10:31:02.114] fe_https be_api/api2 0/0/1/12/13 200 812 - - ---- 41/41/3/1/0 0/0 "GET /v1/items HTTP/1.1"
+error	haproxy[1880]: 203.0.113.31:41288 [26/Sep/2026:10:31:05.902] fe_https be_api/<NOSRV> 0/-1/-1/-1/0 503 217 - - SC-- 12/12/0/0/0 0/0 "GET /v1/items HTTP/1.1"
+error	[2026-09-26T10:32:11.004Z] "GET /v1/cart HTTP/1.1" 503 UH 0 19 0 - "198.51.100.40" "ExampleApp/3.2" "b1f0c2d4-7e1a-4c55-9a0e-3f5d2c1b7a90" "api.example.com" "-"
+warning	2026-09-26 10:33:04 203.0.113.61 GET /api/orders - 443 - 198.51.100.9 Mozilla/5.0 - 401 2 5 31
+info	Completed 302 Found in 9ms (ActiveRecord: 1.2ms | Allocations: 812)
+warning	ModSecurity: Access denied with code 403 (phase 2). Matched "Operator `Rx'" against "ARGS:id" [id "942100"] [msg "SQL Injection Attack Detected via libinjection"] [hostname "shop.example.com"]
+warning	[2026-09-26T10:47:10,013][o.e.c.r.a.AllocationService] [node-es-1] Cluster health status changed from [GREEN] to [YELLOW] (reason: [{node-es-3} reason: disconnected]).
+fault	fatal: unable to access 'https://git.example.com/app.git/': Could not resolve host: git.example.com
+error	Error: Cannot find module '/srv/app/dist/server.js'
+error	OSError: [Errno 24] Too many open files
+warning	[Errno 104] Connection reset by peer; reconnecting to broker (attempt 2 of 10)
+error	terraform apply failed after 12 of 18 resources changed; state lock held by run 4471
+info	Apply complete! Resources: 2 added, 1 changed, 0 destroyed.
+info	policy check: rule allow-read matched /usr/lib/libSystem.B.dylib (rule 3 of 14)
+warning	upstream response time 2.8s exceeded SLO of 1s for 4% of requests in the last 5m
+info	Sep 26 10:15:31 web-03 systemd[1]: Stopped api.service - Example API.
+error	Sep 26 10:15:31 web-03 systemd[1]: api.service: Start request repeated too quickly.
+warning	Sep 26 10:15:25 web-03 systemd[1]: api.service: Scheduled restart job, restart counter is at 3.
+warning	found 3 vulnerabilities (2 moderate, 1 high)
+info	found 0 vulnerabilities
+error	✖ 3 problems (3 errors, 0 warnings)
+warning	✖ 2 problems (0 errors, 2 warnings)
+info	Sep 26 10:22:31 web-03 api[2211]: cache miss for key session:9f1c, loading from redis
+info	2026-09-26T10:22:31.442Z pool stats: active=3 idle=9 waiting=0
+info	2026/09/26 10:22:31 dialing tcp 10.0.3.15:5432
+info	[2026-09-26 10:44:05,002] [Consumer clientId=payments-1, groupId=payments-cg] Sending FETCH request with header RequestHeader(apiKey=FETCH, apiVersion=15)
+error	uncaught exception in worker: RangeError: Maximum call stack size exceeded
+warning	Sep 26 10:03:40 web-03 kernel: nf_conntrack: nf_conntrack: table full, dropping packet
+info	Sep 26 10:03:40 web-03 sshd[9301]: Disconnected from user deploy 192.0.2.10 port 50122
+fault	FATAL Thread 0 Crashed:: Dispatch queue: com.apple.main-thread
+fault	FATAL thread 'tokio-runtime-worker' panicked at src/handlers/upload.rs:88:31: called `Result::unwrap()` on an `Err` value: Os { code: 28, kind: StorageFull, message: "No space left on device" }
+fault	F0926 01:52:36.412 Termination Reason: Namespace SIGNAL, Code 6 Abort trap: 6
+fault	FATAL migration 20260926_add_invoice_index aborted: lock timeout; schema left at 20260919_add_tax_code
+fault	FATAL [nodemon] app crashed - waiting for file changes before starting...
+fault	FATAL Segmentation fault (core dumped)
+fault	[crit] 2026-09-26 09:51:03.114 ReportCrash[1432]: Saved crash report for Notes[1411] version 4.11 to Notes-2026-09-26-095103.ips
+fault	FATAL panic: assignment to entry in nil map
+fault	[crit] Sep 26 10:12:05 web-03 systemd[1]: api.service: Failed with result 'oom-kill'.
+fault	[crit] deploy of api@a91f3c2 to production aborted: 3 of 4 instances failed to become healthy; rolled back
+error	err: [Sat Sep 26 10:41:59.004120 2026] [pid 2230:tid 140288] [client 192.0.2.61:50990] PHP: Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes) in /srv/app/vendor/lib/Parser.php on line 311
+error	[error] app exited with code 1 before binding to $PORT; release failed
+error	[error] 2026/09/26 10:30:12 open() "/var/www/static/app.js" failed (13: Permission denied), client: 192.0.2.5, server: static.example.com
+error	err: https 2026-09-26T10:30:01.412345Z app/web-prod/50dc6c495c0c9188 198.51.100.21:51544 10.0.1.7:8080 0.001 30.002 -1 504 - 612 0 "GET https://api.example.com:443/v1/export HTTP/1.1" "curl/8.7.1"
+error	E0926 09:38:04.207 Sep 26 10:07:12 web-03 kernel: nvme0n1: I/O 812 QID 3 timeout, aborting
+error	ERROR tar: /Volumes/Backup/2026-09-26.tar: Cannot write: No space left on device
+error	level=error worker 14 died unexpectedly (signal 6), 212 in-flight jobs lost
+error	E0926 01:42:04.207 sync with upstream failed after 6 attempts (last: dial tcp 192.0.2.40:443: i/o timeout); aborting run
+error	err: [2026-09-26T10:47:30,118][o.e.b.ElasticsearchUncaughtExceptionHandler] [node-es-2] uncaught exception in thread [main]
+error	level=error backup verification failed: restored row count 1,204,331 does not match source 1,204,902
+warning	WARN consumer lag for topic clickstream exceeds 500k messages
+warning	level=warning Node.js 16 actions are deprecated. Please update the following actions to use Node.js 20: actions/checkout@v3
+warning	W0926 09:45:24.588 container api using 3.8GiB of 4GiB memory limit
+warning	level=warning 2026-09-26 10:33:04 203.0.113.61 GET /api/orders - 443 - 198.51.100.9 Mozilla/5.0 - 401 2 5 31
+warning	[warn] [MY-010068] [Server] CA certificate ca.pem is self signed.
+warning	WARN 2026/09/26 10:26:02 an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/4/12/0000000124 while reading upstream
+warning	[warn] Sep 26 10:15:25 web-03 systemd[1]: api.service: Scheduled restart job, restart counter is at 3.
+warning	W0926 15:05:10.588 [Sat Sep 26 10:43:12.000431 2026] [pid 1990:tid 140102] AH01909: www.example.com:443:0 server certificate does NOT include an ID which matches the server name
+warning	W0926 12:35:17.588 heap usage 88% of 4096MB after full GC; consider increasing -Xmx
+warning	[warn] {"t":{"$date":"2026-09-26T10:40:22.113Z"},"c":"COMMAND","id":51803,"ctx":"conn41","msg":"Slow query","attr":{"ns":"shop.orders","durationMillis":2211,"planSummary":"COLLSCAN"}}
+info	[info] [2026-09-26 10:46:31,445] Consumer group payments-cg finished rebalancing; assigned 4 partitions
+info	I0926 00:31:53.031 jwt claims: sub=u_3350 aud=api.example.com exp=1790423400 scope=read:orders
+info	level=info containerd: shim reaped, container 5f2a9c exited with status 0
+info	level=info nightly-backup finished: 38.2 GB in 41m, uploaded to s3://backups-example/2026-09-26/
+info	[debug] GC(12) Pause Young (Normal) (G1 Evacuation Pause) 212M->88M(512M) 4.112ms
+info	INFO bundler: using rack 3.1.7
+info	level=debug role "billing-admin" granted to u_7731 by u_1002
+info	[info] Sep 26 10:22:31 web-03 api[2211]: cache miss for key session:9f1c, loading from redis
+info	INFO database system is ready to accept connections
+info	D0926 05:07:21.990 2026/09/26 11:00:00 starting api version=1.14.2 commit=a91f3c2
+info	INFO retrying upload after transient error: attempt 2 of 5 succeeded
+info	level=info msg="error budget at 98% remaining" service=checkout
+info	[info] health check passed; 0 failures in the last 300 requests
+warning	INFO connection pool exhausted, requests are queueing (depth=41)
+error	level=info msg="payment capture failed" order=A-1043 status=declined_by_gateway
+warning	DEBUG deprecated config key 'timeout_ms' used; will be removed in 3.0
+info	ERROR_REPORTING=1 passed to the worker environment
+fault	level=warning msg="worker exited with signal 11" pid=5512 restarting=false
