@@ -357,7 +357,7 @@ struct Chat: AsyncParsableCommand {
                     try session.openAgent(
                         approver: TerminalApprover(style: style), transcript: transcript, observer: tap,
                         model: selection)
-                }, stats: session.stats),
+                }, stats: session.stats, configFile: Wisp.home.configFile),
             style: style,
             io: .init(
                 readLine: { readLine() },
@@ -414,7 +414,7 @@ struct Chat: AsyncParsableCommand {
                 },
                 openModel: { selection, transcript in
                     try session.openAgent(approver: approver, transcript: transcript, observer: tap, model: selection)
-                }, stats: session.stats),
+                }, stats: session.stats, configFile: Wisp.home.configFile),
             io: .init(
                 readLine: { router.nextMessage() },
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
@@ -494,12 +494,84 @@ struct Logs: ParsableCommand {
 /// Prints the effective configuration: every default applied, and where the file is.
 struct ConfigCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "config", abstract: "Print the effective configuration as JSON.",
-        discussion: "Defaults applied; the same view the model's inspect tool and the wisp://config resource give.")
+        commandName: "config", abstract: "Show or change the configuration.",
+        discussion:
+            "config.json lives in ~/.wisp. 'set' and 'unset' change the settings 'list' shows, checking that the "
+            + "file still loads; the rest of the file is kept as it is. Changes apply from the next session.",
+        subcommands: [Show.self, List.self, SetValue.self, Unset.self], defaultSubcommand: Show.self)
 
-    func run() throws {
-        let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
-        print(Introspection.render(Introspection(home: Wisp.home, config: config).configuration))
+    /// Prints the effective configuration.
+    struct Show: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Print the effective configuration as JSON.",
+            discussion: "Defaults applied; the same view the model's inspect tool and the wisp://config resource give.")
+
+        func run() throws {
+            let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
+            print(Introspection.render(Introspection(home: Wisp.home, config: config).configuration))
+        }
+    }
+
+    /// Lists the settings that can be changed.
+    struct List: ParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "List the settings 'set' can change.")
+
+        func run() throws {
+            let data = try? Data(contentsOf: Wisp.home.configFile)
+            for setting in ConfigSettings.all {
+                let current: JSONValue? = (try? ConfigEdit.current(setting.path, in: data)) ?? nil
+                print("\(setting.path)\t\(current.map(ChatLoop.shown) ?? "(default)")\t\(setting.summary)")
+            }
+        }
+    }
+
+    /// Sets one setting.
+    struct SetValue: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "set", abstract: "Set a setting, such as: approval.classifier coreml")
+
+        @Argument(help: "The setting, as 'wisp config list' names it.")
+        var path: String
+
+        @Argument(parsing: .remaining, help: "The value; a list may be JSON or words separated by spaces.")
+        var value: [String]
+
+        func run() throws {
+            try ConfigCommand.apply(path) { try ConfigEdit.set(path, to: value.joined(separator: " "), in: $0) }
+        }
+    }
+
+    /// Removes one setting so its default applies.
+    struct Unset: ParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "Remove a setting so its default applies.")
+
+        @Argument(help: "The setting, as 'wisp config list' names it.")
+        var path: String
+
+        func run() throws {
+            try ConfigCommand.apply(path) { try ConfigEdit.unset(path, in: $0) }
+        }
+    }
+
+    /// Edits the file, audits the change, and says what changed.
+    ///
+    /// - Throws: A usage error when the edit is refused.
+    static func apply(_ path: String, _ edit: (Data?) throws -> ConfigEdit.Outcome) throws {
+        let url = Wisp.home.configFile
+        let outcome: ConfigEdit.Outcome
+        do {
+            outcome = try edit(try? Data(contentsOf: url))
+            try ConfigEdit.write(outcome, to: url)
+        } catch let failure as ConfigEdit.Failure {
+            throw ValidationError("\(failure)")
+        }
+        let session = try Wisp.begin(.init(entryPoint: .config))
+        session.audit.record(.configChange, details: AuditEvent.Details.configChange(outcome, source: "cli"))
+        session.end()
+        let old = outcome.old.map(ChatLoop.shown) ?? "(default)"
+        let new = outcome.new.map(ChatLoop.shown) ?? "(default)"
+        print("\(path): \(old) → \(new); used from the next session on")
+        if let warning = outcome.warning { FileHandle.standardError.write(Data("note: \(warning)\n".utf8)) }
     }
 }
 

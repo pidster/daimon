@@ -24,6 +24,8 @@ public enum ChatInput: Equatable, Sendable {
     case stats
     /// List the lines typed this session, oldest first.
     case history
+    /// Show or change `config.json`.
+    case config(ConfigRequest)
     /// A message for the model.
     case message(String)
     /// A slash command that does not exist.
@@ -62,6 +64,7 @@ public enum ChatInput: Equatable, Sendable {
         case "model": self = .model(argument)
         case "stats": self = .stats
         case "history": self = .history
+        case "config": self = .config(ConfigRequest(argument))
         default: self = .unknown(command)
         }
     }
@@ -77,8 +80,37 @@ public enum ChatInput: Equatable, Sendable {
         /model [name]    switch the conversation to a model, keeping the transcript; no name shows the current one
         /stats           show timings of recent model turns and classifier calls
         /history         list what you have typed this session (Up and Down recall it in wisp-tui)
+        /config          show the config; /config list shows the settings you can change
+        /config set KEY VALUE, /config unset KEY   change ~/.wisp/config.json; leave out a part to choose it
         /save [name]     save the transcript to ~/.wisp/transcripts
         /new             start a fresh conversation with the same instructions and tools
         /quit            exit (also /exit, a bare exit or quit, Ctrl-D)
         """
+}
+
+/// What `/config` asks for.
+public enum ConfigRequest: Equatable, Sendable {
+    /// The effective configuration, as `/inspect config` shows it.
+    case show
+    /// The settings that can be changed, with their values.
+    case list
+    /// Set a setting; a missing path or value is chosen interactively.
+    case set(path: String?, value: String?)
+    /// Remove a setting so its default applies; a missing path is chosen interactively.
+    case unset(String?)
+    /// Anything else, with the word that was not understood.
+    case unknown(String)
+
+    /// Parses what follows `/config`.
+    public init(_ argument: String?) {
+        let parts = (argument ?? "").split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true).map(
+            String.init)
+        switch parts.first {
+        case nil, "show": self = .show
+        case "list": self = .list
+        case "set": self = .set(path: parts.count > 1 ? parts[1] : nil, value: parts.count > 2 ? parts[2] : nil)
+        case "unset": self = .unset(parts.count > 1 ? parts[1] : nil)
+        case let word?: self = .unknown(word)
+        }
+    }
 }

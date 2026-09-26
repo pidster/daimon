@@ -1,0 +1,301 @@
+import Foundation
+
+/// The settings a person can change from chat or `wisp config set`, and what each accepts
+/// ([ADR 0040](../../../../docs/decisions/0040-config-from-chat.md)). The rest of `config.json`
+/// (policies, custom tools, backend model tables) is edited by hand; an edit here keeps it as it is.
+public enum ConfigSettings {
+    /// What a setting's value is.
+    public enum Kind: Equatable, Sendable {
+        /// One of these words.
+        case choice([String])
+        /// `true` or `false`; `on`, `off`, `yes`, and `no` are read too.
+        case flag
+        /// A whole number within the range.
+        case integer(ClosedRange<Int>)
+        /// A number within the range.
+        case number(ClosedRange<Double>)
+        /// Free text.
+        case text
+        /// A model, as `--model` spells it.
+        case model
+        /// Models, least to most capable, as a JSON array or separated by commas or spaces.
+        case models
+        /// Tool names, as a JSON array or separated by commas or spaces.
+        case tools
+        /// A Core ML model: a file under `<home>/models/coreml`, or an absolute or `~` path.
+        case coremlModel
+    }
+
+    /// One setting.
+    public struct Setting: Equatable, Sendable {
+        /// Its dotted path in `config.json`, such as `approval.classifier`.
+        public var path: String
+        /// What it does, in a line.
+        public var summary: String
+        /// What it accepts.
+        public var kind: Kind
+    }
+
+    /// Every setting, in the order a list shows them.
+    public static let all: [Setting] = [
+        Setting(path: "model", summary: "the model new sessions run on", kind: .model),
+        Setting(
+            path: "approval.threshold", summary: "ask before commands rated at this level or above",
+            kind: .choice(["safe", "moderate", "dangerous", "never"])),
+        Setting(
+            path: "approval.classifier", summary: "what judges each command beside the rules",
+            kind: .choice(RiskClassifierChoice.allCases.map(\.rawValue))),
+        Setting(
+            path: "approval.coremlModel", summary: "the Core ML model for classifier coreml", kind: .coremlModel),
+        Setting(
+            path: "approval.coremlMinimumConfidence", summary: "below this a Core ML verdict asks anyway",
+            kind: .number(0...1)),
+        Setting(
+            path: "approval.timeoutSeconds", summary: "seconds to wait for an approval; 0 waits forever",
+            kind: .integer(0...86_400)),
+        Setting(
+            path: "approval.persistDays", summary: "days a project or always approval lasts", kind: .integer(1...365)),
+        Setting(
+            path: "routing.ladder", summary: "models to route to by input size, least capable first", kind: .models),
+        Setting(
+            path: "commandTimeoutSeconds", summary: "seconds a command may run; 0 waits forever",
+            kind: .integer(0...86_400)),
+        Setting(
+            path: "commandMaxOutputBytes", summary: "bytes of output kept from each command",
+            kind: .integer(256...1_048_576)),
+        Setting(path: "tools.disabled", summary: "built-in tools the model does not get", kind: .tools),
+        Setting(path: "notifications.enabled", summary: "whether wisp posts notifications", kind: .flag),
+        Setting(path: "notifications.perMinute", summary: "notifications allowed a minute", kind: .integer(1...60)),
+        Setting(path: "audit.enabled", summary: "whether the audit log is written", kind: .flag),
+        Setting(path: "ollama.baseURL", summary: "where Ollama serves", kind: .text),
+        Setting(
+            path: "ollama.contextLength", summary: "the context window asked of Ollama models",
+            kind: .integer(1024...1_048_576)),
+        Setting(path: "systemPromptExtension", summary: "text added to wisp's system prompt", kind: .text),
+    ]
+
+    /// The setting at `path`, or nil.
+    public static func setting(_ path: String) -> Setting? {
+        all.first { $0.path == path }
+    }
+}
+
+/// A change to `config.json`, checked before it is written: the file must still load exactly as it
+/// does at start-up ([ADR 0040](../../../../docs/decisions/0040-config-from-chat.md)).
+public enum ConfigEdit {
+    /// Why a change was refused. Nothing is written.
+    public enum Failure: Error, CustomStringConvertible, Equatable {
+        /// No such setting.
+        case unknownSetting(String)
+        /// The value is not one the setting accepts.
+        case invalidValue(path: String, reason: String)
+        /// The existing file is not a JSON object.
+        case unreadableFile(String)
+        /// The edited file would not load.
+        case wouldNotLoad(String)
+
+        /// Human-readable explanation.
+        public var description: String {
+            switch self {
+            case .unknownSetting(let path):
+                "no setting '\(path)'; the settings are: " + ConfigSettings.all.map(\.path).joined(separator: ", ")
+            case .invalidValue(let path, let reason): "\(path): \(reason)"
+            case .unreadableFile(let detail): "config.json is not a JSON object: \(detail)"
+            case .wouldNotLoad(let detail): "the change would leave config.json unloadable: \(detail)"
+            }
+        }
+    }
+
+    /// What a change did.
+    public struct Outcome: Equatable, Sendable {
+        /// The setting.
+        public var path: String
+        /// The value before, nil when unset.
+        public var old: JSONValue?
+        /// The value after, nil when unset.
+        public var new: JSONValue?
+        /// The file's new contents.
+        public var data: Data
+        /// A warning when the change weakens approval or the audit, or needs something else set.
+        public var warning: String?
+    }
+
+    /// The value `text` means for `setting`.
+    ///
+    /// - Throws: `Failure.invalidValue`.
+    public static func value(_ text: String, for setting: ConfigSettings.Setting) throws -> JSONValue {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        let invalid = { (reason: String) in Failure.invalidValue(path: setting.path, reason: reason) }
+        switch setting.kind {
+        case .choice(let options):
+            guard options.contains(text) else {
+                throw invalid("'\(text)' is not one of \(options.joined(separator: ", "))")
+            }
+            return .string(text)
+        case .flag:
+            switch text.lowercased() {
+            case "true", "on", "yes": return .bool(true)
+            case "false", "off", "no": return .bool(false)
+            default: throw invalid("'\(text)' is not true or false")
+            }
+        case .integer(let range):
+            guard let number = Int(text), range.contains(number) else {
+                throw invalid("'\(text)' is not a whole number from \(range.lowerBound) to \(range.upperBound)")
+            }
+            return .int(number)
+        case .number(let range):
+            guard let number = Double(text), range.contains(number) else {
+                throw invalid("'\(text)' is not a number from \(range.lowerBound) to \(range.upperBound)")
+            }
+            return .double(number)
+        case .text, .coremlModel:
+            guard !text.isEmpty else { throw invalid("give a value, or unset it") }
+            return .string(unquoted(text))
+        case .model:
+            do {
+                return .string(try ModelSelection(parsing: text).description)
+            } catch {
+                throw invalid("\(error)")
+            }
+        case .models:
+            var models: [JSONValue] = []
+            for name in list(text) {
+                do {
+                    models.append(.string(try ModelSelection(parsing: name).description))
+                } catch {
+                    throw invalid("\(error)")
+                }
+            }
+            return .array(models)
+        case .tools:
+            let names = list(text)
+            let unknown = names.filter { !ToolRegistry.builtInNames.contains($0) }
+            guard unknown.isEmpty else {
+                throw invalid(
+                    "no built-in tool \(unknown.joined(separator: ", ")); the tools are "
+                        + ToolRegistry.builtInNames.joined(separator: ", "))
+            }
+            return .array(names.map { .string($0) })
+        }
+    }
+
+    /// `text` without one pair of surrounding double quotes.
+    static func unquoted(_ text: String) -> String {
+        text.count >= 2 && text.hasPrefix("\"") && text.hasSuffix("\"") ? String(text.dropFirst().dropLast()) : text
+    }
+
+    /// Items of a JSON array of strings, or of text separated by commas or spaces.
+    static func list(_ text: String) -> [String] {
+        if let decoded = try? JSONDecoder().decode([String].self, from: Data(text.utf8)) { return decoded }
+        return text.split { $0 == "," || $0.isWhitespace }.map(String.init)
+    }
+
+    /// Sets `path` to `text` in the file `data` holds (nil for no file).
+    ///
+    /// - Throws: `Failure`.
+    public static func set(_ path: String, to text: String, in data: Data?) throws -> Outcome {
+        guard let setting = ConfigSettings.setting(path) else { throw Failure.unknownSetting(path) }
+        return try change(path, to: try value(text, for: setting), in: data)
+    }
+
+    /// Removes `path` from the file `data` holds, so its default applies.
+    ///
+    /// - Throws: `Failure`.
+    public static func unset(_ path: String, in data: Data?) throws -> Outcome {
+        guard ConfigSettings.setting(path) != nil else { throw Failure.unknownSetting(path) }
+        return try change(path, to: nil, in: data)
+    }
+
+    /// The value at `path` in the file `data` holds, nil when unset.
+    ///
+    /// - Throws: `Failure.unreadableFile`.
+    public static func current(_ path: String, in data: Data?) throws -> JSONValue? {
+        let root = try object(data)
+        return value(at: path.split(separator: ".").map(String.init), in: .object(root))
+    }
+
+    /// The file's top-level object.
+    static func object(_ data: Data?) throws -> [String: JSONValue] {
+        guard let data, !data.isEmpty else { return [:] }
+        do {
+            guard let object = try JSONDecoder().decode(JSONValue.self, from: data).objectValue else {
+                throw Failure.unreadableFile("the top level is not an object")
+            }
+            return object
+        } catch let failure as Failure {
+            throw failure
+        } catch {
+            throw Failure.unreadableFile("\(error)")
+        }
+    }
+
+    private static func value(at keys: [String], in root: JSONValue) -> JSONValue? {
+        keys.reduce(Optional(root)) { node, key in node?.objectValue?[key] }
+    }
+
+    /// `object` with `keys` set to `value`, or removed when nil; an object left empty is removed too.
+    private static func setting(
+        _ keys: ArraySlice<String>, to value: JSONValue?, in object: [String: JSONValue]
+    )
+        -> [String: JSONValue]
+    {
+        guard let key = keys.first else { return object }
+        var object = object
+        if keys.count == 1 {
+            object[key] = value
+        } else {
+            let child = setting(keys.dropFirst(), to: value, in: object[key]?.objectValue ?? [:])
+            object[key] = child.isEmpty ? nil : .object(child)
+        }
+        return object
+    }
+
+    private static func change(_ path: String, to new: JSONValue?, in data: Data?) throws -> Outcome {
+        let root = try object(data)
+        let keys = path.split(separator: ".").map(String.init)
+        let edited = setting(keys[...], to: new, in: root)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let output: Data
+        do {
+            output = try encoder.encode(JSONValue.object(edited)) + Data("\n".utf8)
+            let config = try JSONDecoder().decode(Config.self, from: output)
+            try config.commandPolicy?.validate()
+            try config.tools?.validate()
+        } catch {
+            throw Failure.wouldNotLoad("\(error)")
+        }
+        return Outcome(
+            path: path, old: value(at: keys, in: .object(root)), new: new, data: output,
+            warning: warning(path: path, new: new, in: edited))
+    }
+
+    /// Words for a change that weakens the gate or the audit, or that needs another setting.
+    static func warning(path: String, new: JSONValue?, in edited: [String: JSONValue]) -> String? {
+        switch (path, new?.stringValue, new?.boolValue) {
+        case ("approval.threshold", "never", _):
+            return "commands will run without asking, however risky; the policy and sandbox still apply"
+        case ("approval.threshold", "dangerous", _):
+            return "only commands rated dangerous will ask; moderate ones, such as git push or npm install, run at once"
+        case ("approval.classifier", "rules", _):
+            return "only the rules judge commands; anything they do not recognise is rated by them alone"
+        case ("approval.classifier", "coreml", _)
+        where value(at: ["approval", "coremlModel"], in: .object(edited)) == nil:
+            return "set approval.coremlModel too (wisp classifier train writes risk.mlmodel); until then every "
+                + "command is rated moderate"
+        case ("audit.enabled", _, false):
+            return "nothing will be recorded in the audit log from the next session on"
+        default:
+            return nil
+        }
+    }
+
+    /// Writes an outcome's data to `url`, readable by the owner only, replacing the file whole.
+    ///
+    /// - Throws: File-system errors.
+    public static func write(_ outcome: Outcome, to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try outcome.data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+}

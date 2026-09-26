@@ -176,6 +176,15 @@ extension AuditEvent {
             ]
         }
 
+        /// `config.change`: which setting, its value before and after (null when unset), and whether the
+        /// change came from chat or the command line.
+        public static func configChange(_ outcome: ConfigEdit.Outcome, source: String) -> [String: JSONValue] {
+            [
+                "path": .string(outcome.path), "old": outcome.old ?? .null, "new": outcome.new ?? .null,
+                "source": .string(source),
+            ]
+        }
+
         /// `classifier.train`: where the model went, what it learned from, and how well it fits that.
         public static func classifierTrained(
             _ outcome: RiskClassifierTraining.Outcome, examplesSource: String
@@ -304,6 +313,7 @@ extension AuditEvent {
         case .error: ["message", "context"]
         case .classifierVerdict: ["command", "pattern", "line", "level", "reasons", "sources", "seconds", "metadata"]
         case .classifierTrained: ["path", "examplesSource", "examples", "perLevel", "trainingAccuracy", "seconds"]
+        case .configChange: ["path", "old", "new", "source"]
         case .approvalRequested: ["command", "pattern", "line", "level"]
         case .approvalDecided:
             [

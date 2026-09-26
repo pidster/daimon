@@ -1,0 +1,112 @@
+import Foundation
+import Testing
+import WispTestSupport
+
+@testable import WispCore
+
+/// Changing `config.json` from chat and the command line: values checked per setting, the rest of the
+/// file kept, and the edited file loading as it would at start-up (ADR 0040).
+@Suite struct ConfigEditTests {
+    private func setting(_ path: String) throws -> ConfigSettings.Setting {
+        try #require(ConfigSettings.setting(path))
+    }
+
+    @Test func valuesAreReadAsEachSettingExpects() throws {
+        #expect(try ConfigEdit.value("coreml", for: setting("approval.classifier")) == "coreml")
+        #expect(try ConfigEdit.value("off", for: setting("audit.enabled")) == false)
+        #expect(try ConfigEdit.value("YES", for: setting("notifications.enabled")) == true)
+        #expect(try ConfigEdit.value("0", for: setting("approval.timeoutSeconds")) == 0)
+        #expect(try ConfigEdit.value("0.75", for: setting("approval.coremlMinimumConfidence")) == .double(0.75))
+        #expect(try ConfigEdit.value("ollama:granite4.1:8b", for: setting("model")) == "ollama:granite4.1:8b")
+        #expect(
+            try ConfigEdit.value(#"["system", "ollama:qwen3.8:27b"]"#, for: setting("routing.ladder"))
+                == ["system", "ollama:qwen3.8:27b"])
+        #expect(try ConfigEdit.value("notify, inspect", for: setting("tools.disabled")) == ["notify", "inspect"])
+        #expect(try ConfigEdit.value("\"be brief\"", for: setting("systemPromptExtension")) == "be brief")
+        let refusals: [(String, String)] = [
+            ("approval.classifier", "sometimes"), ("audit.enabled", "maybe"), ("approval.persistDays", "0"),
+            ("approval.coremlMinimumConfidence", "2"), ("model", "nonsense:"), ("routing.ladder", "system bad:"),
+            ("tools.disabled", "run_command teleport"), ("ollama.baseURL", "  "),
+        ]
+        for (path, text) in refusals {
+            #expect(throws: ConfigEdit.Failure.self, "\(path) \(text)") {
+                try ConfigEdit.value(text, for: setting(path))
+            }
+        }
+    }
+
+    @Test func aChangeKeepsTheRestOfTheFileAndMustStillLoad() throws {
+        let file = Data(#"{"commandPolicy": {"deny": ["^shutdown"]}, "approval": {"timeoutSeconds": 0}}"#.utf8)
+        let set = try ConfigEdit.set("approval.classifier", to: "rules", in: file)
+        #expect(set.old == nil && set.new == "rules")
+        #expect(set.warning?.hasPrefix("only the rules judge commands") == true)
+        let config = try JSONDecoder().decode(Config.self, from: set.data)
+        #expect(config.approval?.classifier == .rules && config.approval?.timeoutSeconds == 0)
+        #expect(config.commandPolicy?.deny == ["^shutdown"])
+        #expect(String(decoding: set.data, as: UTF8.self).hasSuffix("}\n"))
+        // Unsetting the last key of an object removes the object.
+        let unset = try ConfigEdit.unset("approval.timeoutSeconds", in: set.data)
+        #expect(unset.old == 0 && unset.new == nil)
+        let cleared = try ConfigEdit.unset("approval.classifier", in: unset.data)
+        #expect(try ConfigEdit.object(cleared.data)["approval"] == nil)
+        #expect(try ConfigEdit.current("commandPolicy.deny", in: cleared.data) == ["^shutdown"])
+        // No file is an empty config.
+        #expect(try ConfigEdit.set("model", to: "system", in: nil).new == "system")
+    }
+
+    @Test func refusalsNameTheProblemAndWriteNothing() throws {
+        #expect(throws: ConfigEdit.Failure.unknownSetting("approval.clasifier")) {
+            try ConfigEdit.set("approval.clasifier", to: "rules", in: nil)
+        }
+        #expect(throws: ConfigEdit.Failure.unknownSetting("commandPolicy")) {
+            try ConfigEdit.unset("commandPolicy", in: nil)
+        }
+        #expect(throws: ConfigEdit.Failure.self) { try ConfigEdit.set("model", to: "system", in: Data("[1]".utf8)) }
+        #expect(throws: ConfigEdit.Failure.self) { try ConfigEdit.set("model", to: "system", in: Data("{".utf8)) }
+        // A file that would not load, here an invalid policy pattern already in it, is refused.
+        let broken = Data(#"{"commandPolicy": {"deny": ["("]}}"#.utf8)
+        #expect(throws: ConfigEdit.Failure.self) { try ConfigEdit.set("model", to: "system", in: broken) }
+        let described = "\(ConfigEdit.Failure.unknownSetting("x"))"
+        #expect(described.hasPrefix("no setting 'x'; the settings are: model, approval.threshold"))
+        #expect("\(ConfigEdit.Failure.invalidValue(path: "a", reason: "b"))" == "a: b")
+        #expect("\(ConfigEdit.Failure.unreadableFile("x"))".hasPrefix("config.json is not a JSON object"))
+        #expect("\(ConfigEdit.Failure.wouldNotLoad("x"))".hasPrefix("the change would leave"))
+    }
+
+    @Test func weakeningTheGateOrTheAuditIsWarned() throws {
+        #expect(
+            try ConfigEdit.set("approval.threshold", to: "never", in: nil).warning?.contains("without asking") == true)
+        #expect(try ConfigEdit.set("approval.threshold", to: "dangerous", in: nil).warning != nil)
+        #expect(try ConfigEdit.set("approval.threshold", to: "moderate", in: nil).warning == nil)
+        #expect(try ConfigEdit.set("audit.enabled", to: "false", in: nil).warning != nil)
+        #expect(
+            try ConfigEdit.set("approval.classifier", to: "coreml", in: nil).warning?.contains("coremlModel") == true)
+        let withModel = Data(#"{"approval": {"coremlModel": "risk.mlmodel"}}"#.utf8)
+        #expect(try ConfigEdit.set("approval.classifier", to: "coreml", in: withModel).warning == nil)
+    }
+
+    @Test func writingReplacesTheFileReadableByTheOwnerOnly() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-config-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appending(path: "config.json")
+        try ConfigEdit.write(try ConfigEdit.set("model", to: "system", in: nil), to: url)
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        #expect((attributes[.posixPermissions] as? Int) == 0o600)
+        #expect(try Config.load(from: url).model == .system)
+        let details = AuditEvent.Details.configChange(
+            try ConfigEdit.set("model", to: "system", in: nil), source: "chat")
+        #expect(Set(details.keys) == AuditEvent.fields(for: .configChange) && details["old"] == .null)
+    }
+
+    @Test func chatParsesConfigRequests() {
+        #expect(ChatInput(line: "/config") == .config(.show))
+        #expect(ChatInput(line: "/config list") == .config(.list))
+        #expect(ChatInput(line: "/config set") == .config(.set(path: nil, value: nil)))
+        #expect(ChatInput(line: "/config set model") == .config(.set(path: "model", value: nil)))
+        #expect(
+            ChatInput(line: "/config set routing.ladder system ollama:x")
+                == .config(.set(path: "routing.ladder", value: "system ollama:x")))
+        #expect(ChatInput(line: "/config unset model") == .config(.unset("model")))
+        #expect(ChatInput(line: "/config frob") == .config(.unknown("frob")))
+    }
+}

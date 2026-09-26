@@ -122,6 +122,8 @@ What a session shows, and where it goes:
 | `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
 | `/stats` | Timings of this session's recent model turns and classifier calls: per kind and model, the count, failures, mean, P50, P95, and maximum seconds, and the mean prompt tokens where the runtime reports them (Ollama); then the latest eight calls by start time. Kept in memory only, the latest 256 calls; see below. |
 | `/history` | The lines typed this session, numbered, oldest first: the latest 100, blank lines and a line repeating the one before it left out. |
+| `/config`, `/config list` | The effective configuration, as `/inspect config` shows it; `list` shows the settings that can be changed here, each with its value in `config.json` (or `(default)`) and what it does. |
+| `/config set KEY VALUE`, `/config unset KEY` | Change `~/.wisp/config.json`, as `wisp config set` does (below). Given without a key or a value, it lists the settings. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, `/q`, a bare `exit`, `quit`, or `q`, Ctrl-D | Exit, saving if a name is set. |
@@ -232,9 +234,48 @@ tool the eval harness has measured ([measurements.md](measurements.md)).
 
 ### `wisp config`
 
-Prints the effective configuration as JSON: every setting with its default applied, the model, the
-`run_command` policy, and the paths under `~/.wisp`, with whether `config.json` exists. The same view
-the model's [`inspect`](tools/inspect.md) tool and the `wisp://config` resource give.
+`wisp config` (or `config show`) prints the effective configuration as JSON: every setting with its
+default applied, the model, the `run_command` policy, and the paths under `~/.wisp`, with whether
+`config.json` exists. The same view the model's [`inspect`](tools/inspect.md) tool and the
+`wisp://config` resource give.
+
+`wisp config list` prints the settings that can be changed without editing the file, one per line:
+the setting, its value in `config.json` or `(default)`, and what it does. `wisp config set KEY VALUE`
+sets one and `wisp config unset KEY` removes one so its default applies
+([ADR 0040](decisions/0040-config-from-chat.md)); chat's `/config set` and `unset` do the same.
+
+```
+wisp config set approval.classifier coreml
+wisp config set approval.coremlModel risk.mlmodel
+wisp config set routing.ladder system ollama:qwen3.8:27b     # or a JSON array
+wisp config unset approval.timeoutSeconds
+```
+
+| Setting | Accepts |
+| --- | --- |
+| `model` | A model, as `--model` spells it. |
+| `approval.threshold` | `safe`, `moderate`, `dangerous`, or `never`. |
+| `approval.classifier` | `rules`, `system-model`, or `coreml`. |
+| `approval.coremlModel` | A Core ML model under `~/.wisp/models/coreml`, or an absolute or `~` path. |
+| `approval.coremlMinimumConfidence` | A number from 0 to 1. |
+| `approval.timeoutSeconds` | Seconds, 0 to 86,400; 0 waits forever. |
+| `approval.persistDays` | Days, 1 to 365. |
+| `routing.ladder` | Models, least capable first. |
+| `commandTimeoutSeconds` | Seconds, 0 to 86,400. |
+| `commandMaxOutputBytes` | Bytes, 256 to 1,048,576. |
+| `tools.disabled` | Built-in tool names. |
+| `notifications.enabled`, `audit.enabled` | `true` or `false` (`on`, `off`, `yes`, `no`). |
+| `notifications.perMinute` | 1 to 60. |
+| `ollama.baseURL`, `systemPromptExtension` | Text. |
+| `ollama.contextLength` | 1,024 to 1,048,576. |
+
+Each change is checked before it is written: an unknown setting, a value the setting does not take, or
+a file that would no longer load is refused with the reason, and nothing changes. The rest of the file,
+the command policy and custom tools included, is kept as it is; the file is written readable by its
+owner only. A change that weakens the gate or the audit (the threshold at `never` or `dangerous`, the
+classifier at `rules`, the audit off) prints a note, and so does `coreml` without a model. Changes are
+audited as `config.change` and apply from the next session: a running chat keeps the settings it
+started with. The model cannot change the configuration; there is no tool for it.
 
 ### `wisp doctor`
 

@@ -19,6 +19,8 @@ public enum EntryPoint: String, Sendable, Codable, CaseIterable {
     case watch
     /// `wisp draft`, a commit message or PR drafted from a diff.
     case draft
+    /// `wisp config set` or `unset`, a setting changed from the command line.
+    case config
     /// `wisp classifier`, a risk classifier trained or measured.
     case classifier
 

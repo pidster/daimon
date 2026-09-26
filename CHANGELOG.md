@@ -4,6 +4,16 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- `/config set KEY VALUE` and `/config unset KEY` in chat, and `wisp config set` and `unset`, change
+  `~/.wisp/config.json` without editing it: each value is checked against the setting, the file must
+  still load, the rest of it is kept, and every change is audited. `/config list` and `wisp config list`
+  show the settings that can be changed and their values. A change that weakens the approval gate or the
+  audit is flagged.
+
 ## 0.11.0
 
 Added:

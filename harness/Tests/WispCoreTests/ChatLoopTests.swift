@@ -169,6 +169,47 @@ import WispTestSupport
         #expect(bare.noted.contains("stats are not kept here"))
     }
 
+    @Test func configChangesTheFileAuditsAndSaysWhenItApplies() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.json")
+        try Data(#"{"approval": {"timeoutSeconds": 0}}"#.utf8).write(to: file)
+        let sink = MemoryAuditSink()
+        let agent = Agent(
+            instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: ScriptedModel()),
+            audit: AuditLog(session: "chat", sink: sink))
+        var context = Self.context
+        context.configFile = file
+        let capture = Capture(lines: [
+            "/config set approval.classifier rules", "/config set approval.threshold sometimes", "/config list",
+            "/config set", "/config unset approval.timeoutSeconds", "/config frob", "/config",
+        ])
+        var loop = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
+        try await loop.run()
+        let saved = try Config.load(from: file)
+        #expect(saved.approval?.classifier == .rules && saved.approval?.timeoutSeconds == nil)
+        let notes = capture.noted.joined(separator: "\n")
+        #expect(
+            notes.contains(
+                "approval.classifier: (default) → rules; saved to \(file.path), and used from the next session on"))
+        #expect(notes.contains("note: only the rules judge commands"))
+        #expect(notes.contains("error: approval.threshold: 'sometimes' is not one of"))
+        #expect(notes.contains("give the setting and the value"))
+        #expect(notes.contains("unknown /config frob"))
+        #expect(capture.output.contains("approval.classifier") && capture.output.contains("(default)"))
+        #expect(capture.output.contains("inspected config"))
+        let changes = sink.events.filter { $0.kind == .configChange }
+        #expect(changes.map { $0.details["path"] } == ["approval.classifier", "approval.timeoutSeconds"])
+        #expect(changes.first?.details["source"] == "chat")
+        // Without a config file the changes are refused and nothing is written.
+        let bare = Capture(lines: ["/config set model system"])
+        var unavailable = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: Self.context, io: bare.io)
+        try await unavailable.run()
+        #expect(bare.noted.contains("the configuration cannot be changed here"))
+    }
+
     @Test func historyKeepsTheLatestLinesAndNumbersThemToAlign() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(at: dir) }

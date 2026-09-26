@@ -67,6 +67,8 @@ public struct ChatLoop {
         public var openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)?
         /// The session's call store, for `/stats`; nil makes the command unavailable.
         public var stats: CallStats?
+        /// The `config.json` that `/config set` and `unset` change; nil makes them unavailable.
+        public var configFile: URL?
 
         /// Creates a context.
         public init(
@@ -74,8 +76,10 @@ public struct ChatLoop {
             git: @escaping @Sendable (String) -> (branch: String?, dirty: Bool?) = { _ in (nil, nil) },
             inspect: (@Sendable (String) async -> String)? = nil, banner: String? = nil,
             models: (@Sendable (ModelSelection, [any Tool]) async -> [String])? = nil,
-            openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil, stats: CallStats? = nil
+            openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil, stats: CallStats? = nil,
+            configFile: URL? = nil
         ) {
+            self.configFile = configFile
             self.directory = directory
             self.approval = approval
             self.git = git
@@ -102,8 +106,8 @@ public struct ChatLoop {
     public private(set) var history: [String] = []
     /// How many lines `history` keeps.
     public static let historyLimit = 100
-    private let context: Context
-    private let io: IO
+    let context: Context
+    let io: IO
 
     /// Creates a loop over `agent`.
     ///
@@ -236,6 +240,8 @@ public struct ChatLoop {
             case .new:
                 agent.reset()
                 io.note("new conversation")
+            case .config(let request):
+                await config(request)
             case .unknown(let command):
                 io.note("unknown command /\(command); /help lists commands")
             case .message(let text):
