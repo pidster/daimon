@@ -13,6 +13,10 @@ Added:
   still load, the rest of it is kept, and every change is audited. `/config list` and `wisp config list`
   show the settings that can be changed and their values. A change that weakens the approval gate or the
   audit is flagged.
+- `/config set` offers what you leave out: the settings, then the setting's choices, including the
+  models this Mac can run and the trained Core ML models on disk. `wisp-tui` shows a picker in place of
+  the input (arrows, Enter, Esc, or type a value); the plain chat shows a numbered list. `wisp chat
+  --json` gains `choice` and `choose` for it.
 
 Fixed:
 

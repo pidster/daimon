@@ -9,8 +9,9 @@ import Synchronization
 /// Outbound (to the front end): `banner`, `status`, `output` (a whole line, as `/help` prints), `delta`
 /// (streamed reply text), `turn` (`start`/`end`), `event` (an audit event of the conversation, raw, with
 /// the line the terminal chat would show for it as `text`), `note`, `approval` (a request the front end
-/// must answer), `exit`. Inbound: `message` (a chat line, slash commands included) and `answer` (to an
-/// approval, by id).
+/// must answer), `choice` (a question a chat command asks, such as `/config set`), `exit`. Inbound:
+/// `message` (a chat line, slash commands included), `answer` (to an approval, by id), and `choose` (to
+/// a choice, by id; no value is no answer).
 public enum ChatProtocol {
     /// What the front end sends.
     public enum Inbound: Equatable, Sendable {
@@ -31,6 +32,8 @@ public enum ChatProtocol {
             switch type {
             case "answer":
                 self = .answer(id: object["id"]?.stringValue ?? "", decision: object["decision"]?.stringValue ?? "no")
+            case "choose":
+                self = .answer(id: object["id"]?.stringValue ?? "", decision: object["value"]?.stringValue ?? "")
             default:
                 self = .message(object["text"]?.stringValue ?? "")
             }
@@ -76,6 +79,30 @@ public enum ChatProtocol {
         case .end(let turn, let seconds, let failed):
             ["phase": "end", "turn": .int(turn), "seconds": .double(seconds), "outcome": failed ? "error" : "ok"]
         }
+    }
+
+    /// The `choice` line's fields: its id, title, options, the current value, and whether typed text
+    /// is taken.
+    public static func choice(id: String, _ choice: ChatChoice) -> [String: JSONValue] {
+        [
+            "id": .string(id), "title": .string(choice.title), "current": choice.current.map { .string($0) } ?? .null,
+            "acceptsText": .bool(choice.acceptsText),
+            "options": .array(
+                choice.options.map {
+                    .object(["value": .string($0.value), "label": .string($0.label), "detail": .string($0.detail)])
+                }),
+        ]
+    }
+
+    /// Asks the front end a choice and waits for its `choose` answer, bounded by `timeout`; silence, an
+    /// empty value, or a lapsed wait is no answer.
+    public static func ask(
+        _ choice: ChatChoice, router: LineRouter, timeout: Duration?, send: @Sendable (String) -> Void
+    ) async -> String? {
+        let id = ShortID.make()
+        send(encode("choice", Self.choice(id: id, choice)))
+        let answer = try? await Timeout.run(timeout) { await router.answer(for: id) }
+        return answer.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// The `approval` line's fields.

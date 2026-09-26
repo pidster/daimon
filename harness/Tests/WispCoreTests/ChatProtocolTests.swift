@@ -67,6 +67,29 @@ import WispTestSupport
         #expect(router.nextMessage() == nil)
     }
 
+    @Test func aChoiceIsAskedThroughTheProtocolAndAnsweredByID() async throws {
+        let router = LineRouter()
+        let lines = Mutex<[String]>([])
+        let choice = ChatChoice(title: "pick", options: [.init(value: "a", detail: "first")], current: "a")
+        let send: @Sendable (String) -> Void = { line in
+            lines.withLock { $0.append(line) }
+            let id = (try? JSONDecoder().decode(JSONValue.self, from: Data(line.utf8)))?.objectValue?["id"]?.stringValue
+            router.receive(#"{"type":"choose","id":"\#(id ?? "")","value":"a"}"#)
+        }
+        #expect(await ChatProtocol.ask(choice, router: router, timeout: .seconds(5), send: send) == "a")
+        let sent = try #require(lines.withLock { $0.first })
+        let fields = try JSONDecoder().decode(JSONValue.self, from: Data(sent.utf8)).objectValue
+        #expect(fields?["type"] == "choice" && fields?["title"] == "pick" && fields?["current"] == "a")
+        #expect(fields?["options"]?.arrayValue?.first?.objectValue?["detail"] == "first")
+        // An empty value, or no answer in time, is no answer.
+        let empty: @Sendable (String) -> Void = { line in
+            let id = (try? JSONDecoder().decode(JSONValue.self, from: Data(line.utf8)))?.objectValue?["id"]?.stringValue
+            router.receive(#"{"type":"choose","id":"\#(id ?? "")"}"#)
+        }
+        #expect(await ChatProtocol.ask(choice, router: router, timeout: .seconds(5), send: empty) == nil)
+        #expect(await ChatProtocol.ask(choice, router: router, timeout: .milliseconds(20), send: { _ in }) == nil)
+    }
+
     @Test func approverAsksThroughTheProtocolAndHonoursTheTimeout() async {
         let router = LineRouter()
         let sent = Mutex<[String]>([])

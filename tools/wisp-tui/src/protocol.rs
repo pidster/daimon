@@ -30,6 +30,8 @@ pub enum Outbound {
     Event(Event),
     /// An approval the front end must answer.
     Approval(Approval),
+    /// A choice a chat command asks, such as `/config set`.
+    Choice(Choice),
     /// wisp is exiting.
     Exit,
     /// Anything this version does not know.
@@ -91,6 +93,35 @@ pub struct Event {
     pub text: Option<String>,
 }
 
+/// One answer a choice offers.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ChoiceOption {
+    /// What choosing it answers.
+    pub value: String,
+    /// What it is called.
+    pub label: String,
+    /// A line about it, or empty.
+    #[serde(default)]
+    pub detail: String,
+}
+
+/// A question with answers to pick from.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Choice {
+    /// The id to answer with.
+    pub id: String,
+    /// The question.
+    pub title: String,
+    /// The answers on offer; empty when only typed text will do.
+    #[serde(default)]
+    pub options: Vec<ChoiceOption>,
+    /// The value in force now.
+    pub current: Option<String>,
+    /// Whether typed text is taken as well as an option.
+    #[serde(rename = "acceptsText", default)]
+    pub accepts_text: bool,
+}
+
 /// An approval request.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Approval {
@@ -119,6 +150,13 @@ pub enum Inbound {
     Message {
         /// The text.
         text: String,
+    },
+    /// An answer to a choice; `None` is no answer.
+    Choose {
+        /// The choice's id.
+        id: String,
+        /// The value chosen.
+        value: Option<String>,
     },
     /// An answer to an approval.
     Answer {
@@ -192,6 +230,20 @@ mod tests {
         );
         assert!(
             matches!(&end, Outbound::Turn(t) if !t.is_start() && t.outcome.as_deref() == Some("error"))
+        );
+        let choice = Outbound::parse(
+            r#"{"type":"choice","id":"c","title":"pick","options":[{"value":"a","label":"A","detail":""}],"current":null,"acceptsText":true}"#,
+        );
+        assert!(
+            matches!(&choice, Outbound::Choice(c) if c.options[0].label == "A" && c.accepts_text && c.current.is_none())
+        );
+        assert_eq!(
+            Inbound::Choose {
+                id: "c".into(),
+                value: None
+            }
+            .line(),
+            "{\"type\":\"choose\",\"id\":\"c\",\"value\":null}\n"
         );
         assert_eq!(Outbound::parse(r#"{"type":"exit"}"#), Outbound::Exit);
         assert_eq!(Outbound::parse(r#"{"type":"future"}"#), Outbound::Unknown);

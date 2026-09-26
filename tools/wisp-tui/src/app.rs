@@ -10,6 +10,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::editor::{Edit, Editor};
 use crate::markdown;
 use crate::palette;
+use crate::picker::Picker;
 use crate::protocol::{Approval, Inbound, Outbound, Status};
 
 /// Rows the band occupies with a one-row input: reply in progress, dialog, a half-height strip, the
@@ -101,6 +102,8 @@ pub struct App {
     pub status: Option<Status>,
     /// An approval awaiting an answer.
     pub approval: Option<Approval>,
+    /// A choice awaiting an answer.
+    pub picker: Option<Picker>,
     /// Whether a turn is in progress (input is held until the next status).
     pub busy: bool,
     /// The turn under way, or how the last one ended, for the status line.
@@ -177,6 +180,10 @@ impl App {
                 self.flush_partial();
                 self.approval = Some(approval);
             }
+            Outbound::Choice(choice) => {
+                self.flush_partial();
+                self.picker = Some(Picker::new(choice));
+            }
             Outbound::Exit => self.exited = true,
             Outbound::Unknown => {}
         }
@@ -238,15 +245,45 @@ impl App {
         Action::None
     }
 
+    /// Whether the input takes edits: with no dialog up and no turn running, or while a choice that
+    /// takes typed text is open.
+    fn typing(&self) -> bool {
+        match &self.picker {
+            Some(picker) => picker.choice.accepts_text,
+            None => self.approval.is_none() && !self.busy,
+        }
+    }
+
     /// An edit to the input: ignored while a dialog wants its keys or a turn is running.
     pub fn edit(&mut self, edit: &Edit) {
-        if self.approval.is_none() && !self.busy {
+        if self.typing() {
             self.editor.apply(edit);
         }
     }
 
-    /// Enter: sends the input as a message, echoing it into history.
+    /// Answers the open choice with `value`, `None` for no answer, and closes it.
+    fn choose(&mut self, value: Option<String>) -> Action {
+        let Some(picker) = self.picker.take() else {
+            return Action::None;
+        };
+        self.editor.take();
+        Action::Send(Inbound::Choose {
+            id: picker.choice.id,
+            value,
+        })
+    }
+
+    /// Esc: leaves an open choice unanswered; otherwise nothing.
+    pub fn cancel(&mut self) -> Action {
+        self.choose(None)
+    }
+
+    /// Enter: sends the input as a message, echoing it into history; with a choice open, answers it.
     pub fn submit(&mut self) -> Action {
+        if let Some(picker) = &self.picker {
+            let answer = picker.answer(&self.editor.text());
+            return self.choose(answer);
+        }
         if self.approval.is_some() || self.busy {
             return Action::None;
         }
@@ -269,6 +306,10 @@ impl App {
 
     /// Up: replaces the input with the previous submitted line, keeping what was typed as the draft.
     pub fn recall_previous(&mut self) {
+        if let Some(picker) = &mut self.picker {
+            picker.step(false);
+            return;
+        }
         if self.approval.is_some() || self.busy || self.recall.is_empty() {
             return;
         }
@@ -285,6 +326,10 @@ impl App {
 
     /// Down: moves to the next submitted line, and past the newest back to the draft.
     pub fn recall_next(&mut self) {
+        if let Some(picker) = &mut self.picker {
+            picker.step(true);
+            return;
+        }
         if self.approval.is_some() || self.busy {
             return;
         }
@@ -303,6 +348,9 @@ impl App {
 
     /// Ctrl-C or Ctrl-D: cancel a dialog first, otherwise quit.
     pub fn interrupt(&mut self) -> Action {
+        if self.picker.is_some() {
+            return self.cancel();
+        }
         if let Some(approval) = self.approval.take() {
             self.push(&answered(&approval.command, "no"), LineKind::Note);
             return Action::Send(Inbound::Answer {
@@ -322,6 +370,11 @@ impl App {
     /// the input's text needs, up to `MAX_INPUT_ROWS`.
     /// While a dialog is asked it takes the input's place: the reply row, the dialog, and the status.
     pub fn band_height(&self, width: u16) -> u16 {
+        if let Some(picker) = &self.picker {
+            return u16::try_from(picker.rows())
+                .unwrap_or(u16::MAX)
+                .saturating_add(DIALOG_FRAME + 2);
+        }
         if let Some(approval) = &self.approval {
             let rows = dialog_lines(approval, dialog_width(width)).len();
             return u16::try_from(rows)
@@ -338,6 +391,40 @@ impl App {
         u16::try_from(rows)
             .unwrap_or(MAX_INPUT_ROWS)
             .clamp(1, MAX_INPUT_ROWS)
+    }
+
+    /// Draws an open choice in the input's place: a border around the question, the options, the keys,
+    /// and the typed row with the terminal's cursor in it when the choice takes text.
+    fn render_picker(&self, frame: &mut Frame, picker: &Picker, area: Rect, inset: Rect) {
+        let mut lines = picker.lines();
+        let typed_row = picker.choice.accepts_text.then(|| {
+            lines.push(Line::from(vec![
+                Span::styled("› ", palette::prompt()),
+                Span::styled(self.editor.text(), palette::user()),
+            ]));
+            lines.len() - 1
+        });
+        let height = u16::try_from(lines.len())
+            .unwrap_or(u16::MAX)
+            .saturating_add(DIALOG_FRAME);
+        let block = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(palette::wisp())
+            .title(Span::styled(" choose ", palette::wisp()))
+            .padding(Padding::horizontal(1));
+        let dialog = Rect {
+            y: area.y + 1,
+            height: height.min(area.height.saturating_sub(2)),
+            ..inset
+        };
+        frame.render_widget(Paragraph::new(lines).block(block), dialog);
+        // The terminal's cursor sits in the typed row: the border, the padding, and the prompt.
+        if let Some(row) = typed_row {
+            let column = u16::try_from(self.editor.rows(usize::MAX).column).unwrap_or(0);
+            let x = dialog.x.saturating_add(2 + PROMPT_CELLS_U16 + column);
+            let y = dialog.y + 1 + u16::try_from(row).unwrap_or(0);
+            frame.set_cursor_position((x.min(area.right().saturating_sub(1)), y));
+        }
     }
 
     /// Draws the band into `area`. Text is inset by the margin everywhere; the input's tint runs edge
@@ -360,6 +447,11 @@ impl App {
             0,
             Line::from(Span::styled(self.partial.clone(), palette::body())),
         );
+        if let Some(picker) = &self.picker {
+            self.render_picker(frame, picker, area, inset);
+            plain(frame, area.height.saturating_sub(1), self.status_line());
+            return;
+        }
         if let Some(approval) = &self.approval {
             let lines = dialog_lines(approval, dialog_width(area.width));
             let height = u16::try_from(lines.len())
@@ -523,6 +615,8 @@ impl App {
     }
 }
 
+/// The prompt's cells as a row offset.
+const PROMPT_CELLS_U16: u16 = 2;
 /// Rows a dialog's border and nothing else take: the top and bottom edges.
 const DIALOG_FRAME: u16 = 2;
 /// Rows a long command may wrap to in the dialog before it is cut.
@@ -610,7 +704,7 @@ fn answered(command: &str, decision: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{Event, Turn};
+    use crate::protocol::{Choice, ChoiceOption, Event, Turn};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use serde_json::Value;
@@ -701,6 +795,87 @@ mod tests {
                 seconds: 0.5,
                 failed: true
             })
+        );
+    }
+
+    fn choice(options: &[&str], accepts_text: bool) -> Choice {
+        Choice {
+            id: "c1".into(),
+            title: "approval.classifier: what judges each command".into(),
+            options: options
+                .iter()
+                .map(|v| ChoiceOption {
+                    value: (*v).into(),
+                    label: (*v).into(),
+                    detail: String::new(),
+                })
+                .collect(),
+            current: Some("system-model".into()),
+            accepts_text,
+        }
+    }
+
+    #[test]
+    fn a_choice_takes_the_arrows_enter_and_esc_and_takes_the_input_place() {
+        let mut app = App {
+            status: Some(Status::default()),
+            busy: true,
+            ..Default::default()
+        };
+        app.handle(Outbound::Choice(choice(
+            &["rules", "system-model", "coreml"],
+            false,
+        )));
+        assert_eq!(
+            app.band_height(60),
+            1 + 5 + 2 + 1,
+            "reply, question, three options, keys, border, status"
+        );
+        let rows = drawn(&app, 60);
+        assert!(rows[1].starts_with(" ╭ choose "), "{rows:?}");
+        assert!(rows[4].contains("▸ system-model *"), "{rows:?}");
+        app.recall_next();
+        app.type_char('x');
+        assert!(app.editor.is_empty(), "a fixed choice takes no typing");
+        assert_eq!(
+            app.submit(),
+            Action::Send(Inbound::Choose {
+                id: "c1".into(),
+                value: Some("coreml".into())
+            })
+        );
+        assert!(app.picker.is_none());
+        app.handle(Outbound::Choice(choice(&[], true)));
+        for c in "30".chars() {
+            app.type_char(c);
+        }
+        let typed = drawn(&app, 60);
+        assert!(typed.iter().any(|row| row.contains("› 30")), "{typed:?}");
+        assert_eq!(
+            app.submit(),
+            Action::Send(Inbound::Choose {
+                id: "c1".into(),
+                value: Some("30".into())
+            })
+        );
+        assert!(app.editor.is_empty());
+        app.handle(Outbound::Choice(choice(&["a"], false)));
+        assert_eq!(
+            app.cancel(),
+            Action::Send(Inbound::Choose {
+                id: "c1".into(),
+                value: None
+            })
+        );
+        app.handle(Outbound::Choice(choice(&["a"], false)));
+        assert!(matches!(
+            app.interrupt(),
+            Action::Send(Inbound::Choose { value: None, .. })
+        ));
+        assert_eq!(
+            app.cancel(),
+            Action::None,
+            "Esc with nothing open does nothing"
         );
     }
 

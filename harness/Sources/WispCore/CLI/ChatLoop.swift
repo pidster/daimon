@@ -32,13 +32,17 @@ public struct ChatLoop {
         /// A turn's start and end, for a face that shows when the model is working; the terminal
         /// ignores them, since its prompt returning says as much.
         public var turn: (ChatTurn) -> Void
+        /// Offers a choice and returns the answer, nil for none; nil here asks with a numbered list
+        /// through `print` and `readLine`.
+        public var choose: ((ChatChoice) async -> String?)?
 
         /// Creates an IO.
         public init(
             readLine: @escaping () -> String?, print: @escaping (String) -> Void, write: @escaping (String) -> Void,
             note: @escaping @Sendable (String) -> Void, prompt: @escaping (ChatStatus) -> Void,
-            turn: @escaping (ChatTurn) -> Void = { _ in }
+            turn: @escaping (ChatTurn) -> Void = { _ in }, choose: ((ChatChoice) async -> String?)? = nil
         ) {
+            self.choose = choose
             self.readLine = readLine
             self.print = print
             self.write = write
@@ -69,6 +73,9 @@ public struct ChatLoop {
         public var stats: CallStats?
         /// The `config.json` that `/config set` and `unset` change; nil makes them unavailable.
         public var configFile: URL?
+        /// The answers a setting offers beyond its kind's own (the models this Mac can run, the Core ML
+        /// models on disk); nil offers only those.
+        public var configOptions: (@Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option])?
 
         /// Creates a context.
         public init(
@@ -77,9 +84,11 @@ public struct ChatLoop {
             inspect: (@Sendable (String) async -> String)? = nil, banner: String? = nil,
             models: (@Sendable (ModelSelection, [any Tool]) async -> [String])? = nil,
             openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil, stats: CallStats? = nil,
-            configFile: URL? = nil
+            configFile: URL? = nil,
+            configOptions: (@Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option])? = nil
         ) {
             self.configFile = configFile
+            self.configOptions = configOptions
             self.directory = directory
             self.approval = approval
             self.git = git

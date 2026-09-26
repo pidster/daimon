@@ -73,6 +73,14 @@ chat` offers them. Lines too long for the dialog end in an ellipsis. The answer 
 scrollback as one line, `⚠ approved for this session: git push` or `⚠ refused: …`, and the band gives
 the rows back to the input. Ctrl-C or Ctrl-D refuses.
 
+A choice, such as `/config set approval.classifier` without a value, takes the input's place the same
+way: a border titled `choose` around the question, up to eight options with `▸` on the highlighted one
+and `*` on the value in force, and the keys. Up and Down move, Enter chooses, and Esc or Ctrl-C leaves
+the setting as it was. Where the setting takes a typed value (a number, text, a model not listed), a
+row below the options takes typing, and Enter with something typed sends that instead. In the plain
+chat the same choice is a numbered list: type a number or a value, or press Enter to leave it; a line
+starting with `/` leaves it too.
+
 Replies are rendered as each line goes into the scrollback, in the little Markdown the model writes:
 `#` headings in bold, `-`, `*`, and `+` bullets as `•`, and `` `code` ``, `**strong**`, and `*emphasis*`
 styled with their markers removed. A fenced block keeps its lines as they are, in the code colour, with
@@ -123,7 +131,7 @@ What a session shows, and where it goes:
 | `/stats` | Timings of this session's recent model turns and classifier calls: per kind and model, the count, failures, mean, P50, P95, and maximum seconds, and the mean prompt tokens where the runtime reports them (Ollama); then the latest eight calls by start time. Kept in memory only, the latest 256 calls; see below. |
 | `/history` | The lines typed this session, numbered, oldest first: the latest 100, blank lines and a line repeating the one before it left out. |
 | `/config`, `/config list` | The effective configuration, as `/inspect config` shows it; `list` shows the settings that can be changed here, each with its value in `config.json` (or `(default)`) and what it does. |
-| `/config set KEY VALUE`, `/config unset KEY` | Change `~/.wisp/config.json`, as `wisp config set` does (below). Given without a key or a value, it lists the settings. |
+| `/config set KEY VALUE`, `/config unset KEY` | Change `~/.wisp/config.json`, as `wisp config set` does (below). Leave out the value and chat offers the setting's choices; leave out the key too and it offers the settings first. `unset` without a key offers the settings set in the file. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
 | `/quit`, `/exit`, `/q`, a bare `exit`, `quit`, or `q`, Ctrl-D | Exit, saving if a name is set. |
@@ -166,10 +174,12 @@ Out, to the front end:
 | `output` | `text` | A whole line, as `/help` or `/last` print; an empty one ends a reply. |
 | `event` | `kind`, `call`, `turn`, `details`, `text` | Every audit event of the conversation, as `logging.md` describes them. `text` is the unstyled line the terminal chat shows for it, null when it shows none; a front end shows `text` so every face words tool activity alike, and reads the raw fields only for a view of its own. |
 | `approval` | `id`, `command`, `line`, `pattern`, `directory`, `level`, `reasons` | A command needs a decision; answer with the `id` within `approval.timeoutSeconds` or it is refused. |
+| `choice` | `id`, `title`, `options` (each `value`, `label`, `detail`), `current`, `acceptsText` | A chat command asks something, such as `/config set` without a value; answer with `choose` within `approval.timeoutSeconds`, or nothing changes. |
 | `exit` | | The loop has ended. |
 
 In, from the front end: `{"type":"message","text":"…"}` for a chat line, slash commands included, and
-`{"type":"answer","id":"…","decision":"once|session|project|always|no"}` for an approval. A line that
+`{"type":"answer","id":"…","decision":"once|session|project|always|no"}` for an approval, and
+`{"type":"choose","id":"…","value":"…"}` for a choice, with `value` null or absent for no answer. A line that
 is not a JSON object is taken as a message, so the protocol can be driven by hand:
 
 ```

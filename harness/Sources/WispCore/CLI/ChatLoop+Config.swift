@@ -16,19 +16,77 @@ extension ChatLoop {
             for line in configList() { io.print(line) }
         case .set(let path?, let value?):
             change(path) { try ConfigEdit.set(path, to: value, in: $0) }
+        case .set(let path?, nil):
+            guard let setting = ConfigSettings.setting(path) else {
+                io.note(style.ember("error: \(ConfigEdit.Failure.unknownSetting(path))"))
+                return
+            }
+            guard let value = await ask(await valueChoice(for: setting)) else { return io.note("left as it was") }
+            change(path) { try ConfigEdit.set(path, to: value, in: $0) }
+        case .set(nil, _):
+            guard let path = await ask(settingChoice(title: "Which setting?", onlySet: false)) else {
+                return io.note("left as it was")
+            }
+            await config(.set(path: path, value: nil))
         case .unset(let path?):
             change(path) { try ConfigEdit.unset(path, in: $0) }
-        case .set, .unset:
-            for line in configList() { io.print(line) }
-            io.note(style.muted("give the setting and the value: /config set approval.classifier coreml"))
+        case .unset(nil):
+            let choice = settingChoice(title: "Which setting goes back to its default?", onlySet: true)
+            guard !choice.options.isEmpty else { return io.note("no setting in config.json can be unset here") }
+            guard let path = await ask(choice) else { return io.note("left as it was") }
+            change(path) { try ConfigEdit.unset(path, in: $0) }
         case .unknown(let word):
             io.note("unknown /config \(word); use /config, /config list, /config set KEY VALUE, or /config unset KEY")
         }
     }
 
+    /// Asks through the face's own chooser, or with a numbered list read from the prompt.
+    func ask(_ choice: ChatChoice) async -> String? {
+        if let choose = io.choose { return await choose(choice) }
+        for line in choice.numbered { io.print(line) }
+        return io.readLine().flatMap(choice.answer(typed:))
+    }
+
+    /// The file's contents now, nil when there is none or it cannot be read.
+    var configData: Data? { context.configFile.flatMap { try? Data(contentsOf: $0) } }
+
+    /// The settings to choose from, each with its value; with `onlySet`, only those in the file.
+    func settingChoice(title: String, onlySet: Bool) -> ChatChoice {
+        let data = configData
+        let options = ConfigSettings.all.compactMap { setting -> ChatChoice.Option? in
+            let current: JSONValue? = (try? ConfigEdit.current(setting.path, in: data)) ?? nil
+            if onlySet, current == nil { return nil }
+            return ChatChoice.Option(
+                value: setting.path, detail: "\(current.map(Self.shown) ?? "(default)")  \(setting.summary)")
+        }
+        return ChatChoice(title: title, options: options)
+    }
+
+    /// The answers for one setting: its fixed choices, true and false, or what the face knows of (models,
+    /// Core ML files), with typed text taken wherever the kind allows it.
+    func valueChoice(for setting: ConfigSettings.Setting) async -> ChatChoice {
+        let current: JSONValue? = (try? ConfigEdit.current(setting.path, in: configData)) ?? nil
+        let title = "\(setting.path): \(setting.summary)"
+        let known = await context.configOptions?(setting) ?? []
+        let shown = current.map(Self.shown)
+        switch setting.kind {
+        case .choice(let values):
+            return ChatChoice(title: title, options: values.map { ChatChoice.Option(value: $0) }, current: shown)
+        case .flag:
+            return ChatChoice(
+                title: title, options: [ChatChoice.Option(value: "true"), ChatChoice.Option(value: "false")],
+                current: shown)
+        case .model, .coremlModel:
+            return ChatChoice(title: title, options: known, current: shown, acceptsText: true)
+        case .integer, .number, .text, .models, .tools:
+            let hint = shown.map { " (now \($0))" } ?? " (now the default)"
+            return ChatChoice(title: title + hint, options: known, current: shown, acceptsText: true)
+        }
+    }
+
     /// The settings as a table: each path, its value in the file or `(default)`, and what it does.
     func configList() -> [String] {
-        let data = context.configFile.flatMap { try? Data(contentsOf: $0) }
+        let data = configData
         let rows = ConfigSettings.all.map { setting -> [String] in
             let current: JSONValue? = (try? ConfigEdit.current(setting.path, in: data)) ?? nil
             return [setting.path, current.map(Self.shown) ?? "(default)", setting.summary]

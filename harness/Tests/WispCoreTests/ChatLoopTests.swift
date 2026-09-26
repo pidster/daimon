@@ -182,7 +182,7 @@ import WispTestSupport
         context.configFile = file
         let capture = Capture(lines: [
             "/config set approval.classifier rules", "/config set approval.threshold sometimes", "/config list",
-            "/config set", "/config unset approval.timeoutSeconds", "/config frob", "/config",
+            "/config unset approval.timeoutSeconds", "/config frob", "/config",
         ])
         var loop = ChatLoop(
             agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
@@ -195,7 +195,6 @@ import WispTestSupport
                 "approval.classifier: (default) → rules; saved to \(file.path), and used from the next session on"))
         #expect(notes.contains("note: only the rules judge commands"))
         #expect(notes.contains("error: approval.threshold: 'sometimes' is not one of"))
-        #expect(notes.contains("give the setting and the value"))
         #expect(notes.contains("unknown /config frob"))
         #expect(capture.output.contains("approval.classifier") && capture.output.contains("(default)"))
         #expect(capture.output.contains("inspected config"))
@@ -208,6 +207,42 @@ import WispTestSupport
             agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: Self.context, io: bare.io)
         try await unavailable.run()
         #expect(bare.noted.contains("the configuration cannot be changed here"))
+    }
+
+    @Test func configSetAsksForWhatIsLeftOutWithNumberedLists() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.json")
+        let agent = Agent(
+            instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: ScriptedModel()))
+        var context = Self.context
+        context.configFile = file
+        context.configOptions = { setting in
+            setting.kind == .model ? [ChatChoice.Option(value: "ollama:granite4.1:8b", detail: "5.4 GB")] : []
+        }
+        let classifier = String((ConfigSettings.all.firstIndex { $0.path == "approval.classifier" } ?? 0) + 1)
+        let capture = Capture(lines: [
+            "/config set", classifier, "1",  // the classifier, then rules
+            "/config set model", "1",  // the one model offered, unset again below
+            "/config set approval.timeoutSeconds", "30",  // typed
+            "/config set approval.threshold", "",  // left as it was
+            "/config set nosuch",
+            "/config unset", "1",  // the first setting in the file
+        ])
+        var loop = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
+        try await loop.run()
+        let saved = try Config.load(from: file)
+        // Unset offered the settings in the file in catalogue order; the first is the model.
+        #expect(saved.model == nil && saved.approval?.classifier == .rules && saved.approval?.timeoutSeconds == 30)
+        let out = capture.output
+        #expect(out.contains("Which setting?") && out.contains("approval.classifier: what judges each command"))
+        #expect(out.contains("  1  rules") && out.contains("  1  ollama:granite4.1:8b  5.4 GB"))
+        #expect(
+            out.contains("approval.timeoutSeconds: seconds to wait for an approval; 0 waits forever (now the default)"))
+        #expect(out.contains("Which setting goes back to its default?"))
+        #expect(capture.noted.contains("left as it was"))
+        #expect(capture.noted.contains { $0.hasPrefix("error: no setting 'nosuch'") })
     }
 
     @Test func historyKeepsTheLatestLinesAndNumbersThemToAlign() async throws {

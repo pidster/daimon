@@ -109,4 +109,20 @@ import WispTestSupport
         #expect(ChatInput(line: "/config unset model") == .config(.unset("model")))
         #expect(ChatInput(line: "/config frob") == .config(.unknown("frob")))
     }
+
+    @Test func aChoiceReadsNumbersValuesAndTypedText() {
+        let fixed = ChatChoice(
+            title: "pick", options: [.init(value: "rules"), .init(value: "coreml", detail: "fast")], current: "coreml")
+        #expect(fixed.answer(typed: "2") == "coreml" && fixed.answer(typed: " rules ") == "rules")
+        #expect(
+            fixed.answer(typed: "3") == nil && fixed.answer(typed: "other") == nil && fixed.answer(typed: "") == nil)
+        #expect(
+            fixed.numbered == ["pick", "  1  rules", "* 2  coreml  fast", "type a number, or press Enter to leave it"])
+        let open = ChatChoice(title: "value", options: [], acceptsText: true)
+        #expect(open.answer(typed: "30") == "30" && open.numbered.last == "type a value, or press Enter to leave it")
+        let both = ChatChoice(title: "model", options: [.init(value: "system")], acceptsText: true)
+        #expect(both.answer(typed: "1") == "system" && both.answer(typed: "ollama:x") == "ollama:x")
+        #expect(both.answer(typed: "/quit") == nil, "a slash command is not an answer")
+        #expect(both.numbered.last == "type a number or a value, or press Enter to leave it")
+    }
 }

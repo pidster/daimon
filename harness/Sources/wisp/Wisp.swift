@@ -357,7 +357,8 @@ struct Chat: AsyncParsableCommand {
                     try session.openAgent(
                         approver: TerminalApprover(style: style), transcript: transcript, observer: tap,
                         model: selection)
-                }, stats: session.stats, configFile: Wisp.home.configFile),
+                }, stats: session.stats, configFile: Wisp.home.configFile,
+                configOptions: Chat.configOptions(session: session)),
             style: style,
             io: .init(
                 readLine: { readLine() },
@@ -414,18 +415,43 @@ struct Chat: AsyncParsableCommand {
                 },
                 openModel: { selection, transcript in
                     try session.openAgent(approver: approver, transcript: transcript, observer: tap, model: selection)
-                }, stats: session.stats, configFile: Wisp.home.configFile),
+                }, stats: session.stats, configFile: Wisp.home.configFile,
+                configOptions: Chat.configOptions(session: session)),
             io: .init(
                 readLine: { router.nextMessage() },
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
                 write: { send(ChatProtocol.encode("delta", ["text": .string($0)])) },
                 note: { send(ChatProtocol.encode("note", ["text": .string($0)])) },
                 prompt: { send(ChatProtocol.encode("status", ChatProtocol.status($0))) },
-                turn: { send(ChatProtocol.encode("turn", ChatProtocol.turn($0))) }))
+                turn: { send(ChatProtocol.encode("turn", ChatProtocol.turn($0))) },
+                choose: { choice in
+                    await ChatProtocol.ask(choice, router: router, timeout: session.config.approvalTimeout, send: send)
+                }))
         // Events for the front end, raw and with the terminal's line, instead of the notes the loop would write.
         tap.onEvent { event in send(ChatProtocol.encode("event", ChatProtocol.event(event))) }
         try await loop.run()
         send(ChatProtocol.encode("exit"))
+    }
+
+    /// The answers `/config set` offers beyond a setting's own: the models this Mac can run, and the Core
+    /// ML models under `~/.wisp/models/coreml`.
+    static func configOptions(session: Session) -> @Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option] {
+        let config = session.config
+        return { setting in
+            switch setting.kind {
+            case .model, .models:
+                return await ModelListing.entries(config: config, home: Wisp.home, tools: []).entries
+                    .filter { $0.problem == nil }
+                    .map { ChatChoice.Option(value: $0.selection.description, detail: $0.detail) }
+            case .coremlModel:
+                let dir = Wisp.home.models.appending(path: "coreml")
+                let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+                return names.filter { $0.hasSuffix(".mlmodel") || $0.hasSuffix(".mlmodelc") }.sorted()
+                    .map { ChatChoice.Option(value: $0) }
+            default:
+                return []
+            }
+        }
     }
 
     /// Whether the last stdout write left the cursor mid-line, so a note can start on a fresh one.

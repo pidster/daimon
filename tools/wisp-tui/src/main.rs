@@ -9,6 +9,7 @@ mod app;
 mod editor;
 mod markdown;
 mod palette;
+mod picker;
 mod protocol;
 
 use std::io::{BufRead, BufReader, Write};
@@ -147,6 +148,7 @@ fn run(
             Some(Incoming::Terminal(TermEvent::Key(key))) if key.kind == KeyEventKind::Press => {
                 let action = match command_for(key.code, key.modifiers) {
                     Key::Interrupt => app.interrupt(),
+                    Key::Cancel => app.cancel(),
                     Key::Submit => app.submit(),
                     Key::Type(c) => app.type_char(c),
                     Key::Edit(edit) => {
@@ -215,6 +217,8 @@ fn next_height(current: u16, wanted: u16, input_empty: bool) -> Option<u16> {
 enum Key {
     /// Cancel a dialog, or quit.
     Interrupt,
+    /// Esc: leave an open choice unanswered.
+    Cancel,
     /// Send the input.
     Submit,
     /// A character: typed into the input, or an answer to a dialog.
@@ -257,6 +261,7 @@ fn command_for(code: KeyCode, modifiers: KeyModifiers) -> Key {
         KeyCode::Right => Key::Edit(Edit::Right),
         KeyCode::Home => Key::Edit(Edit::Home),
         KeyCode::End => Key::Edit(Edit::End),
+        KeyCode::Esc => Key::Cancel,
         KeyCode::Up => Key::RecallPrevious,
         KeyCode::Down => Key::RecallNext,
         _ => Key::Nothing,
