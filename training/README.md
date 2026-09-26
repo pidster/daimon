@@ -3,8 +3,10 @@
 Labelled examples for the fast, specialised classifiers of
 [ADR 0038](../docs/decisions/0038-fast-specialised-classifiers.md), one `label<TAB>text` per line, `#`
 for comments. Each file's header states its labels and every judgement rule applied, so a reviewer can
-check the labels against them. None of these is built into the binary; the shipped risk classifier is
-still trained from `harness/Sources/WispCore/Resources/risk-examples.tsv`.
+check the labels against them. Only one is built into the binary: `risk/train.tsv`, which
+`scripts/check classifier-default` copies to `harness/Sources/WispCore/Resources/risk-examples.tsv`, the
+bundled examples the shipped risk classifier is trained from (`TrainingSetsTests` fails if the copy
+differs).
 
 Each task has its own directory with three parts, kept apart by family: `train.tsv` to learn from,
 `dev.tsv` to choose between options (algorithms, tokenisation, training sets), and `test.tsv`, frozen,

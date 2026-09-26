@@ -23,6 +23,9 @@ Added:
   `/inspect status|approvals|audit`, `/approvals revoke [ID]` removes a standing approval at once, and
   `/inspect` stays as an alias. Tab completes the new words and approval ids.
 
+- The shipped risk classifier is trained from 2,061 examples, 1,075 of them real commands from
+  development sessions, instead of 292 drafted ones. On a frozen set of 996 real commands, beside
+  the rules, it rates 817 exactly, where the previous default rated 376.
 - The risk rules know a short list of read-only commands (`ls`, `cat`, `grep`, `git status`, `git log`,
   `git diff`, `--version`, and the like). For those the verdict is `safe` without asking a model
   classifier, so they cost no model call and never prompt. A command that writes, runs something
@@ -31,6 +34,9 @@ Added:
 Fixed:
 
 - Redirecting to `/dev/null` no longer counts as writing a file in the risk rules.
+- The risk rules follow the training labels: building and testing the project (`swift test`, `cargo
+  build`, `make`) no longer asks by itself, while `xcodebuild`, clean targets, and installs still
+  do, and `python3 -m http.server` on every interface is dangerous, not moderate.
 - The risk rules no longer take `git merge-base` for `git merge`, `git tag -l` for making a tag, or a
   program's `open(…)` or a word `at` inside a command for the `open` and `at` commands, so those read-only
   commands no longer ask for approval.

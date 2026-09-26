@@ -30,7 +30,7 @@ import Testing
         Scenario("ls -la", parts: ["ls"], asks: []),
         Scenario("git status && git log --oneline -5", parts: ["git", "git"], asks: []),
         Scenario("head -x 1 -y 2 -z 3", parts: ["head"], asks: []),
-        Scenario("swift test 2>&1 | tail -3", parts: ["swift", "tail"], asks: ["swift test *"]),
+        Scenario("xcodebuild -scheme App 2>&1 | tail -3", parts: ["xcodebuild", "tail"], asks: ["xcodebuild *"]),
         Scenario("ls && touch a | wc -l", parts: ["ls", "touch", "wc"], asks: ["touch *"]),
         Scenario("echo hi > out.txt; cat out.txt", parts: ["echo", "cat"], asks: ["echo *"]),
         Scenario("FOO=1 env python3 -m http.server 8000", parts: ["python3"], asks: ["python3 *"]),

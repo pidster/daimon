@@ -107,6 +107,9 @@ public struct RuleRiskClassifier: RiskClassifier {
         Rule(
             #"(curl|wget)\b.*(-X\s*POST|--data|-d\s|--upload-file|-T\s|@-)"#, .dangerous,
             "uploads data over the network"),
+        Rule(
+            #"-m\s+http\.server\b(?!.*(--bind|-b)\s+(127\.0\.0\.1|localhost|::1)\b)"#, .dangerous,
+            "serves a directory on every network interface"),
         // Moderate
         Rule(start + #"(curl|wget|ssh|scp|sftp|rsync|nc|telnet)\b"#, .moderate, "uses the network"),
         Rule(
@@ -124,10 +127,15 @@ public struct RuleRiskClassifier: RiskClassifier {
             start + #"(rm|mv|cp|touch|mkdir|rmdir|ln|truncate|tee|sed\s+-i|perl\s+-i)\b"#, .moderate, "modifies files"),
         Rule(#"(^|[^>])>{1,2}\s*(?!/dev/null\b)[^&\s]"#, .moderate, "writes to a file"),
         Rule(start + #"edit_file\b"#, .moderate, "edits a file"),
+        // Building and testing the project are safe, as the labels have them (training/risk/labels.md); only
+        // what writes outside the project or throws build output away is moderate.
+        Rule(
+            start + #"xcodebuild(?!\s+(-showsdks|-version|-list)\b)(?=\s|$)"#, .moderate,
+            "writes build products outside the project"),
         Rule(
             start
-                + #"(swift\s+build|swift\s+test|cargo\s+(build|test|run)|make|xcodebuild|npm\s+(run|test)|pytest|go\s+(build|test))\b"#,
-            .moderate, "runs a build or tests"),
+                + #"(make\s+(\S+\s+)*(clean|distclean|install|uninstall)\b|cargo\s+clean\b|swift\s+package\s+(clean|reset|purge-cache)\b|go\s+clean\b)"#,
+            .moderate, "cleans or installs build output"),
         Rule(
             start + #"(open|osascript|defaults\s+write|crontab|at)(?=\s|$)"#, .moderate,
             "affects the desktop or scheduling"),

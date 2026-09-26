@@ -130,13 +130,25 @@ eval_() {
     fi
 }
 
-# classifier-default: train the risk classifier this version ships, from the bundled examples, into
-# the embedded resource; run after WispVersion.current is bumped, and commit the resource with the bump.
-# The shipped file is what the release carries, measured by the eval.
+# classifier-default: copy the risk train set into the bundled examples, then train the risk classifier
+# this version ships from them into the embedded resource; run after WispVersion.current is bumped, and
+# commit both resources with the bump. The shipped file is what the release carries, measured by the eval.
 classifier_default() {
     echo "==> shipped classifier"
+    bundle_risk_examples
     (cd harness && swift build $SWIFT_SANDBOX -q && .build/debug/wisp classifier ship \
         --resource Sources/WispCore/Resources/risk-default.json)
+}
+
+# The bundled risk examples are a copy of training/risk/train.tsv under a header; TrainingSetsTests fails
+# if they differ, so the train set is the one place to edit.
+bundle_risk_examples() {
+    {
+        echo "# The risk classifier's bundled training examples: a copy of training/risk/train.tsv, written by"
+        echo "# scripts/check classifier-default. Edit training/risk/train.tsv, never this file; TrainingSetsTests"
+        echo "# fails if the two differ. Labels and rules: training/risk/labels.md."
+        grep -v '^#' training/risk/train.tsv
+    } > harness/Sources/WispCore/Resources/risk-examples.tsv
 }
 
 format() {

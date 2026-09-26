@@ -253,3 +253,57 @@ The list was written without looking at the test set. It was then measured once:
 - The rules alone rate 691 of the 996 exactly, with 82 over, where they rated 574 with 222 over.
 - The shipped default classifier beside the rules rates 500 exactly, with 460 over, 36 under, and no
   dangerous command safe, where it rated 376 with 587 over and 33 under.
+
+## Amendment, 2026-09-26: trained on real commands, and the rules follow the labels
+
+The measurements on the three-way split showed that drafted training data does not look like real
+use. So 1,438 real commands from development sessions were labelled, reviewed adversarially,
+neutralised, and split into train (1,075) and dev (269), apart from the test set.
+
+On the real dev commands, with the rules beside each classifier:
+
+| Trained on | Exact of 269 | Safe that ask | Under | Dangerous rated safe |
+| --- | --- | --- | --- | --- |
+| drafted | 162 to 180 | 58 to 75 | 9 to 12 | 0 to 1 |
+| real | 211 to 220 | 39 to 42 | 5 to 9 | 0 |
+| drafted and real | 215 to 218 | 36 to 41 | 4 to 8 | 0 |
+
+The ranges span the other options tried, which added little:
+
+- Augmentation, wrapping commands in real plumbing, cut the under-ratings to 4 or 5.
+- Classifying the canonical form helped a little on real data alone.
+- Letting the model raise a level only above a confidence threshold traded prompts for
+  under-ratings and let dangerous commands through, so it was rejected.
+- Classifying compound commands segment by segment made no difference, because the extracted
+  commands had already been split.
+
+**The decisions:**
+- **The training source.** The shipped default is now trained from `training/risk/train.tsv`,
+  drafted and real, with plain tokenisation and no augmentation. The bundled examples are a copy of
+  it, and a test keeps the two identical.
+- **The rules follow the training labels.** Building and testing the project are safe, as the model
+  classifier's instructions already said. `xcodebuild` (it writes DerivedData), clean targets and
+  installs stay moderate. A directory served on every interface is dangerous.
+- **Two rule slips fixed.** `git merge-base` and `git tag -l` are no longer taken for `merge` and
+  `tag`. `open(` in code and a word `at` are no longer taken for commands.
+
+Measured once on the 996 real test commands:
+
+| Beside the rules | Exact | Over | Under | Dangerous rated safe |
+| --- | --- | --- | --- | --- |
+| nothing (rules alone) | 732 | 30 | 234 | 8 |
+| the new default | 817 | 129 | 50 | 4 |
+| the previous default, with the read-only list | 500 | 460 | 36 | 0 |
+
+The new default makes a third of the old one's prompts on safe commands, but rates four of the 25
+dangerous commands safe:
+
+- **`printenv POSTGRES_PASSWORD`** run inside a container reads out a credential, which no rule
+  covers. It is a real rule gap.
+- **`sh -s -- kubernetes`** runs a script piped from `curl`. The simple command no longer shows the
+  pipe.
+- **Two calls of a project hook that deletes worktrees.** Nothing in their text says so.
+
+The previous default avoided them only by rating most commands moderate or dangerous. Four in 25 is
+an upper bound of about 35% at 95% confidence. The test set has too few dangerous commands to
+measure this rate closely.

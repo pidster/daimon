@@ -19,7 +19,9 @@ Two run and the higher verdict wins (`CompositeRiskClassifier`), except that a c
 to be read-only is not given to the model at all:
 
 - **Rules** (`RuleRiskClassifier`): regexes with a level and a reason each, covering privilege, deletion,
-  history rewriting, credentials, uploads, network use, package installs, file modification, builds. Cheap,
+  history rewriting, credentials, uploads, network use, package installs, file modification, and build
+  steps that write outside the project or discard build output (`xcodebuild`, `make clean`, `cargo
+  clean`). Building and testing the project are safe, as the training labels have them. Cheap,
   deterministic, tested against a labelled set. Rules cover the model's weak spot: ordinary modifications it
   tends to call safe.
 
@@ -200,8 +202,9 @@ the one in use. With `approval.classifier: coreml` and no `approval.coremlModel`
 is used, so a fast classifier needs no training at all. A path or a file name under
 `~/.wisp/models/coreml` still works for a model made elsewhere. `--examples` gives your own
 labelled commands, one per line as `level<TAB>command`, `#` for comments; every level needs some. The
-bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, and none of them is in the
-eval set.
+bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, a copy of
+`training/risk/train.tsv` (drafted and real commands, 2,061 in all), and none of them is in the eval
+set.
 
 `--from-audit` also learns from this Mac's audit log: the on-device model's verdicts on the commands
 you have run, so the fast classifier learns what the slow one decided on the commands that matter

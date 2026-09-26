@@ -61,6 +61,14 @@ import WispTestSupport
         #expect(TrainingSplit.patternsCompile)
     }
 
+    @Test func theBundledExamplesAreTheRiskTrainSet() throws {
+        // `scripts/check classifier-default` copies the train set into the bundle; editing either alone fails.
+        let train = try #require(part("risk", "train")).map {
+            "\($0.label)\t\($0.text.replacingOccurrences(of: "\u{200B}", with: ""))"
+        }
+        #expect(RiskExamples.bundled.map { "\($0.level.rawValue)\t\($0.command)" } == train)
+    }
+
     @Test func familiesIgnoreWhatVariesAndKeepWhatMatters() {
         let family = TrainingSplit.family(of:)
         #expect(family("cat README.md") == family("cat  notes.txt"))
