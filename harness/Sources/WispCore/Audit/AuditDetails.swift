@@ -176,6 +176,19 @@ extension AuditEvent {
             ]
         }
 
+        /// `classifier.train`: where the model went, what it learned from, and how well it fits that.
+        public static func classifierTrained(
+            _ outcome: RiskClassifierTraining.Outcome, examplesSource: String
+        ) -> [String: JSONValue] {
+            [
+                "path": .string(outcome.url.path), "examplesSource": .string(examplesSource),
+                "examples": .int(outcome.examples),
+                "perLevel": .object(
+                    Dictionary(uniqueKeysWithValues: outcome.perLevel.map { ($0.key.rawValue, .int($0.value)) })),
+                "trainingAccuracy": .double(outcome.trainingAccuracy), "seconds": .double(outcome.seconds),
+            ]
+        }
+
         /// `redaction`: where, how much, and how many values of each kind were replaced.
         public static func redaction(_ report: Redaction.Report) -> [String: JSONValue] {
             [
@@ -290,6 +303,7 @@ extension AuditEvent {
         case .mcpResult: ["tool", "isError", "text", "seconds"]
         case .error: ["message", "context"]
         case .classifierVerdict: ["command", "pattern", "line", "level", "reasons", "sources", "seconds", "metadata"]
+        case .classifierTrained: ["path", "examplesSource", "examples", "perLevel", "trainingAccuracy", "seconds"]
         case .approvalRequested: ["command", "pattern", "line", "level"]
         case .approvalDecided:
             [

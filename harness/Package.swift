@@ -31,7 +31,10 @@ let package = Package(
     targets: [
         .target(
             name: "WispCore",
-            exclude: ["Resources/system-prompt.md", "Resources/measurements.json", "Resources/multiplexers.txt"],
+            exclude: [
+                "Resources/system-prompt.md", "Resources/measurements.json", "Resources/multiplexers.txt",
+                "Resources/risk-examples.tsv",
+            ],
             linkerSettings: [.linkedFramework("FoundationModels")],
             plugins: ["EmbedSystemPrompt"]
         ),
@@ -93,7 +96,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ModelEvalTests",
-            dependencies: ["WispCore"],
+            dependencies: ["WispCore", "WispTestSupport"],
             // Real diffs from this repository's history, read by path in DraftEvalTests.
             exclude: ["Fixtures"]
         ),

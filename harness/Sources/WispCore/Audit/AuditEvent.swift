@@ -30,6 +30,7 @@ public struct AuditEvent: Codable, Equatable, Sendable {
         case watchRun = "watch.run"
         case modelRouted = "model.routed"
         case classifierVerdict = "classifier.verdict"
+        case classifierTrained = "classifier.train"
         case approvalRequested = "approval.requested"
         case approvalDecided = "approval.decided"
         case condensation = "context.condensation"

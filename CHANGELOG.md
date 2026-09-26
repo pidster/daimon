@@ -18,8 +18,21 @@ Added:
 - `wisp-tui` renders the Markdown in replies: headings, bullets, inline code, bold, and italics, with
   fenced code blocks kept as they are in the code colour.
 
+- `wisp classifier train` trains a risk classifier on this Mac in well under a second, from the
+  bundled examples or your own, and `wisp classifier measure` reports any classifier's accuracy and
+  speed on labelled commands. A trained classifier answers in about 0.05 ms, against about 2.3 s for
+  the on-device model; use it with `approval.classifier: coreml`. The Core ML classifier now loads its
+  model once instead of on every command, and reads contract 2 models.
+
+Removed:
+
+- `scripts/train-risk-classifier` and `docs/examples/risk-labels.csv`, which trained on the eval set;
+  `wisp classifier train` replaces them.
+
 Fixed:
 
+- The rules rate deletion through `find … -delete`, `find … -exec rm`, and `xargs rm` as dangerous;
+  they called it safe.
 - `wisp-tui` no longer redraws its band while idle, which could make the cursor flicker or restart its
   blink, and no longer resizes the band back and forth when deleting across a wrapped line.
 

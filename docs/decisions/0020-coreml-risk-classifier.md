@@ -46,3 +46,13 @@ commands, fast, deterministic, and chosen independently of which model runs the 
   the guard exists and why the rules run beside it. Before an operator relies on a model, they evaluate
   it on commands like theirs; loading and producing valid labels is not evidence of suitability.
 - General intent classification and model routing are outside this decision.
+
+## Amendment, 2026-09-25
+
+[ADR 0038](0038-fast-specialised-classifiers.md) adds contract version 2 (version 1's features and
+labels, with shell punctuation split into tokens), which `wisp classifier train` writes; version 1
+models still load. The classifier now loads its model once, not per verdict. `scripts/train-risk-classifier`
+and `docs/examples/risk-labels.csv` are removed: they trained on the eval set. The two dangerous
+commands this ADR's measurement saw called `safe` are revisited there: `find … -delete` is now caught by
+the rules, and a classifier trained on the bundled examples rates neither below `moderate`.
+

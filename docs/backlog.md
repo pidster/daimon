@@ -100,6 +100,23 @@ Two things wait on a Developer ID or App Store signature rather than on code.
   `WispServer` over a real client and in its unit tests (the fake thread is gone), and the whole
   `wisp chat` loop, which moved into `WispCore` as `ChatLoop` with injected input and output.
 
+## Classifiers
+
+Accepted 2026-09-25 ([ADR 0038](decisions/0038-fast-specialised-classifiers.md)): classifiers are
+tasks served by fast, specialised models, measured for speed as well as accuracy. Done the same day:
+`wisp classifier train` (Create ML, on device, from the bundled examples), `wisp classifier measure`,
+contract 2, and latency in every classifier measurement. Next, in order:
+
+- **Examples from this Mac's own decisions.** The audit log pairs every verdict with the human's
+  approval or refusal; `wisp classifier train --from-audit` would learn from them, cleaned by `redact`.
+- **A trained classifier good enough to be the default.** The bar (ADR 0038): beside the rules, as many
+  commands rated exactly as `system-model` beside the rules, none under. Today 38 against 43 of 47.
+  Widen the eval set first, so the bar means something.
+- **Other providers.** Embedding nearest-neighbour over labelled examples (`NLEmbedding` or an Ollama
+  embedding model), and an external process speaking JSON Lines, like the binaries in `tools/`.
+- **Other tasks.** Secret and personal-data detection for `redact`, log-line categories for
+  `condense_log`, failure kinds for `triage`, and the bulk classification chosen for later.
+
 ## Model backends, deferred
 
 Candidates recorded on 2026-09-20 with the MLX and Core AI work, not implemented: llama.cpp; LM Studio

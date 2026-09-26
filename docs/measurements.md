@@ -17,7 +17,9 @@ Mac on one day; it is evidence, not a certification.
 
 | Task | Eval | A pass is |
 | --- | --- | --- |
-| `classifier.system-model` | `ClassifierEvalTests`, 47 labelled commands, twelve held out | the command rated at exactly its level; separately, no dangerous command below moderate is a hard requirement |
+| `classifier.system-model` | `ClassifierEvalTests`, 47 labelled commands (`RiskEvalSet`), twelve held out | the command rated at exactly its level by the on-device model alone; separately, no dangerous command below moderate is a hard requirement. Recorded with p50 and p95 latency per verdict |
+| `classifier.system-model+rules` | the same set | the default classifier as the gate runs it, the rules beside the model, the higher level winning |
+| `classifier.trained`, `classifier.trained+rules` | the same set | a classifier trained on device from the bundled examples, which never include an eval case, alone and beside the rules ([ADR 0038](decisions/0038-fast-specialised-classifiers.md)). On 2026-09-25: 41/47 and 38/47 at 0.04 and 0.07 ms, against the model's 46/47 and 43/47 at 2.3 s |
 | `triage` | `TriageEvalTests`, abridged swift build, swift test, cargo test, and pytest output | an expected failure found, by test name or file:line |
 | `summarise_diff` | `DiffSummaryEvalTests`, five small diffs | the expected flag (secret, deleted or disabled test) on the expected file, or no flag for an ordinary change, from the rules and the model together; every file must also get a summary line. The model alone scored 2 of 5 on 2026-09-21, which is why the rules exist |
 | `redact.thorough` | `RedactionEvalTests`, a ticket, a service log, a meeting note, build output, a stack trace | every expected value (names, an account number, a user id, an address, a private hostname) replaced by the rules and the model together, and every phrase that must survive unchanged; the judge runs under wisp's own system prompt, as callers' passes do |
@@ -25,6 +27,11 @@ Mac on one day; it is evidence, not a certification.
 | `system_info.topic` | `SystemInfoEvalTests`, eight plain questions about the Mac, twice each, with `run_command` also offered | a `system_info` call in the turn naming the expected topic (and port or process); three runs on 2026-09-24, with the process name required, scored 15, 16, and 16 of 16 |
 | `edit_file.replace` | `ToolEvalTests`, ten small files | after read_file then edit_file replace by line number, the file is exactly as intended |
 | `respond.schema` | `ToolEvalTests`, six code snippets | the schema-shaped reply parses and names the language |
+
+Classifier measurements also carry `p50Milliseconds` and `p95Milliseconds`, the latency per verdict,
+since a classifier runs on every command and speed is half of what makes one fit
+([ADR 0038](decisions/0038-fast-specialised-classifiers.md)); `wisp classifier measure` reports the same
+for any classifier over any labelled file.
 
 The sets are small on purpose: they prove the pipeline and catch regressions. Widen a set when the
 model gets a case wrong in practice, keeping cases that do not resemble the prompt's own examples.

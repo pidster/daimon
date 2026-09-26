@@ -131,7 +131,7 @@ not an audit log is attached, and the refusals `respond` reports are those of th
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `threshold` | `moderate` | Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`. |
-| `classifier` | `system-model` | What runs beside the rules: `rules` (nothing; fast and deterministic), `system-model` (Apple's on-device model), or `coreml` (a Core ML text classifier, below). Independent of `model`. |
+| `classifier` | `system-model` | What runs beside the rules: `rules` (nothing; fast and deterministic), `system-model` (Apple's on-device model, about 2.3 s a command), or `coreml` (a Core ML text classifier, below, such as one `wisp classifier train` makes, about 0.05 ms a command). Independent of `model`. |
 | `useModel` | `true` | The pre-0.2 switch; `false` means `classifier: rules`. Read only when `classifier` is absent. |
 | `coremlModel` | none | For `coreml`: the `.mlmodel` or `.mlmodelc`, absolute, `~`, or under `<home>/models/coreml`. |
 | `coremlMinimumConfidence` | `0.6` | For `coreml`: below this top-label probability the verdict is raised to at least `moderate`. |
@@ -148,11 +148,14 @@ How approval should reach clients that do not render elicitation at all remains 
 The rules, the threshold, and the human stay authoritative: the higher of the two levels wins, and
 nothing the classifier does can lower a level or grant an approval.
 
-The model must follow contract version 1: input `text`, a string; output `label`, one of `safe`,
-`moderate`, `dangerous`; creator metadata `wisp.classifier.contract` = `1` and
-`wisp.classifier.labels` = `safe,moderate,dangerous`. wisp gives it the command line trimmed with
-runs of whitespace collapsed to one space, case kept. A model declaring anything else is rejected when
-it loads. Its metadata version string is its identity in the audit.
+The model must follow contract version 1 or 2: input `text`, a string; output `label`, one of `safe`,
+`moderate`, `dangerous`; creator metadata `wisp.classifier.contract` = `1` or `2` and
+`wisp.classifier.labels` = `safe,moderate,dangerous`. Under version 1 wisp gives it the command line
+trimmed with runs of whitespace collapsed to one space, case kept; version 2 first puts spaces around
+shell punctuation (`| & ; < > ( ) $ \` " ' = / ~ .`), so each is a token of its own
+([ADR 0038](decisions/0038-fast-specialised-classifiers.md)). A model declaring anything else is
+rejected when it loads. Its metadata version string is its identity in the audit, and the model is
+loaded once per process.
 
 Every failure is a `moderate` verdict with the reason: no path configured, a missing asset, a model
 Core ML cannot load, a contract mismatch, an inference error, no prediction, an unknown label, or a
@@ -160,16 +163,33 @@ top-label probability below `coremlMinimumConfidence`. Confidence is recorded on
 label probabilities (Create ML text classifiers do); it is uncalibrated, and the threshold guards
 against guessing rather than measuring accuracy. `wisp doctor` checks the configured model prepares.
 
-Train one from a `text,label` CSV, then measure it before relying on it:
+### Training and measuring a classifier
+
+A classifier runs on every command, so it should be fast and specialised rather than a general model
+([ADR 0038](decisions/0038-fast-specialised-classifiers.md)). wisp trains one on this Mac:
 
 ```
-scripts/train-risk-classifier docs/examples/risk-labels.csv ~/.wisp/models/coreml/risk.mlmodel
-WISP_MODEL_TESTS=1 WISP_COREML_MODEL=~/.wisp/models/coreml/risk.mlmodel scripts/check eval
+wisp classifier train                        # from the ~290 bundled examples, in well under a second
+wisp classifier measure --classifier coreml --coreml-model risk.mlmodel --examples my-commands.tsv
 ```
 
-`docs/examples/risk-labels.csv` is the 45-command eval set: enough to prove the pipeline, not to trust
-a model trained on it. Loading and producing valid labels is not evidence of suitability; the eval's
-hard requirement is that no dangerous command is rated safe, and its accuracy figure is what you judge.
+`train` writes `~/.wisp/models/coreml/risk.mlmodel` (or `--out`) with Create ML, a maximum-entropy
+text classifier under contract 2, and prints the config that uses it:
+`"approval": {"classifier": "coreml", "coremlModel": "risk.mlmodel"}`. `--examples` gives your own
+labelled commands, one per line as `level<TAB>command`, `#` for comments; every level needs some. The
+bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, and none of them is in the
+eval set.
+
+`measure` runs a classifier over labelled commands with the rules beside it, as the gate runs it, and
+prints the commands rated exactly, over, and under, every miss, and the latency per verdict (p50, p95,
+slowest). It exits 1 when a dangerous command is rated safe. `--classifier` and `--coreml-model`
+override the config for the measurement. Measure a trained model on commands it did not learn from.
+
+Measured on 2026-09-25 over the 47-command eval set, the rules beside each: the default `system-model`
+rated 43 exactly at 2.3 s a command, a trained classifier 38 at 0.07 ms, neither rating any command
+below its level. The trained classifier's misses are over-ratings, commands like `git status` rated
+`moderate`, which ask for approval needlessly; that is why it is not yet the default.
+[measurements.md](measurements.md) has the current figures.
 
 ## Audit
 

@@ -84,6 +84,10 @@ public struct RuleRiskClassifier: RiskClassifier {
             start + #"git\s+(reset\s+--hard|clean\s+-[a-z]*f|checkout\s+--\s|restore\s)"#, .dangerous,
             "discards local changes"),
         Rule(start + #"git\s+branch\s+-D\b"#, .dangerous, "deletes a branch without merge check"),
+        Rule(
+            start + #"find\b.*\s(-delete\b|-exec(dir)?\s+rm\b)"#, .dangerous,
+            "deletes every file the search matches"),
+        Rule(start + #"xargs\s+(-\S+\s+)*rm\b"#, .dangerous, "deletes every path given to it"),
         Rule(start + #"(chmod|chown)\s+(-R|--recursive)"#, .dangerous, "recursive permission change"),
         Rule(
             start + #"(mkfs|diskutil\s+(erase|partition)|newfs_|dd\s.*\bof=/dev/)"#, .dangerous,

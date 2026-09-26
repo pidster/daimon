@@ -341,6 +341,17 @@ Each run prints a line (`[22:15:34] run 2 (change): pass, exit 0, 1.3 s; was fai
 `watch.run`; notifications are audited as `notification` with source `watch`. Ctrl-C stops after the
 current run; a second Ctrl-C stops at once.
 
+### `wisp classifier`
+
+`wisp classifier train [--examples <file>] [--out <path>]` trains a risk classifier on this Mac with
+Create ML, from labelled commands (`level<TAB>command` per line) or the bundled examples, into
+`~/.wisp/models/coreml/risk.mlmodel`, and prints the config that makes the approval gate use it.
+`wisp classifier measure [--examples <file>] [--classifier rules|system-model|coreml] [--coreml-model <path>]`
+runs a classifier, with the rules beside it, over labelled commands and prints its exact, over-, and
+under-ratings, misses, and latency per verdict; it exits 1 when a dangerous command is rated safe.
+Training is audited as `classifier.train`. See [approval.md](approval.md), "Training and measuring a
+classifier".
+
 ### `wisp approvals`
 
 `wisp approvals` (or `approvals list`) prints standing approvals: id, scope, expiry, directory, pattern

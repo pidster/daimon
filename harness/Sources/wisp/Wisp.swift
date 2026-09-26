@@ -17,7 +17,7 @@ struct Wisp: AsyncParsableCommand {
         subcommands: [
             Respond.self, Chat.self, Tools.self, Models.self, Mcp.self, Logs.self, ConfigCommand.self,
             DoctorCommand.self,
-            Approvals.self, Notify.self, Scan.self, Redact.self, Watch.self, Draft.self,
+            Approvals.self, Notify.self, Scan.self, Redact.self, Watch.self, Draft.self, ClassifierCommand.self,
         ],
         defaultSubcommand: Respond.self
     )
@@ -631,6 +631,7 @@ struct Redact: AsyncParsableCommand {
 }
 
 extension Watcher.NotifyPolicy: ExpressibleByArgument {}
+extension RiskClassifierChoice: ExpressibleByArgument {}
 extension ChangeDraft.Kind: ExpressibleByArgument {}
 
 /// Drafts a commit message, PR description, or changelog line from the staged diff or a piped one.
@@ -878,6 +879,109 @@ struct Approvals: AsyncParsableCommand {
         func run() async throws {
             try await ApprovalStore(url: Wisp.home.approvalsFile).clear()
             print("cleared")
+        }
+    }
+}
+
+/// Trains and measures the fast, specialised classifiers the approval gate can use (ADR 0038).
+struct ClassifierCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "classifier", abstract: "Train and measure risk classifiers for the approval gate.",
+        discussion:
+            "A classifier judges every command the model runs, so it must be fast: a model trained here answers "
+            + "in well under a millisecond, the on-device language model in about half a second.",
+        subcommands: [Train.self, Measure.self])
+
+    /// Where `train` writes by default: the name `approval.coremlModel` resolves without a path.
+    static let defaultModelName = "risk.mlmodel"
+
+    /// Labelled commands from a file, or the bundled training examples.
+    ///
+    /// - Throws: A usage error naming the file and the bad line.
+    static func examples(_ path: String?) throws -> (examples: [RiskExample], source: String) {
+        guard let path else { return (RiskExamples.bundled, "bundled") }
+        let url = URL(filePath: (path as NSString).expandingTildeInPath)
+        do {
+            return (try RiskExamples.load(url), url.path)
+        } catch {
+            throw ValidationError("\(url.path): \(error)")
+        }
+    }
+
+    /// Trains a risk classifier with Create ML on this Mac.
+    struct Train: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Train a risk classifier on this Mac from labelled commands.",
+            discussion:
+                "Examples are lines of level<TAB>command, level being safe, moderate, or dangerous; '#' starts a "
+                + "comment. Without --examples, the examples bundled with wisp are used.")
+
+        @Option(name: .long, help: "Labelled commands to learn from. Defaults to the bundled examples.")
+        var examples: String?
+
+        @Option(name: .long, help: "Where to write the model. Defaults to ~/.wisp/models/coreml/risk.mlmodel.")
+        var out: String?
+
+        func run() async throws {
+            let session = try Wisp.begin(.init(entryPoint: .classifier))
+            defer { session.end() }
+            let (examples, source) = try ClassifierCommand.examples(examples)
+            let url =
+                out.map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
+                ?? Wisp.home.models.appending(path: "coreml").appending(path: ClassifierCommand.defaultModelName)
+            let version = "wisp \(WispVersion.current), \(Date().formatted(.iso8601.year().month().day()))"
+            let outcome: RiskClassifierTraining.Outcome
+            do {
+                outcome = try RiskClassifierTraining.train(examples, writingTo: url, version: version)
+            } catch let failure as RiskClassifierTraining.Failure {
+                throw ValidationError("\(source): \(failure)")
+            }
+            session.audit.record(
+                .classifierTrained, details: AuditEvent.Details.classifierTrained(outcome, examplesSource: source))
+            let levels = RiskLevel.allCases.map { "\(outcome.perLevel[$0, default: 0]) \($0.rawValue)" }
+            print(
+                "trained on \(outcome.examples) examples (\(levels.joined(separator: ", "))) in "
+                    + String(format: "%.1f s; ", outcome.seconds)
+                    + String(format: "%.0f%% of them labelled back correctly", outcome.trainingAccuracy * 100))
+            print("wrote \(url.path)")
+            let name = out == nil ? ClassifierCommand.defaultModelName : url.path
+            print(
+                "to use it, set in ~/.wisp/config.json: \"approval\": {\"classifier\": \"coreml\", "
+                    + "\"coremlModel\": \"\(name)\"}")
+            print(
+                "measure it on commands it has not seen: wisp classifier measure --classifier coreml --examples <file>")
+        }
+    }
+
+    /// Runs a classifier over labelled commands for accuracy and speed.
+    struct Measure: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Measure a risk classifier's accuracy and speed on labelled commands.",
+            discussion:
+                "The rules always run beside a classifier, as the approval gate runs them. Exits 1 when a dangerous "
+                + "command is rated safe. Measure a trained model on examples it was not trained on.")
+
+        @Option(name: .long, help: "Labelled commands. Defaults to the bundled training examples.")
+        var examples: String?
+
+        @Option(name: .long, help: "rules, system-model, or coreml. Defaults to approval.classifier.")
+        var classifier: RiskClassifierChoice?
+
+        @Option(name: .long, help: "The Core ML model for --classifier coreml. Defaults to approval.coremlModel.")
+        var coremlModel: String?
+
+        func run() async throws {
+            let session = try Wisp.begin(.init(entryPoint: .classifier))
+            defer { session.end() }
+            let (examples, source) = try ClassifierCommand.examples(examples)
+            var config = session.config
+            if let classifier { config.approvalClassifier = classifier }
+            if let coremlModel { config.coremlModel = coremlModel }
+            let measured = Session.Dependencies.live.makeClassifier(config, Wisp.home)
+            let report = await RiskMeasurement.run(measured, on: examples)
+            print("\(config.approvalClassifier.rawValue) on \(examples.count) examples from \(source):")
+            for line in report.lines { print("  \(line)") }
+            if !report.holdsTheHardRequirement { throw ExitCode.failure }
         }
     }
 }

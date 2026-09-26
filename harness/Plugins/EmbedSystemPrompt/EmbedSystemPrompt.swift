@@ -4,7 +4,8 @@ import PackagePlugin
 /// Embeds text resources into `WispCore` as Swift string constants at build time, so each is a plain
 /// file in the source tree and the product stays one binary with nothing to ship beside it:
 /// `Resources/system-prompt.md` as `SystemPromptText.text`, `Resources/measurements.json` as
-/// `MeasurementsText.text`, and `Resources/multiplexers.txt` as `MultiplexersText.text`. The text goes into a raw multi-line literal, so it needs no escaping; the
+/// `MeasurementsText.text`, `Resources/multiplexers.txt` as `MultiplexersText.text`, and
+/// `Resources/risk-examples.tsv` as `RiskExamplesText.text`. The text goes into a raw multi-line literal, so it needs no escaping; the
 /// one sequence that would end the literal early is refused.
 @main
 struct EmbedSystemPrompt: BuildToolPlugin {
@@ -23,7 +24,7 @@ struct EmbedSystemPrompt: BuildToolPlugin {
     /// The resources embedded, as file name and Swift type.
     static let resources = [
         ("system-prompt.md", "SystemPromptText"), ("measurements.json", "MeasurementsText"),
-        ("multiplexers.txt", "MultiplexersText"),
+        ("multiplexers.txt", "MultiplexersText"), ("risk-examples.tsv", "RiskExamplesText"),
     ]
 
     func createBuildCommands(context: PluginContext, target: Target) throws -> [Command] {

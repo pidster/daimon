@@ -19,6 +19,8 @@ public enum EntryPoint: String, Sendable, Codable, CaseIterable {
     case watch
     /// `wisp draft`, a commit message or PR drafted from a diff.
     case draft
+    /// `wisp classifier`, a risk classifier trained or measured.
+    case classifier
 
     /// The entry point of a further conversation opened under this one.
     public var thread: EntryPoint {

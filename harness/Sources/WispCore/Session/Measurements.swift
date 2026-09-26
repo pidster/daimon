@@ -24,16 +24,23 @@ public struct Measurement: Codable, Equatable, Sendable {
     /// The largest input among the cases, in bytes, when the task routes by input size: the result is
     /// evidence for inputs up to this size and no further ([ADR 0037](../../../../docs/decisions/0037-routing-by-input-size.md)).
     public var maxInputBytes: Int?
+    /// The median time per case in milliseconds, when speed is part of what is measured, as it is for
+    /// a classifier that runs on every command ([ADR 0038](../../../../docs/decisions/0038-fast-specialised-classifiers.md)).
+    public var p50Milliseconds: Double?
+    /// The 95th-percentile time per case in milliseconds, beside `p50Milliseconds`.
+    public var p95Milliseconds: Double?
 
     /// Creates a measurement dated today.
     public init(
         task: String, tool: String? = nil, model: String, passed: Int, total: Int, notes: String,
-        maxInputBytes: Int? = nil
+        maxInputBytes: Int? = nil, p50Milliseconds: Double? = nil, p95Milliseconds: Double? = nil
     ) {
         self.task = task
         self.tool = tool
         self.model = model
         self.maxInputBytes = maxInputBytes
+        self.p50Milliseconds = p50Milliseconds
+        self.p95Milliseconds = p95Milliseconds
         date = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
         self.passed = passed
         self.total = total
@@ -43,7 +50,10 @@ public struct Measurement: Codable, Equatable, Sendable {
     /// `passed/total` and the rate.
     public var summary: String {
         let rate = total > 0 ? Int((Double(passed) / Double(total) * 100).rounded()) : 0
-        return "\(passed)/\(total) (\(rate)%)"
+        let speed = p50Milliseconds.map { p50 in
+            String(format: ", p50 %.2f ms, p95 %.2f ms", p50, p95Milliseconds ?? p50)
+        }
+        return "\(passed)/\(total) (\(rate)%)\(speed ?? "")"
     }
 }
 
