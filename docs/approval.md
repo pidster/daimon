@@ -15,12 +15,24 @@ classifier assesses the command's risk and, at or above a threshold, a human is 
 
 ## Classifiers
 
-Two run and the higher verdict wins (`CompositeRiskClassifier`):
+Two run and the higher verdict wins (`CompositeRiskClassifier`), except that a command the rules know
+to be read-only is not given to the model at all:
 
 - **Rules** (`RuleRiskClassifier`): regexes with a level and a reason each, covering privilege, deletion,
   history rewriting, credentials, uploads, network use, package installs, file modification, builds. Cheap,
   deterministic, tested against a labelled set. Rules cover the model's weak spot: ordinary modifications it
   tends to call safe.
+
+  The rules also keep a short list of read-only commands (`KnownSafeCommands`): `ls`, `cat`, `grep`,
+  `find`, `git status`, `git log`, `git diff`, and other git reads, `--version` queries, and reads of the
+  Mac's state such as `sysctl` and `defaults read`. A simple command no risky rule matches that fits one
+  of those forms from start to end is **known safe**. Harmless redirections (`2>&1`, `>/dev/null`) and
+  display-only variables (`NO_COLOR=1`) don't count against it. It must run nothing else (no `$(…)` or
+  backticks), write nowhere, and name nothing sensitive (`.env`, `token`, `password`, `.pem`, shell
+  history, Messages, Mail). It must also avoid the options that make a reading program write a file or
+  run a program (`find -exec` or `-delete`, `sort -o`, `rg --pre`, `git diff --output`, `awk`'s
+  `system()`). For a known-safe command the rules' `safe` is final: no model is asked, so it costs no
+  model call and cannot be over-rated. A command off the list is judged as before, never refused.
 - **Model** (`ModelRiskClassifier`): one fresh on-device session per command with a `@Generable` verdict.
   The verdict generates the one-sentence `reason` before the `risk` level, so the level follows the
   reasoning. The instructions give the model facts it otherwise guesses at (project build output is the
@@ -84,7 +96,7 @@ git verb until it expires. An approval has a scope
 For each simple command in a line, the gate does the following, in this order, stopping at the first
 step that decides:
 
-1. Classify it with the rules and the model.
+1. Classify it with the rules and, unless the rules know it to be read-only, the model.
 2. If the verdict is below the threshold, run it. Nothing else is consulted.
 3. Check the session cache for this pattern in this directory.
 4. Check the turn cache for a once-approval given earlier in this turn.

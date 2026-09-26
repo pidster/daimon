@@ -222,3 +222,34 @@ Their weakness is warnings, at 5% recall.
   rules.
 - **Log severity.** Log severity stays with the rules. Improving their warning keywords is the
   cheaper fix.
+
+## Amendment, 2026-09-26: the rules know read-only commands, and the model is not asked about them
+
+The rules only raised a level; none said that a command was safe. So every command went to the model
+classifier, which over-rates real commands. The rules now keep a short list of read-only forms
+(`KnownSafeCommands`). A simple command is known safe when all of these hold:
+
+- no risky rule matches it;
+- it fits one of the forms from start to end, once harmless redirections (`2>&1`, `>/dev/null`) and
+  display-only variables (`NO_COLOR=1`) are set aside;
+- it runs nothing else;
+- it writes nowhere;
+- it names nothing sensitive;
+- it avoids the options that make a reading program write or run something.
+
+For such a command the composite stops at the rules, and the verdict is `safe`, final, and marked
+`rules.knownSafe` in the audit log. The list errs short: a command left off is judged as before.
+
+The write rule also stops counting a redirection to `/dev/null` as writing a file. It had rated
+`2>/dev/null` moderate, which was wrong as a reason, and 23 of the real test commands had been
+caught only by it. Without it, the rules alone rate 223 test commands too low and 8 dangerous
+commands safe, where they rated 200 and 7. With a model classifier beside the rules, those commands
+are the model's to judge.
+
+The list was written without looking at the test set. It was then measured once:
+
+- It marks 172 of the 996 real test commands known safe, and 26 of the 123 dev commands. Every one of
+  them is labelled safe.
+- The rules alone rate 691 of the 996 exactly, with 82 over, where they rated 574 with 222 over.
+- The shipped default classifier beside the rules rates 500 exactly, with 460 over, 36 under, and no
+  dangerous command safe, where it rated 376 with 587 over and 33 under.

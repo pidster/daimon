@@ -23,8 +23,14 @@ Added:
   `/inspect status|approvals|audit`, `/approvals revoke [ID]` removes a standing approval at once, and
   `/inspect` stays as an alias. Tab completes the new words and approval ids.
 
+- The risk rules know a short list of read-only commands (`ls`, `cat`, `grep`, `git status`, `git log`,
+  `git diff`, `--version`, and the like). For those the verdict is `safe` without asking a model
+  classifier, so they cost no model call and never prompt. A command that writes, runs something
+  else, or names a sensitive file is never on the list.
+
 Fixed:
 
+- Redirecting to `/dev/null` no longer counts as writing a file in the risk rules.
 - Training a risk classifier uses every example and gives the same classifier from the same examples:
   Create ML held back a random slice of them for its own validation, so two trainings disagreed on about
   4% of commands.

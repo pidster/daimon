@@ -121,7 +121,7 @@ public struct RuleRiskClassifier: RiskClassifier {
             .moderate, "installs or publishes packages"),
         Rule(
             start + #"(rm|mv|cp|touch|mkdir|rmdir|ln|truncate|tee|sed\s+-i|perl\s+-i)\b"#, .moderate, "modifies files"),
-        Rule(#"(^|[^>])>{1,2}\s*[^&\s]"#, .moderate, "writes to a file"),
+        Rule(#"(^|[^>])>{1,2}\s*(?!/dev/null\b)[^&\s]"#, .moderate, "writes to a file"),
         Rule(start + #"edit_file\b"#, .moderate, "edits a file"),
         Rule(
             start
@@ -136,13 +136,23 @@ public struct RuleRiskClassifier: RiskClassifier {
     /// knew the command".
     public static let noSignals = "no risk signals in the command text"
 
-    /// Applies every rule and returns the highest level with all matching reasons.
+    /// The reason given for a command on the read-only list (`KnownSafeCommands`).
+    public static let knownSafe = "a known read-only command"
+
+    /// Applies every rule and returns the highest level with all matching reasons. A command no rule
+    /// matches that is on the read-only list is marked `RiskAssessment.knownSafeKey`, so a composite asks
+    /// no other classifier about it.
     public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
         var level = RiskLevel.safe
         var reasons: [String] = []
         for (regex, rule) in compiled where regex.matches(anywhereIn: command) {
             level = max(level, rule.level)
             if !reasons.contains(rule.reason) { reasons.append(rule.reason) }
+        }
+        if reasons.isEmpty, KnownSafeCommands.contains(command) {
+            return RiskAssessment(
+                level: .safe, reasons: [Self.knownSafe], sources: ["rules"],
+                metadata: [RiskAssessment.knownSafeKey: true])
         }
         if reasons.isEmpty { reasons = [Self.noSignals] }
         return RiskAssessment(level: level, reasons: reasons, sources: ["rules"])

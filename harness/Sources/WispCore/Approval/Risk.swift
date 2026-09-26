@@ -61,6 +61,13 @@ extension RiskAssessment {
     /// it could not judge (unavailable, failed, no usable answer). A low-confidence verdict is a judgement
     /// and does not set it. `TimedRiskClassifier` counts these as failures in `/stats`.
     public static let failureKey = "classifier.failure"
+
+    /// The metadata key the rules set on a command on their read-only list. A composite stops there:
+    /// the verdict is safe and final, and no model is asked.
+    public static let knownSafeKey = "rules.knownSafe"
+
+    /// Whether this verdict is final: a command the rules know to be read-only.
+    public var isKnownSafe: Bool { level == .safe && metadata[Self.knownSafeKey] == true }
 }
 
 /// Something that judges the risk of running a shell command.
@@ -70,7 +77,9 @@ public protocol RiskClassifier: Sendable {
     func classify(command: String, workingDirectory: String) async -> RiskAssessment
 }
 
-/// Takes the highest verdict across several classifiers.
+/// Takes the highest verdict across several classifiers, in order, stopping at a verdict that is known
+/// safe (`RiskAssessment.isKnownSafe`), so the rules, listed first, spare the model the commands they
+/// know to be read-only.
 public struct CompositeRiskClassifier: RiskClassifier {
     private let classifiers: [any RiskClassifier]
 
@@ -83,15 +92,17 @@ public struct CompositeRiskClassifier: RiskClassifier {
     public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
         var result = RiskAssessment(level: .safe, reasons: [], sources: [])
         for classifier in classifiers {
-            result = result.merged(
-                with: await classifier.classify(command: command, workingDirectory: workingDirectory))
+            let verdict = await classifier.classify(command: command, workingDirectory: workingDirectory)
+            result = result.merged(with: verdict)
+            if verdict.isKnownSafe { break }
         }
         return result
     }
 }
 
 /// Times each classification by another classifier into a session's `CallStats`, as a `classifier`
-/// call; an assessment carrying `RiskAssessment.failureKey` is recorded as failed. The verdict passes
+/// call; an assessment carrying `RiskAssessment.failureKey` is recorded as failed, and a known-safe one,
+/// which no model judged, is not recorded. The verdict passes
 /// through unchanged.
 public struct TimedRiskClassifier: RiskClassifier {
     private let classifier: any RiskClassifier
@@ -114,6 +125,8 @@ public struct TimedRiskClassifier: RiskClassifier {
     public func classify(command: String, workingDirectory: String) async -> RiskAssessment {
         let started = Date()
         let assessment = await classifier.classify(command: command, workingDirectory: workingDirectory)
+        // A command the rules know to be read-only never reached a model, so it is not a model call.
+        guard !assessment.isKnownSafe else { return assessment }
         stats.record(
             CallStats.Call(
                 kind: .classifier, model: name, started: started, seconds: Date().timeIntervalSince(started),
