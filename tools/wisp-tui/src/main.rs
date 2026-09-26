@@ -314,12 +314,42 @@ fn insert(terminal: &mut ratatui::DefaultTerminal, line: &HistoryLine, width: u1
         .map(|span| span.content.as_ref())
         .collect();
     let height = wrapped_height(&shown, inner);
+    if line.kind == LineKind::User {
+        // A sent line looks like the input it came from, a shade darker: its tint edge to edge, with
+        // half-block strips above and below, since a terminal cannot tint less than a row.
+        terminal.insert_before(height + 2, move |buffer| {
+            sent(buffer, rendered, width, inner, height);
+        })?;
+        return Ok(());
+    }
     terminal.insert_before(height, move |buffer| {
         Paragraph::new(rendered)
             .wrap(Wrap { trim: false })
             .render(Rect::new(MARGIN.min(width / 2), 0, inner, height), buffer);
     })?;
     Ok(())
+}
+
+/// Draws a sent line into `buffer`: a `▄` strip, the text on the sent tint across the whole width, and
+/// a `▀` strip.
+fn sent(
+    buffer: &mut ratatui::buffer::Buffer,
+    text: Line<'static>,
+    width: u16,
+    inner: u16,
+    height: u16,
+) {
+    let strip =
+        |glyph: &str| Paragraph::new(glyph.repeat(usize::from(width))).style(palette::sent_edge());
+    strip("▄").render(Rect::new(0, 0, width, 1), buffer);
+    Paragraph::new("")
+        .style(palette::sent_background())
+        .render(Rect::new(0, 1, width, height), buffer);
+    Paragraph::new(text)
+        .style(palette::sent_background())
+        .wrap(Wrap { trim: false })
+        .render(Rect::new(MARGIN.min(width / 2), 1, inner, height), buffer);
+    strip("▀").render(Rect::new(0, height + 1, width, 1), buffer);
 }
 
 /// A history line in its colours; a reply's Markdown is rendered here, as the line is committed.
@@ -488,6 +518,30 @@ mod tests {
             ("let **x** = 1".into(), palette::code())
         );
         assert_eq!(text(&styled(&line("`raw`", LineKind::Tool))), "`raw`");
+    }
+
+    #[test]
+    fn a_sent_line_sits_on_its_tint_between_half_block_strips() {
+        let mut buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, 12, 3));
+        let text = styled(&HistoryLine {
+            text: "› hi".into(),
+            kind: LineKind::User,
+        });
+        super::sent(&mut buffer, text, 12, 10, 1);
+        let row = |y: u16| {
+            (0..12)
+                .map(|x| buffer[(x, y)].symbol().to_string())
+                .collect::<String>()
+        };
+        assert_eq!(row(0), "▄".repeat(12));
+        assert_eq!(row(1).trim_end(), " › hi");
+        assert_eq!(row(2), "▀".repeat(12));
+        assert_eq!(
+            buffer[(11, 1)].bg,
+            palette::SENT,
+            "the tint runs edge to edge"
+        );
+        assert_eq!(buffer[(0, 0)].fg, palette::SENT);
     }
 
     #[test]

@@ -56,6 +56,9 @@ in both.
 | Paste | Inserted whole (bracketed paste), newlines kept, so pasting never sends. |
 | Tab | Complete the slash command being typed: the command, `/config`'s words, a setting, a setting's values, a model after `/model`, a view after `/inspect`. One match fills in; several fill in what they share and show above the input, and Tab again cycles through them. |
 
+A line you send goes into the scrollback styled like the input it came from, a shade darker: its tint
+edge to edge, halfway from the input's blue to black, with half-block strips above and below.
+
 The input grows a row for each line or wrapped line of the message, up to six rows; beyond that it
 scrolls within them to keep the cursor's row in sight. It shrinks back only once the input is empty, as
 it is when the message is sent, so deleting across a wrap does not resize the band as you type. The

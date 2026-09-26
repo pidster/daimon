@@ -12,6 +12,8 @@ pub const WISP: Color = Color::Rgb(0x8F, 0xD3, 0xF4);
 pub const MIST: Color = Color::Rgb(0x86, 0xAE, 0xC8);
 /// The deep tone: the input row's background.
 pub const DEEP: Color = Color::Rgb(0x25, 0x3B, 0x4E);
+/// The input's tint halfway to black: the background of a line you sent, in the scrollback.
+pub const SENT: Color = Color::Rgb(0x12, 0x1D, 0x27);
 /// Attention: approvals, moderate, a nearly full context.
 pub const AMBER: Color = Color::Rgb(0xF2, 0xB9, 0x50);
 /// Danger and errors.
@@ -70,6 +72,14 @@ pub fn input_background() -> Style {
 /// The half-block strips above and below the input: the tint as a foreground on the plain background.
 pub fn input_edge() -> Style {
     Style::default().fg(DEEP)
+}
+/// A sent line's background in the scrollback.
+pub fn sent_background() -> Style {
+    Style::default().bg(SENT)
+}
+/// The half-block strips above and below a sent line.
+pub fn sent_edge() -> Style {
+    Style::default().fg(SENT)
 }
 /// A risk level in its colour.
 pub fn level(level: &str) -> Style {

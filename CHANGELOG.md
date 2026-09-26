@@ -16,6 +16,8 @@ Added:
 - `wisp classifier train` leaves out every example that overlaps `~/.wisp/classifiers/risk/held-out.tsv`
   or a file given with `--exclude`, so a test set of commands run on this Mac is never trained on.
 - `/config` in chat shows the configuration as YAML; `wisp config` stays JSON.
+- `wisp-tui` shows the lines you send in the scrollback like the input box, a shade darker, with its
+  half-block strips above and below.
 - Chat's commands follow the CLI's nouns: `/config get KEY` (and `wisp config get KEY`) shows one
   setting and whether it is set or the default; `/status`, `/approvals`, and `/audit` replace
   `/inspect status|approvals|audit`, `/approvals revoke [ID]` removes a standing approval at once, and
