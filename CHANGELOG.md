@@ -4,6 +4,16 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Added:
+
+- Risk classifier versions: each release ships a default, `risk@X.Y.Z-default`, trained once, measured,
+  and never changed, used by `approval.classifier: coreml` when no model is named, so a fast classifier
+  needs no training. `wisp classifier train` adds a new version, `risk@X.Y.Z-local.<n>`, and never
+  overwrites one; `wisp classifier list`, `use`, and `remove` manage them, and `measure` records each
+  result in the version's manifest. Versions live in `~/.wisp/classifiers/risk`.
+
 ## 0.12.0
 
 Added:

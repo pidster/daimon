@@ -454,10 +454,18 @@ struct Chat: AsyncParsableCommand {
                     .filter { $0.problem == nil }
                     .map { ChatChoice.Option(value: $0.selection.description, detail: $0.detail) }
             case .coremlModel:
+                let store = ClassifierStore(home: Wisp.home)
+                _ = try? store.installDefault()
+                let versions = store.versions().map { manifest in
+                    ChatChoice.Option(
+                        value: ClassifierStore.reference(manifest.version),
+                        detail: "\(manifest.examples) examples, \(manifest.examplesSource)")
+                }
                 let dir = Wisp.home.models.appending(path: "coreml")
                 let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-                return names.filter { $0.hasSuffix(".mlmodel") || $0.hasSuffix(".mlmodelc") }.sorted()
-                    .map { ChatChoice.Option(value: $0) }
+                return versions
+                    + names.filter { $0.hasSuffix(".mlmodel") || $0.hasSuffix(".mlmodelc") }.sorted()
+                    .map { ChatChoice.Option(value: $0, detail: "a file in ~/.wisp/models/coreml") }
             default:
                 return []
             }
@@ -994,14 +1002,22 @@ struct Approvals: AsyncParsableCommand {
 /// Trains and measures the fast, specialised classifiers the approval gate can use (ADR 0038).
 struct ClassifierCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "classifier", abstract: "Train and measure risk classifiers for the approval gate.",
+        commandName: "classifier", abstract: "Train, measure, and choose risk classifiers for the approval gate.",
         discussion:
             "A classifier judges every command the model runs, so it must be fast: a model trained here answers "
-            + "in well under a millisecond, the on-device language model in about half a second.",
-        subcommands: [Train.self, Measure.self])
+            + "in well under a millisecond, the on-device language model in one to two seconds. Versions live in "
+            + "~/.wisp/classifiers/risk: the default each release ships, never changed, and those trained here, "
+            + "never overwritten.",
+        subcommands: [List.self, Train.self, Measure.self, Use.self, Remove.self, Ship.self])
 
-    /// Where `train` writes by default: the name `approval.coremlModel` resolves without a path.
-    static let defaultModelName = "risk.mlmodel"
+    /// The store under wisp's home.
+    static var store: ClassifierStore { ClassifierStore(home: Wisp.home) }
+
+    /// The version `approval.coremlModel` names, or the default when it names none.
+    static func inUse(_ config: Config.Resolved) -> String? {
+        guard let configured = config.coremlModel else { return ClassifierStore.defaultVersion() }
+        return ClassifierStore.version(of: configured)
+    }
 
     /// Every audit event on this Mac, oldest first: the rotated files, then the current one.
     static func auditEvents(session: Session) -> [AuditEvent] {
@@ -1024,24 +1040,51 @@ struct ClassifierCommand: AsyncParsableCommand {
         }
     }
 
-    /// Trains a risk classifier with Create ML on this Mac.
+    /// Lists the versions.
+    struct List: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(abstract: "List the risk classifier versions on this Mac.")
+
+        func run() async throws {
+            let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
+            _ = try? ClassifierCommand.store.installDefault()
+            let active = config.approvalClassifier == .coreml ? ClassifierCommand.inUse(config) : nil
+            for manifest in ClassifierCommand.store.versions() {
+                let mark = manifest.version == active ? "*" : " "
+                let last =
+                    manifest.measurements.last.map { m in
+                        String(
+                            format: "%d/%d exact, %d under, p50 %.2f ms", m.correct, m.total, m.under, m.p50Milliseconds
+                        )
+                    } ?? "not measured"
+                print(
+                    "\(mark) \(ClassifierStore.reference(manifest.version))\t\(manifest.created.prefix(10))\t"
+                        + "\(manifest.examples) examples (\(manifest.examplesSource))\t\(last)")
+            }
+            if active == nil {
+                print("approval.classifier is \(config.approvalClassifier.rawValue); 'use' switches to one")
+            }
+        }
+    }
+
+    /// Trains a new version with Create ML on this Mac.
     struct Train: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Train a risk classifier on this Mac from labelled commands.",
+            abstract: "Train a new risk classifier version on this Mac from labelled commands.",
             discussion:
                 "Examples are lines of level<TAB>command, level being safe, moderate, or dangerous; '#' starts a "
-                + "comment. Without --examples, the examples bundled with wisp are used.")
+                + "comment. Without --examples, the examples bundled with wisp are used. Each run adds a version "
+                + "and changes nothing in use; 'wisp classifier use' switches to it.")
 
         @Option(name: .long, help: "Labelled commands to learn from. Defaults to the bundled examples.")
         var examples: String?
-
-        @Option(name: .long, help: "Where to write the model. Defaults to ~/.wisp/models/coreml/risk.mlmodel.")
-        var out: String?
 
         @Flag(
             name: .long,
             help: "Also learn from the on-device model's verdicts in this Mac's audit log, secrets redacted.")
         var fromAudit = false
+
+        @Flag(name: .long, help: "Use the new version at once, as 'wisp classifier use' would.")
+        var use = false
 
         func run() async throws {
             let session = try Wisp.begin(.init(entryPoint: .classifier))
@@ -1056,30 +1099,104 @@ struct ClassifierCommand: AsyncParsableCommand {
                 examples = RiskExamples.merged(examples, with: harvest.examples)
                 source += " + audit"
             }
-            let url =
-                out.map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
-                ?? Wisp.home.models.appending(path: "coreml").appending(path: ClassifierCommand.defaultModelName)
-            let version = "wisp \(WispVersion.current), \(Date().formatted(.iso8601.year().month().day()))"
-            let outcome: RiskClassifierTraining.Outcome
+            let parent = session.config.approvalClassifier == .coreml ? ClassifierCommand.inUse(session.config) : nil
+            let trained: (manifest: ClassifierStore.Manifest, outcome: RiskClassifierTraining.Outcome)
             do {
-                outcome = try RiskClassifierTraining.train(examples, writingTo: url, version: version)
+                trained = try ClassifierCommand.store.train(examples, source: source, parent: parent)
             } catch let failure as RiskClassifierTraining.Failure {
                 throw ValidationError("\(source): \(failure)")
             }
             session.audit.record(
-                .classifierTrained, details: AuditEvent.Details.classifierTrained(outcome, examplesSource: source))
-            let levels = RiskLevel.allCases.map { "\(outcome.perLevel[$0, default: 0]) \($0.rawValue)" }
+                .classifierTrained,
+                details: AuditEvent.Details.classifierTrained(trained.outcome, examplesSource: source))
+            let levels = RiskLevel.allCases.map { "\(trained.outcome.perLevel[$0, default: 0]) \($0.rawValue)" }
+            let reference = ClassifierStore.reference(trained.manifest.version)
             print(
-                "trained on \(outcome.examples) examples (\(levels.joined(separator: ", "))) in "
-                    + String(format: "%.1f s; ", outcome.seconds)
-                    + String(format: "%.0f%% of them labelled back correctly", outcome.trainingAccuracy * 100))
-            print("wrote \(url.path)")
-            let name = out == nil ? ClassifierCommand.defaultModelName : url.path
-            print(
-                "to use it, set in ~/.wisp/config.json: \"approval\": {\"classifier\": \"coreml\", "
-                    + "\"coremlModel\": \"\(name)\"}")
-            print(
-                "measure it on commands it has not seen: wisp classifier measure --classifier coreml --examples <file>")
+                "trained \(reference) on \(trained.outcome.examples) examples (\(levels.joined(separator: ", "))) in "
+                    + String(format: "%.1f s; ", trained.outcome.seconds)
+                    + String(format: "%.0f%% of them labelled back correctly", trained.outcome.trainingAccuracy * 100))
+            if use {
+                try ClassifierCommand.use(reference)
+            } else {
+                print("to use it: wisp classifier use \(reference)")
+            }
+            print("measure it on commands it has not seen: wisp classifier measure \(reference) --examples <file>")
+        }
+    }
+
+    /// Points the approval gate at a version: `approval.classifier` coreml and `approval.coremlModel` it.
+    ///
+    /// - Throws: A usage error for an unknown version or a refused change.
+    static func use(_ reference: String) throws {
+        guard let version = ClassifierStore.version(of: reference) else {
+            throw ValidationError("\(ClassifierStore.Failure.notAReference(reference))")
+        }
+        if version == ClassifierStore.defaultVersion() { _ = try? store.installDefault() }
+        guard store.manifest(version) != nil else {
+            throw ValidationError("\(ClassifierStore.Failure.unknownVersion(version))")
+        }
+        try ConfigCommand.apply("approval.coremlModel") {
+            try ConfigEdit.set("approval.coremlModel", to: reference, in: $0)
+        }
+        try ConfigCommand.apply("approval.classifier") {
+            try ConfigEdit.set("approval.classifier", to: "coreml", in: $0)
+        }
+    }
+
+    /// Switches the approval gate to a version.
+    struct Use: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Use a risk classifier version for the approval gate, from the next session.")
+
+        @Argument(help: "The version, as 'wisp classifier list' shows it: risk@<version>.")
+        var reference: String
+
+        func run() async throws {
+            try ClassifierCommand.use(reference)
+        }
+    }
+
+    /// Removes a local version.
+    struct Remove: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Remove a risk classifier version trained here; not the default, not the one in use.")
+
+        @Argument(help: "The version: risk@<version>.")
+        var reference: String
+
+        func run() async throws {
+            guard let version = ClassifierStore.version(of: reference) else {
+                throw ValidationError("\(ClassifierStore.Failure.notAReference(reference))")
+            }
+            let config = try Wisp.usage { try Session.loadConfig(home: Wisp.home) }
+            let inUse = config.approvalClassifier == .coreml ? ClassifierCommand.inUse(config) : nil
+            do {
+                try ClassifierCommand.store.remove(version, inUse: inUse)
+            } catch let failure as ClassifierStore.Failure {
+                throw ValidationError("\(failure)")
+            }
+            print("removed \(reference)")
+        }
+    }
+
+    /// Trains the default a release ships, for the release preparation; not for everyday use.
+    struct Ship: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Train the default classifier a release ships into a resource file.", shouldDisplay: false)
+
+        @Option(name: .long, help: "The resource to write: harness/Sources/WispCore/Resources/risk-default.json.")
+        var resource: String
+
+        func run() async throws {
+            let version = ClassifierStore.defaultVersion()
+            let staging = FileManager.default.temporaryDirectory.appending(path: "wisp-ship-\(UUID().uuidString)")
+            let store = ClassifierStore(home: Home(root: staging))
+            let trained = try store.train(RiskExamples.bundled, source: "bundled", version: version)
+            let model = try Data(contentsOf: store.model(version))
+            let text = try ShippedClassifier.resource(manifest: trained.manifest, model: model)
+            try Data(text.utf8).write(to: URL(filePath: resource), options: .atomic)
+            try? FileManager.default.removeItem(at: staging)
+            print("wrote \(ClassifierStore.reference(version)) (\(model.count) bytes) to \(resource)")
         }
     }
 
@@ -1089,7 +1206,11 @@ struct ClassifierCommand: AsyncParsableCommand {
             abstract: "Measure a risk classifier's accuracy and speed on labelled commands.",
             discussion:
                 "The rules always run beside a classifier, as the approval gate runs them. Exits 1 when a dangerous "
-                + "command is rated safe. Measure a trained model on examples it was not trained on.")
+                + "command is rated safe. Measure a trained version on examples it was not trained on; the result is "
+                + "recorded in the version's manifest.")
+
+        @Argument(help: "A version to measure, risk@<version>; without it, what the configuration uses.")
+        var reference: String?
 
         @Option(name: .long, help: "Labelled commands. Defaults to the bundled training examples.")
         var examples: String?
@@ -1097,7 +1218,7 @@ struct ClassifierCommand: AsyncParsableCommand {
         @Option(name: .long, help: "rules, system-model, or coreml. Defaults to approval.classifier.")
         var classifier: RiskClassifierChoice?
 
-        @Option(name: .long, help: "The Core ML model for --classifier coreml. Defaults to approval.coremlModel.")
+        @Option(name: .long, help: "A Core ML model file for --classifier coreml, instead of a version.")
         var coremlModel: String?
 
         func run() async throws {
@@ -1105,12 +1226,22 @@ struct ClassifierCommand: AsyncParsableCommand {
             defer { session.end() }
             let (examples, source) = try ClassifierCommand.examples(examples)
             var config = session.config
+            if let reference {
+                config.approvalClassifier = .coreml
+                config.coremlModel = reference
+            }
             if let classifier { config.approvalClassifier = classifier }
             if let coremlModel { config.coremlModel = coremlModel }
             let measured = Session.Dependencies.live.makeClassifier(config, Wisp.home)
             let report = await RiskMeasurement.run(measured, on: examples)
-            print("\(config.approvalClassifier.rawValue) on \(examples.count) examples from \(source):")
+            let version = config.approvalClassifier == .coreml ? ClassifierCommand.inUse(config) : nil
+            print(
+                "\(version.map(ClassifierStore.reference) ?? config.approvalClassifier.rawValue) on \(examples.count) examples from \(source):"
+            )
             for line in report.lines { print("  \(line)") }
+            if let version, ClassifierCommand.store.manifest(version) != nil {
+                try? ClassifierCommand.store.record(.init(report, examplesSource: source), for: version)
+            }
             if !report.holdsTheHardRequirement { throw ExitCode.failure }
         }
     }

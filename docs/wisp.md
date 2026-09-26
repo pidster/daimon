@@ -399,14 +399,20 @@ current run; a second Ctrl-C stops at once.
 
 ### `wisp classifier`
 
-`wisp classifier train [--examples <file>] [--out <path>] [--from-audit]` trains a risk classifier on
-this Mac with Create ML, from labelled commands (`level<TAB>command` per line) or the bundled examples,
-into `~/.wisp/models/coreml/risk.mlmodel`, and prints the config that makes the approval gate use it.
-`--from-audit` adds the on-device model's verdicts on the commands in this Mac's audit log (see
-[approval.md](approval.md)).
-`wisp classifier measure [--examples <file>] [--classifier rules|system-model|coreml] [--coreml-model <path>]`
+Risk classifier versions live in `~/.wisp/classifiers/risk`: the default each release ships,
+`risk@X.Y.Z-default`, never changed, and those trained here, `risk@X.Y.Z-local.<n>`, never overwritten.
+
+`wisp classifier list` shows them, the one in use marked `*`, each with its source and latest
+measurement. `wisp classifier train [--examples <file>] [--from-audit] [--use]` trains a new version with
+Create ML from labelled commands (`level<TAB>command` per line) or the bundled examples; `--from-audit`
+adds the on-device model's verdicts on the commands in this Mac's audit log, and `--use` switches to it.
+`wisp classifier use risk@<version>` sets `approval.classifier` to `coreml` and `approval.coremlModel`
+to it, from the next session; `wisp classifier remove risk@<version>` deletes one trained here, not the
+default or the one in use.
+`wisp classifier measure [risk@<version>] [--examples <file>] [--classifier rules|system-model|coreml] [--coreml-model <path>]`
 runs a classifier, with the rules beside it, over labelled commands and prints its exact, over-, and
-under-ratings, misses, and latency per verdict; it exits 1 when a dangerous command is rated safe.
+under-ratings, misses, and latency per verdict, recording them in the version's manifest; it exits 1
+when a dangerous command is rated safe.
 Training is audited as `classifier.train`. See [approval.md](approval.md), "Training and measuring a
 classifier".
 

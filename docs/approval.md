@@ -169,13 +169,24 @@ A classifier runs on every command, so it should be fast and specialised rather 
 ([ADR 0038](decisions/0038-fast-specialised-classifiers.md)). wisp trains one on this Mac:
 
 ```
-wisp classifier train                        # from the ~290 bundled examples, in well under a second
-wisp classifier measure --classifier coreml --coreml-model risk.mlmodel --examples my-commands.tsv
+wisp classifier list                         # the versions on this Mac, the one in use marked *
+wisp classifier train --from-audit --use     # a new version, in well under a second, used from the next session
+wisp classifier measure risk@0.13.0-local.1 --examples my-commands.tsv
+wisp classifier use risk@0.13.0-default      # back to the one the release ships
 ```
 
-`train` writes `~/.wisp/models/coreml/risk.mlmodel` (or `--out`) with Create ML, a maximum-entropy
-text classifier under contract 2, and prints the config that uses it:
-`"approval": {"classifier": "coreml", "coremlModel": "risk.mlmodel"}`. `--examples` gives your own
+Versions live in `~/.wisp/classifiers/risk/<version>/`, each a read-only `model.mlmodel` beside a
+`manifest.json` recording what it learned from (the source, the count per level, a SHA-256 of the
+examples), the version in use when it was trained, and every measurement taken of it since. Each release
+ships a default, `risk@X.Y.Z-default`, trained once from the bundled examples when the release is
+prepared, measured by the eval, embedded in the binary, and written into the store on first use; it is
+never changed. `train` always adds a new version, `risk@X.Y.Z-local.<n>`, and never overwrites one;
+training is not deterministic, so two versions trained on the same examples can differ. `use` points
+`approval.classifier` at `coreml` and `approval.coremlModel` at the version, through the same checked,
+audited change as `/config set`; `remove` deletes a version trained here, but not the default and not
+the one in use. With `approval.classifier: coreml` and no `approval.coremlModel`, the release's default
+is used, so a fast classifier needs no training at all. A path or a file name under
+`~/.wisp/models/coreml` still works for a model made elsewhere. `--examples` gives your own
 labelled commands, one per line as `level<TAB>command`, `#` for comments; every level needs some. The
 bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, and none of them is in the
 eval set.
@@ -190,8 +201,9 @@ fallbacks, how many were raised, and how many were redacted.
 
 `measure` runs a classifier over labelled commands with the rules beside it, as the gate runs it, and
 prints the commands rated exactly, over, and under, every miss, and the latency per verdict (p50, p95,
-slowest). It exits 1 when a dangerous command is rated safe. `--classifier` and `--coreml-model`
-override the config for the measurement. Measure a trained model on commands it did not learn from.
+slowest). It exits 1 when a dangerous command is rated safe. Given a version it measures that one, and
+records the result in its manifest, so `list` shows each version's latest score; `--classifier` and
+`--coreml-model` override the config otherwise. Measure a trained model on commands it did not learn from.
 
 Measured on 2026-09-26 over the 123-command eval set, the rules beside each: the default `system-model`
 rated 108 exactly at 1.3 to 2.3 s a command, with one dangerous command rated `moderate`; a classifier

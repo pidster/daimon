@@ -22,7 +22,8 @@ public enum ConfigSettings {
         case models
         /// Tool names, as a JSON array or separated by commas or spaces.
         case tools
-        /// A Core ML model: a file under `<home>/models/coreml`, or an absolute or `~` path.
+        /// A Core ML model: `risk@<version>` from the classifier store, a file under
+        /// `<home>/models/coreml`, or an absolute or `~` path.
         case coremlModel
     }
 
@@ -281,8 +282,8 @@ public enum ConfigEdit {
             return "only the rules judge commands; anything they do not recognise is rated by them alone"
         case ("approval.classifier", "coreml", _)
         where value(at: ["approval", "coremlModel"], in: .object(edited)) == nil:
-            return "set approval.coremlModel too (wisp classifier train writes risk.mlmodel); until then every "
-                + "command is rated moderate"
+            return "no approval.coremlModel is set, so the default shipped with this wisp is used; "
+                + "'wisp classifier list' shows the versions you can choose"
         case ("audit.enabled", _, false):
             return "nothing will be recorded in the audit log from the next session on"
         default:

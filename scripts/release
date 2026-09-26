@@ -41,6 +41,8 @@ grep -q "^version = \"$VERSION\"" tools/wisp-tui/Cargo.toml || { echo "tools/wis
 command -v cargo >/dev/null || { echo "cargo is needed to build wisp-tui" >&2; exit 1; }
 CURRENT="$(sed -n 's/.*public static let current = "\([^"]*\)".*/\1/p' harness/Sources/WispCore/Audit/AuditEvent.swift)"
 [ "$CURRENT" = "$VERSION" ] || { echo "WispVersion.current is $CURRENT, not $VERSION; bump it first" >&2; exit 1; }
+SHIPPED="$(sed -n 's/^ *"version" : "\([^"]*\)",*$/\1/p' harness/Sources/WispCore/Resources/risk-default.json | head -1)"
+[ "$SHIPPED" = "$VERSION-default" ] || { echo "the shipped classifier is $SHIPPED, not $VERSION-default; run scripts/check classifier-default after the bump" >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then echo "tag $TAG exists" >&2; exit 1; fi
 gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated" >&2; exit 1; }
 NOTES="$(awk -v v="$VERSION" '

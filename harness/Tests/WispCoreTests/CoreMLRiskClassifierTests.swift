@@ -163,7 +163,10 @@ import Testing
         #expect(
             Session.coremlModelURL(config: Config(approval: .init(coremlModel: "/x/y.mlmodelc")).resolved, home: home)?
                 .path == "/x/y.mlmodelc")
-        #expect(Session.coremlModelURL(config: Config().resolved, home: home) == nil)
+        // No model named is the default this build ships, installed into the store (ADR 0038, amendment).
+        #expect(
+            Session.coremlModelURL(config: Config().resolved, home: home)
+                == ClassifierStore(home: home).model(ClassifierStore.defaultVersion()))
         #expect(Session.Dependencies.live.makeClassifier(config, home) is CompositeRiskClassifier)
         #expect(
             Session.Dependencies.live.makeClassifier(Config(approval: .init(useModel: false)).resolved, home)

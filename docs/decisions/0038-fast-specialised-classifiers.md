@@ -113,3 +113,24 @@ The audit-trained figure is an upper bound: four of that log's commands are also
 model's latency varied between runs on the same Mac. The default stays under decision 6 until a
 trained classifier matches its 108; the trained ones already rate nothing below its level.
 
+## Amendment, 2026-09-26: shipped defaults are fixed, trained versions are kept
+
+`wisp classifier train` wrote `~/.wisp/models/coreml/risk.mlmodel` and replaced whatever was there, so
+retraining silently changed the classifier the gate used, with no history and no way back. And nothing
+trained shipped: every Mac trained its own. Training is not deterministic either: three runs on the
+same bundled examples on 2026-09-26 gave three different files, rating 99 and 101 of 123 exactly.
+
+- **Versions.** Classifiers live in `<home>/classifiers/risk/<version>/`, a read-only `model.mlmodel`
+  beside a `manifest.json` (task, version, the wisp that trained it, when, the examples' source, count
+  per level and SHA-256, the version in use at the time, and every measurement since). Config names one
+  as `risk@<version>` in `approval.coremlModel`; paths still work for a model made elsewhere.
+- **Shipped defaults are fixed.** Each release ships `risk@X.Y.Z-default`, trained once from the bundled
+  examples when the release is prepared (`scripts/check classifier-default`, into
+  `Resources/risk-default.json`, the model in base64), measured by the eval, embedded in the binary, and
+  written into the store on first use. It is never changed, and cannot be removed. The release
+  preflight refuses a default whose version is not the release's. `approval.classifier: coreml` with no
+  model named uses it, so a fast classifier needs no training.
+- **Local versions are never overwritten.** `train` adds `risk@X.Y.Z-local.<n>`; `use` switches to one
+  through the checked config change of ADR 0040; `remove` deletes one, but not the default and not the
+  one in use; `measure` records its result in the manifest; `list` shows them all.
+

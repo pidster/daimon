@@ -130,6 +130,15 @@ eval_() {
     fi
 }
 
+# classifier-default: train the risk classifier this version ships, from the bundled examples, into
+# the embedded resource; run after WispVersion.current is bumped, and commit the resource with the bump.
+# Training is not deterministic, so the shipped file is what the release carries, measured by the eval.
+classifier_default() {
+    echo "==> shipped classifier"
+    (cd harness && swift build $SWIFT_SANDBOX -q && .build/debug/wisp classifier ship \
+        --resource Sources/WispCore/Resources/risk-default.json)
+}
+
 format() {
     (cd harness && swift format --in-place --recursive $SWIFT_PATHS)
     if have_crates; then (cd tools && cargo fmt --all); fi
@@ -181,9 +190,10 @@ case "${1:-all}" in
     coverage) coverage ;;
     coverage-gate) coverage_gate ;;
     coverage-baseline) coverage_baseline ;;
+    classifier-default) classifier_default ;;
     eval) eval_ "${2:-}" ;;
     hygiene) hygiene ;;
     all) hygiene; lint; build; test_ ;;
     install-hooks) install_hooks ;;
-    *) echo "usage: scripts/check [lint|build|test|format|coverage|coverage-gate|coverage-baseline|eval [record]|hygiene|all|install-hooks]" >&2; exit 64 ;;
+    *) echo "usage: scripts/check [lint|build|test|format|coverage|coverage-gate|coverage-baseline|classifier-default|eval [record]|hygiene|all|install-hooks]" >&2; exit 64 ;;
 esac

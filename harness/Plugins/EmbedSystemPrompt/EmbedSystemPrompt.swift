@@ -5,7 +5,8 @@ import PackagePlugin
 /// file in the source tree and the product stays one binary with nothing to ship beside it:
 /// `Resources/system-prompt.md` as `SystemPromptText.text`, `Resources/measurements.json` as
 /// `MeasurementsText.text`, `Resources/multiplexers.txt` as `MultiplexersText.text`, and
-/// `Resources/risk-examples.tsv` as `RiskExamplesText.text`. The text goes into a raw multi-line literal, so it needs no escaping; the
+/// `Resources/risk-examples.tsv` as `RiskExamplesText.text`, and `Resources/risk-default.json` (the shipped
+/// risk classifier, its model in base64) as `RiskDefaultText.text`. The text goes into a raw multi-line literal, so it needs no escaping; the
 /// one sequence that would end the literal early is refused.
 @main
 struct EmbedSystemPrompt: BuildToolPlugin {
@@ -25,6 +26,7 @@ struct EmbedSystemPrompt: BuildToolPlugin {
     static let resources = [
         ("system-prompt.md", "SystemPromptText"), ("measurements.json", "MeasurementsText"),
         ("multiplexers.txt", "MultiplexersText"), ("risk-examples.tsv", "RiskExamplesText"),
+        ("risk-default.json", "RiskDefaultText"),
     ]
 
     func createBuildCommands(context: PluginContext, target: Target) throws -> [Command] {

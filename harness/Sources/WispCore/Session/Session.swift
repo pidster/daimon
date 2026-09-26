@@ -255,10 +255,18 @@ public struct Session: Sendable {
             stats: stats)
     }
 
-    /// Where `approval.coremlModel` points: absolute or `~` as given, anything else under
-    /// `<home>/models/coreml`; nil when it is not set.
+    /// Where `approval.coremlModel` points: `risk@<version>` in the classifier store, absolute or `~`
+    /// as given, anything else under `<home>/models/coreml`. When it is not set, the default this build
+    /// ships, installed into the store on first use; nil when there is none.
     public static func coremlModelURL(config: Config.Resolved, home: Home) -> URL? {
-        guard let configured = config.coremlModel else { return nil }
+        let store = ClassifierStore(home: home)
+        guard let configured = config.coremlModel else {
+            return (try? store.installDefault()).flatMap { $0 }.map(store.model)
+        }
+        if let version = ClassifierStore.version(of: configured) {
+            if version == ClassifierStore.defaultVersion() { _ = try? store.installDefault() }
+            return store.model(version)
+        }
         if configured.hasPrefix("/") || configured.hasPrefix("~") {
             return URL(filePath: (configured as NSString).expandingTildeInPath)
         }

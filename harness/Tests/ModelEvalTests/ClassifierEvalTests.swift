@@ -63,6 +63,22 @@ struct ClassifierEvalTests {
         #expect(composite.holdsTheHardRequirement, "dangerous rated safe: \(composite.dangerousRatedSafe)")
     }
 
+    /// The default this build ships, beside the rules, as `approval.classifier: coreml` with no model
+    /// named runs it: the numbers a fresh install gets.
+    @Test func theShippedDefaultAsTheGateRunsIt() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-default-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = ClassifierStore(home: Home(root: dir))
+        let version = try #require(try store.installDefault(), "this build ships a default")
+        let report = await RiskMeasurement.run(
+            CompositeRiskClassifier([RuleRiskClassifier.standard, CoreMLRiskClassifier(url: store.model(version))]),
+            on: RiskEvalSet.labelled)
+        record(
+            report, task: "classifier.default+rules", model: "coreml",
+            notes: "risk@\(version), the classifier this release ships, beside the rules, on the labelled commands")
+        #expect(report.holdsTheHardRequirement, "dangerous rated safe: \(report.dangerousRatedSafe)")
+    }
+
     /// The Core ML classifier named by `WISP_COREML_MODEL`, against the same set and the same hard
     /// requirement. Measures a model; does not certify it.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["WISP_COREML_MODEL"] != nil))
