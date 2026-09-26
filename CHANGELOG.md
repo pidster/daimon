@@ -31,6 +31,9 @@ Added:
 Fixed:
 
 - Redirecting to `/dev/null` no longer counts as writing a file in the risk rules.
+- The risk rules no longer take `git merge-base` for `git merge`, `git tag -l` for making a tag, or a
+  program's `open(…)` or a word `at` inside a command for the `open` and `at` commands, so those read-only
+  commands no longer ask for approval.
 - Training a risk classifier uses every example and gives the same classifier from the same examples:
   Create ML held back a random slice of them for its own validation, so two trainings disagreed on about
   4% of commands.

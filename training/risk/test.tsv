@@ -380,7 +380,7 @@ safe	LC_ALL=C sort
 moderate	.claude/hooks/harness/dispatch-steer.sh P216 -
 moderate	.claude/hooks/harness/dispatch-steer.sh P53 -
 safe	diff $S/cov1.txt $S/cov2.txt
-moderate	cp "/Users/[REDACTED:user-name#1]/.claude/projects/<project>/00000000-0000-0000-0000-000000000000/tool-results/artifact-a313b6ba-1787822758-5797.html" /tmp/database-signoffs-v2.html
+moderate	cp "/Users/[REDACTED:user-name#1]/.claude/projects/-Users-me-src-app/00000000-0000-0000-0000-000000000000/tool-results/artifact-a313b6ba-1787822758-5797.html" /tmp/database-signoffs-v2.html
 safe	SF=$(git config --get gpg.ssh.allowedSignersFile || echo '')
 safe	RC=$(ls -d ~/.cargo/registry/src/*/ratatui-core-* | tail -1)
 moderate	npm audit fix 2>&1
@@ -580,7 +580,7 @@ safe	claude plugin --help 2>&1
 safe	time docker exec p96-pg psql -U postgres -tAc "SELECT count(*) FROM pg_database;" 2>&1
 moderate	wisp --model pcc "Say hello in three words" 2>&1
 moderate	WISP_LOG=debug wisp --model pcc --no-tools "Say hello in three words" 2>&1
-safe	tail -50 /Users/[REDACTED:user-name#1]/.claude/projects/<project>/00000000-0000-0000-0000-000000000000/tool-results/bd0b93kd2.txt
+safe	tail -50 /Users/[REDACTED:user-name#1]/.claude/projects/-Users-me-src-app/00000000-0000-0000-0000-000000000000/tool-results/bd0b93kd2.txt
 safe	ps -o pid,etime,command -p $P 2>/dev/null
 safe	date +%H:%M:%S
 safe	WISP_OLLAMA_TESTS=1 WISP_OLLAMA_MODEL=qwen3-coder:latest swift test --filter OllamaSpikeTests 2>&1
@@ -652,7 +652,7 @@ moderate	$W notify "Posted by wisp notify from the command line." --title "wisp 
 safe	WT=$(git worktree list --porcelain | awk '/quota-signal/{found=1} found&&/^worktree/{print $2; exit}')
 moderate	git checkout -b codex/p280-t4-verify-sha-on-ref
 safe	awk '/fn make_coalescer/{print NR": "$0; found=1} found && /^mod tests|#\[cfg\(test\)\]/{print NR": "$0}' /Users/[REDACTED:user-name#1]/src/github.com/database-ci/database-rs/src/database-forge-backend/src/services/trigger_service.rs
-moderate	jq -r '.content' /Users/[REDACTED:user-name#1]/.claude/projects/<project>/00000000-0000-0000-0000-000000000000/tool-results/mcp-codex-codex-reply-1785426274505.txt > /tmp/p136-response.txt
+moderate	jq -r '.content' /Users/[REDACTED:user-name#1]/.claude/projects/-Users-me-src-app/00000000-0000-0000-0000-000000000000/tool-results/mcp-codex-codex-reply-1785426274505.txt > /tmp/p136-response.txt
 safe	time .build/debug/wisp redact --thorough /tmp/scratch/sample.log
 safe	stat -f "%Sp %u %g" /Users/[REDACTED:user-name#1]/src/github.com/database-ci/database-rs/.git/worktrees/database-rs-task-p136/ 2>&1
 safe	uniq -c
@@ -664,7 +664,7 @@ dangerous	rm -rf /Users/[REDACTED:user-name#1]/src/github.com/database-ci/databa
 safe	awk '{ print length($0), NR }' /Users/[REDACTED:user-name#1]/src/github.com/database-ci/database-rs/plans/ASSIGNMENTS.md
 safe	readlink src/database-forge-ui/tests/e2e 2>&1
 safe	readlink /tmp
-safe	cat /Users/[REDACTED:user-name#1]/.claude/projects/<project>/memory/MEMORY.md 2>/dev/null
+safe	cat /Users/[REDACTED:user-name#1]/.claude/projects/-Users-me-src-app/memory/MEMORY.md 2>/dev/null
 moderate	ln -s /private/tmp/sbl/outside escape
 dangerous	LOGIN=$(curl -s -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \ -d '{"email":"[REDACTED:email#2]","password":"[REDACTED:password#1]","provider":"Local"}')
 dangerous	R=$(curl -s -X POST "$BASE/auth/login" -H 'Content-Type: application/json' -H "Origin: $ORIGIN" \ -d '{"email":"[REDACTED:email#2]","password":"[REDACTED:password#1]","provider":"Local"}')

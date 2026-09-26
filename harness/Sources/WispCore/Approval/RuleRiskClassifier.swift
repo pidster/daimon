@@ -113,7 +113,8 @@ public struct RuleRiskClassifier: RiskClassifier {
             #"(-m\s+http\.server|\bhttp-server\b|\bserve\b|\bnc\s+-l|\bngrok\b|\bssh\s+-[LRD]\b|--listen\b|\blisten\s+\d)"#,
             .moderate, "starts a network service"),
         Rule(
-            start + #"git\s+(push|pull|fetch|clone|remote|commit|merge|rebase|stash|tag|cherry-pick|revert)\b"#,
+            start
+                + #"git\s+(push|pull|fetch|clone|remote|commit|merge|rebase|stash|tag(?!\s+(-l|--list)\b)|cherry-pick|revert)(?![\w-])"#,
             .moderate, "changes repository state"),
         Rule(
             start
@@ -128,7 +129,8 @@ public struct RuleRiskClassifier: RiskClassifier {
                 + #"(swift\s+build|swift\s+test|cargo\s+(build|test|run)|make|xcodebuild|npm\s+(run|test)|pytest|go\s+(build|test))\b"#,
             .moderate, "runs a build or tests"),
         Rule(
-            start + #"(open|osascript|defaults\s+write|crontab|at)\b"#, .moderate, "affects the desktop or scheduling"),
+            start + #"(open|osascript|defaults\s+write|crontab|at)(?=\s|$)"#, .moderate,
+            "affects the desktop or scheduling"),
         Rule(start + #"(kill|pkill)\b"#, .moderate, "signals a process"),
     ]
 

@@ -169,6 +169,25 @@ import WispTestSupport
         }
     }
 
+    @Test func rulesDoNotMistakeLookalikesForTheCommandsTheyMatch() async {
+        // A verb glued to more letters or a hyphen is another verb, a tag listing changes nothing, and a
+        // function called open is not the open command.
+        for command in [
+            "git merge-base --is-ancestor HEAD main", "git tag -l v0.5.0", "git tag --list",
+            "python3 -c \"print(open('a.txt').read())\"", "awk '{print \"seen at\", NR}' log",
+        ] {
+            let verdict = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp")
+            #expect(verdict.level == .safe, "\(command): \(verdict.reasons)")
+        }
+        for command in [
+            "git merge feature", "git tag v1.0", "git tag -d v1.0", "git stash", "open -a Xcode .", "open .",
+            "crontab -e", "at now + 1 minute",
+        ] {
+            let level = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp").level
+            #expect(level >= .moderate, "\(command)")
+        }
+    }
+
     @Test func measurementsShowTheirSpeedWhenTheyHaveOne() {
         let fast = Measurement(
             task: "t", model: "m", passed: 9, total: 10, notes: "n", p50Milliseconds: 0.04, p95Milliseconds: 0.1)
