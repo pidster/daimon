@@ -47,7 +47,7 @@ Both are generated from the live registry, so they cannot drift from what the mo
 
 ## Inspecting wisp
 
-Four more resources and one template let a client read wisp's own state without spending a model turn
+Five more resources and one template let a client read wisp's own state without spending a model turn
 ([ADR 0018](decisions/0018-introspection.md)). They are read-only and show the same views as the model's
 [`inspect`](tools/inspect.md) tool and `wisp config`.
 
@@ -56,7 +56,7 @@ Four more resources and one template let a client read wisp's own state without 
 | `wisp://config` | JSON: every setting with defaults applied, the model, the `run_command` policy, and the paths under `~/.wisp`. |
 | `wisp://status` | JSON: the server session id, entry point, model, tools, live `threads` (most recent first), approvals in force for the session, and the count of standing approvals. |
 | `wisp://approvals` | JSON: the standing approvals with pattern, directory, scope, level, expiry, and source. |
-| `wisp://measurements` | JSON | What the eval harness found each delegated task achieves ([measurements.md](measurements.md)); the per-tool ones also appear on `wisp://tools`. |
+| `wisp://measurements` | JSON: what the eval harness found each delegated task achieves ([measurements.md](measurements.md)); the per-tool ones also appear on `wisp://tools`. |
 | `wisp://audit` | JSON Lines: the last 100 audit events across every session, as written to the audit file. |
 | `wisp://audit/{session}` | JSON Lines: every event of one session or thread id (a `respond` `thread_id`), for reconstructing what a delegated task did. Listed as a resource template. |
 
@@ -185,10 +185,34 @@ Without elicitation, the model's tool call is refused with
 `structuredContent.refusals` carries it structurally. The calling harness should run the command itself
 or start wisp with `--yes`. See [approval.md](approval.md).
 
-| Argument | Type | Required |
-| --- | --- | --- |
-| `command` | string | yes |
-| `working_directory` | string | no |
+One `respond` call in which the model runs a command that needs approval, as the server handles it:
+
+```mermaid
+sequenceDiagram
+    actor person as Person
+    participant client as MCP client
+    participant server as WispServer
+    participant model as Agent and model
+    participant run as run_command and gate
+    client->>server: tools/call respond: prompt, thread_id
+    server->>model: the thread's agent takes the prompt
+    model->>run: run_command: command, directory
+    run->>run: policy, split, classify each part
+    opt at or above the threshold, and no approval held
+        run->>client: elicitation, through the server: command, level, reasons, scope
+        client->>person: approval dialog
+        person->>client: Accept with a scope, or Decline
+        client->>run: the answer, or silence until the timeout
+    end
+    alt cleared
+        run->>run: run under Seatbelt, audit the outcome
+        run->>model: exit status and the tail of the output
+    else denied by policy, declined, or no answer
+        run->>model: error: denied, or not approved
+    end
+    model->>server: reply
+    server->>client: reply text, with thread_id, refusals, and receipt
+```
 
 ### `triage`
 
@@ -202,6 +226,21 @@ the lists, drops duplicates, and caps the result ([ADR 0023](decisions/0023-cond
 swift-testing's `✘ Test … recorded an issue at`, cargo test's `test … FAILED` and `panicked at`,
 pytest's `FAILED` and `ERROR` lines, and go test's `--- FAIL:`. A chunk whose every line that looks like
 a failure is one of those, or a tool's own tally, needs no model turn.
+
+What stays on the Mac and what goes back to the client:
+
+```mermaid
+flowchart LR
+    client["MCP client"] -->|"command or path"| capture
+    subgraph mac["On this Mac"]
+        capture["Capture: run through the gate, or read; up to 1 MiB"] --> chunks["4 KiB chunks at line ends"]
+        chunks --> known{"KnownFailures explains every failure line?"}
+        known -->|yes| merge["Merge, drop duplicates, cap at max_findings"]
+        known -->|no| model["A fresh, tool-less model turn with a schema"]
+        model --> merge
+    end
+    merge -->|"headline and findings"| client
+```
 
 | Argument | Type | Required | Meaning |
 | --- | --- | --- | --- |

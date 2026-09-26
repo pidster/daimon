@@ -66,6 +66,26 @@ that rate only below about 12%; log severity has one fault. Both need more real 
 
 ## How they were made
 
+The path every set takes, from its sources to the three parts, and for risk into the release:
+
+```mermaid
+flowchart TD
+    drafted["Drafted by an agent"] --> label["Labelled by an agent under labels.md"]
+    real["Real commands, builds, and logs"] --> label
+    third["Third-party synthetic data, secrets test only"] --> label
+    label --> review["Reviewed adversarially by a second agent"]
+    review -->|risk| person["Uncertain labels decided by a person"]
+    review -->|"the other sets"| neutral
+    person --> neutral["Real data neutralised"]
+    neutral --> split["Split by family: wisp classifier split"]
+    split --> train["train.tsv"]
+    split --> dev["dev.tsv: for choosing, and the evals"]
+    split --> test["test.tsv: frozen, scored once"]
+    train -->|"risk only: scripts/check classifier-default"| bundle["risk-examples.tsv and risk-default.json"]
+    bundle --> binary["Embedded in the release binary"]
+```
+
+
 On 2026-09-26 one agent drafted the four sets, the risk set starting from the bundled examples. A
 second agent, which had not written them, reviewed each adversarially (`reviews/`): mislabels,
 inconsistent rules, templated near-duplicates, leakage into the eval sets, shortcut tokens that predict

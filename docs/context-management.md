@@ -48,6 +48,22 @@ model states it (`SystemLanguageModel.contextSize`; Ollama's configured `context
 sends as `num_ctx` so the server's default cannot differ from what it condenses against) or once an
 overflow error has reported it. Nothing happens for a window nobody knows.
 
+Both paths, for one prompt under the default `.condense` policy:
+
+```mermaid
+flowchart TD
+    prompt["A new prompt"] --> ahead{"Window known, and the estimate at 85% or more?"}
+    ahead -->|yes| budget["Condense to the last four turns, reason budget"]
+    ahead -->|no| send["Send it to the model"]
+    budget --> send
+    send --> overflow{"contextSizeExceeded?"}
+    overflow -->|no| reply["The reply"]
+    overflow -->|yes| rebuild["Rebuild from the transcript before the prompt, condensed, reason overflow"]
+    rebuild --> retry{"Retried once: overflow again?"}
+    retry -->|no| reply
+    retry -->|yes| error["The error propagates"]
+```
+
 Tools are the other half of the answer. `run_command` keeps only the tail of output and `read_file` pages a
 file, so a single tool result cannot fill the window.
 

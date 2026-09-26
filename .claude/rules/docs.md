@@ -23,3 +23,10 @@ paths:
 - Verified facts only. If a claim was measured or probed, say so and where (`scripts/check eval`, a probe
   on this machine on a date). Do not document intended behaviour as if it existed.
 - The README is the front door: intro, quick start, doc map, developer setup. Detail belongs in `docs/`.
+- Diagrams only where a reader must hold a flow, sequence, state, or structure in their head that the
+  prose shows less well. Beside the prose, never instead of it, with a one-line caption before it.
+  Mermaid by default (`flowchart`, `sequenceDiagram`, `stateDiagram-v2`; about 15 nodes at most; no
+  styling, so it reads in GitHub's light and dark themes). Every node and arrow matches the code. A
+  hand-written SVG only for a flagship picture of very high quality, in `docs/images/` with light and
+  dark versions through `<picture>`, real text, `<title>`, `<desc>`, and alt text (the README overview
+  is the model). Render and look at a diagram before committing it.

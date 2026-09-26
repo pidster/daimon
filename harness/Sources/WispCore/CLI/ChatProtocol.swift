@@ -6,12 +6,13 @@ import Synchronization
 /// and audit stay in this process. One object per line; unknown types are ignored, and a line that is
 /// not JSON is taken as a typed message so the protocol can be driven by hand.
 ///
-/// Outbound (to the front end): `banner`, `status`, `output` (a whole line, as `/help` prints), `delta`
-/// (streamed reply text), `turn` (`start`/`end`), `event` (an audit event of the conversation, raw, with
-/// the line the terminal chat would show for it as `text`), `note`, `approval` (a request the front end
-/// must answer), `choice` (a question a chat command asks, such as `/config set`), `exit`. Inbound:
-/// `message` (a chat line, slash commands included), `answer` (to an approval, by id), and `choose` (to
-/// a choice, by id; no value is no answer).
+/// Outbound (to the front end): `note` (the banner and other notices), `status`, `output` (a whole line,
+/// as `/help` prints), `delta` (streamed reply text), `turn` (`start`/`end`), `event` (an audit event of
+/// the conversation, raw, with the line the terminal chat would show for it as `text`), `approval` (a
+/// request the front end must answer), `choice` (a question a chat command asks, such as `/config set`),
+/// `completions` (the answer to a `complete`), `exit`. Inbound: `message` (a chat line, slash commands
+/// included), `answer` (to an approval, by id), `choose` (to a choice, by id; no value is no answer), and
+/// `complete` (the input line and cursor to complete, by id).
 public enum ChatProtocol {
     /// What the front end sends.
     public enum Inbound: Equatable, Sendable {

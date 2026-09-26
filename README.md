@@ -9,6 +9,14 @@ summarise a diff, scan a commit for secrets. Every command the model runs passes
 a risk classifier, and, when it matters, you, and every step is written to an audit log you can read
 back.
 
+You and your coding agent reach the same session, and a command the model asks for passes the gate
+before it touches your Mac:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.svg">
+  <img alt="You at the terminal (wisp, wisp chat, wisp-tui) and your coding agent over MCP both open one wisp session. The session runs the model, on device or through Ollama, with its seven tools. A command the model asks for passes the gate in order: the policy deny list, the risk classifier, you when it matters, and the Seatbelt sandbox, and only then reaches your Mac. The session, the model, and the gate all write to one audit log." src="docs/images/overview-light.svg" width="960">
+</picture>
+
 ## What you can do with it
 
 ### At the terminal

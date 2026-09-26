@@ -15,8 +15,10 @@ classifier assesses the command's risk and, at or above a threshold, a human is 
 
 ## Classifiers
 
-Two run and the higher verdict wins (`CompositeRiskClassifier`), except that a command the rules know
-to be read-only is not given to the model at all:
+Two run and the higher verdict wins (`CompositeRiskClassifier`): the rules, and the classifier
+`approval.classifier` names beside them, by default the Core ML classifier the release ships
+([below](#a-core-ml-classifier)), or the on-device model. A command the rules know to be read-only is
+not given to the second at all:
 
 - **Rules** (`RuleRiskClassifier`): regexes with a level and a reason each, covering privilege, deletion,
   history rewriting, credentials, uploads, network use, package installs, file modification, and build
@@ -35,7 +37,7 @@ to be read-only is not given to the model at all:
   run a program (`find -exec` or `-delete`, `sort -o`, `rg --pre`, `git diff --output`, `awk`'s
   `system()`). For a known-safe command the rules' `safe` is final: no model is asked, so it costs no
   model call and cannot be over-rated. A command off the list is judged as before, never refused.
-- **Model** (`ModelRiskClassifier`): one fresh on-device session per command with a `@Generable` verdict.
+- **The on-device model** (`ModelRiskClassifier`, `approval.classifier: system-model`): one fresh on-device session per command with a `@Generable` verdict.
   The verdict generates the one-sentence `reason` before the `risk` level, so the level follows the
   reasoning. The instructions give the model facts it otherwise guesses at (project build output is the
   project's own programs; filtering output is not network access; git reads are safe; anything that
@@ -98,13 +100,37 @@ git verb until it expires. An approval has a scope
 For each simple command in a line, the gate does the following, in this order, stopping at the first
 step that decides:
 
-1. Classify it with the rules and, unless the rules know it to be read-only, the model.
+1. Classify it with the rules and, unless the rules know it to be read-only, the configured classifier.
 2. If the verdict is below the threshold, run it. Nothing else is consulted.
 3. Check the session cache for this pattern in this directory.
 4. Check the turn cache for a once-approval given earlier in this turn.
 5. Check the persistent file for a `project` entry in this directory or an `always` entry, **but only if
    the verdict is not dangerous**.
 6. Ask the approver.
+
+The life of one command line through the policy and the gate, part by part, is this; every verdict and
+decision along the way is audited:
+
+```mermaid
+flowchart TD
+    line["A command line from the model"] --> split["Split into simple commands"]
+    split --> policy{"A deny pattern matches the line or a part, or no allow pattern does?"}
+    policy -->|yes| denied["Refused by policy"]
+    policy -->|no| rules{"Next part: the rules know it read-only?"}
+    rules -->|"yes: safe, final"| threshold{"Below the threshold?"}
+    rules -->|no| classifier["The configured classifier runs too; the higher level wins"]
+    classifier --> threshold
+    threshold -->|no| held{"A session or this-turn approval covers it?"}
+    held -->|no| stored{"Not dangerous, and a project or always approval covers it?"}
+    stored -->|no| ask["Ask the approver"]
+    ask -->|"declined, or no answer in time"| refused["The whole line is refused"]
+    threshold -->|yes| more{"More parts?"}
+    held -->|yes| more
+    stored -->|yes| more
+    ask -->|"approved, with a scope"| more
+    more -->|yes| rules
+    more -->|no| run["Run the line under Seatbelt and audit its outcome"]
+```
 
 Step 5's exception is deliberate: a dangerous verdict skips the persistent file and always asks, so a
 stored `rm *` never covers `rm -rf build` and a stored `git push *` never covers `git push --force`. The session
@@ -205,6 +231,23 @@ labelled commands, one per line as `level<TAB>command`, `#` for comments; every 
 bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, a copy of
 `training/risk/train.tsv` (drafted and real commands, 2,135 in all), and none of them is in the eval
 set.
+
+How versions enter the store, which one the gate uses, and what `remove` may not touch:
+
+```mermaid
+flowchart LR
+    binary["The default, embedded in the wisp binary"] -->|"written on first use"| default
+    examples["Examples: bundled, a file, or the audit log, minus held-out.tsv"] -->|"train: always a new version"| local
+    subgraph store["~/.wisp/classifiers/risk"]
+        default["risk@X.Y.Z-default"]
+        local["risk@X.Y.Z-local.N"]
+    end
+    measure["measure"] -->|"recorded in the manifest"| store
+    remove["remove"] -->|"a local version not in use"| local
+    use["use"] -->|"sets approval.coremlModel"| config["config.json"]
+    config -->|"names a version, or none: the default"| gate["The approval gate, from the next session"]
+    store --> gate
+```
 
 `--from-audit` also learns from this Mac's audit log: the on-device model's verdicts on the commands
 you have run, so the fast classifier learns what the slow one decided on the commands that matter

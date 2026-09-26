@@ -2,22 +2,36 @@
 
 ## Overview
 
-```
-┌────────────┐   prompt    ┌──────────────────┐  respond/stream  ┌──────────────────────┐
-│ wisp CLI │ ──────────▶ │ WispCore.Agent │ ───────────────▶ │ LanguageModelSession │
-│ (ArgParser)│ ◀────────── │                  │ ◀─────────────── │  (FoundationModels)  │
-└────────────┘   text      └──────────────────┘                  └──────────┬───────────┘
-                                   │ tools: [any Tool]                      │ tool call
-                                   ▼                                        ▼
-                            ┌──────────────┐        call(arguments:)  ┌───────────┐
-                            │ ToolRegistry │ ───────────────────────▶ │ Tool impl │
-                            └──────────────┘                          └───────────┘
+Every face of wisp sets up through `Session.begin` and opens its conversations from the session it
+returns; every tool call the model makes passes the audit wrapper, and a command also passes the policy,
+the gate, and the sandbox:
+
+```mermaid
+flowchart TD
+    cli["wisp respond, wisp chat"] --> begin["Session.begin"]
+    tui["wisp-tui"] -->|"JSON Lines"| json["wisp chat --json"]
+    json --> begin
+    client["MCP client"] -->|stdio| server["WispServer"]
+    server --> begin
+    begin -->|"one per face, or per thread_id"| conv["Conversation: gate, tools, prompting"]
+    conv --> agent["Agent"]
+    agent --> lms["LanguageModelSession"]
+    lms -->|"tool call"| audited["AuditedTool"]
+    audited --> tools["run_command, read_file, edit_file, and the rest"]
+    tools -->|run_command| runner["CommandRunner"]
+    tools -->|"read_file, edit_file"| gate
+    runner -->|"policy passed"| gate["ApprovalGate: classifier, then Approver"]
+    runner -->|"cleared"| sandbox["sandbox-exec /bin/sh -c"]
+    audited -.-> audit["AuditLog"]
+    gate -.-> audit
+    runner -.-> audit
 ```
 
 The framework owns the agent loop. When the model emits a tool call, `LanguageModelSession` decodes the
 arguments into the tool's `@Generable` `Arguments` type, invokes `call(arguments:)`, appends the result to the
 transcript, and continues generation. `Agent` therefore contains no loop of its own; it only guards
-availability and shapes the API.
+availability and shapes the API. `read_file` and `edit_file` consult the gate without `CommandRunner`;
+`current_date`, `inspect`, `notify`, and `system_info` do not consult it (see "Tools" below).
 
 ## Repository layout
 
@@ -37,7 +51,7 @@ availability and shapes the API.
 | `WispCoreAI` | library | `CoreAIBackend`: models exported to Apple's Core AI format, through the bridge in `apple/coreai-models`. Registered by the executable at launch so `WispCore` never links it. |
 | `WispMLX` | library | `MLXBackend`: models in MLX or Hugging Face layout through `mlx-swift-lm`'s bridge, compiled in only under the `MLX` package trait (Metal toolchain); otherwise registered but refusing with the reason. |
 | `WispMCP` | library | `WispServer` and `ToolCatalog`: exposes wisp over MCP. Depends on `WispCore` and the official MCP Swift SDK. |
-| `wisp` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `models`, `logs`, `doctor`, `approvals`, `mcp`. Session set-up is `Session.begin` in `WispCore`. |
+| `wisp` | executable | Argument parsing and stdin/stdout only. Subcommands `respond` (default), `chat`, `tools`, `models`, `mcp`, `logs`, `config`, `doctor`, `approvals`, `notify`, `scan`, `redact`, `watch`, `draft`, `classifier`. Session set-up is `Session.begin` in `WispCore`. |
 | `EmbedSystemPrompt` | build-tool plugin | Embeds `Resources/system-prompt.md` into `WispCore` as a string constant at build time. |
 | `WispTestSupport` | library, tests only | `ScriptedModel`: a `LanguageModel` that answers from a script, so the agent, tool loop, and MCP server run in tests with no model. |
 | `WispCoreTests`, `WispMCPTests` | tests | swift-testing suites for model-independent logic; `WispServerWireTests` drives the server through a real MCP client on an in-memory transport. |
@@ -258,17 +272,16 @@ sandbox, audit) or reads a file after the gate clears it, chunks it, judges each
 schema-shaped turn on a conversation of its own, and merges the findings
 ([ADR 0023](decisions/0023-condensing-tools.md)).
 
-```
-MCP client ──stdio──▶ WispServer ──respond(thread_id)──▶ ThreadStore ──▶ ConversationThread ──▶ Agent ──▶ session ──▶ tools
-                                   ──close_thread──▶ ThreadStore
-```
+A `respond` call goes from `WispServer` to the `ThreadStore`, which finds or creates the
+`ConversationThread` for its `thread_id`, and on to that thread's `Agent`; `close_thread` removes the
+thread from the store. The overview diagram above shows the rest of the path.
 
 ### CLI
 
 `wisp` mirrors `fm respond` where semantics match: positional prompt or stdin, `--instructions`,
 `--[no-]stream`, repeatable `--tool`. `wisp chat` is a line-oriented REPL with slash commands parsed by
-`ChatInput` (`/help`, `/tools`, `/tokens`, `/models`, `/model`, `/stats`, `/history`, `/save`, `/new`,
-`/quit`), `--resume <name>`, and `--save <name>`.
+`ChatInput` (`/help`, `/tools`, `/tokens`, `/status`, `/approvals`, `/audit`, `/inspect`, `/last`,
+`/models`, `/model`, `/stats`, `/history`, `/config`, `/save`, `/new`, `/quit`), `--resume <name>`, and `--save <name>`.
 `wisp tools` lists the registry. `wisp mcp` serves MCP on stdio. Instructions default to `config.json`.
 Exit codes follow swift-argument-parser conventions (64 for usage errors). The chat loop itself is
 `ChatLoop` in `WispCore`, with its input and output injected, so the executable only wires the

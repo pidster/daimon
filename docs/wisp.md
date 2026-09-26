@@ -201,6 +201,34 @@ printf 'What is the date in Tokyo?\n/quit\n' | wisp chat --json
 Everything else about the session is as for the terminal chat: the same flags, transcripts, and audit.
 Only the presentation moves out of the process.
 
+The order in which the lines pass, from the banner to `exit`:
+
+```mermaid
+sequenceDiagram
+    participant tui as wisp-tui
+    participant wisp as wisp chat --json
+    wisp->>tui: note: the banner and the help line
+    loop until /quit or end of input
+        wisp->>tui: status
+        tui->>wisp: message
+        alt a slash command
+            wisp->>tui: output lines, or a choice
+            tui->>wisp: choose, for a choice
+        else a chat line
+            wisp->>tui: turn, phase start
+            wisp->>tui: event and delta lines, interleaved
+            opt a risky command
+                wisp->>tui: approval
+                tui->>wisp: answer
+            end
+            wisp->>tui: an empty output line ends the reply
+            wisp->>tui: turn, phase end
+        end
+    end
+    wisp->>tui: exit
+    Note over tui,wisp: complete and completions may pass at any time
+```
+
 ### `wisp tools`
 
 Prints each registered tool as `name<TAB>description`. `--json` prints the full catalogue (description,
