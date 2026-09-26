@@ -86,7 +86,9 @@ public struct RuleRiskClassifier: RiskClassifier {
         Rule(#"\|\s*(ba|z|da)?sh(\s|$)"#, .dangerous, "pipes downloaded or generated content into a shell"),
         Rule(start + #"git\s+push\b.*(--force|-f\b|\+)"#, .dangerous, "force push rewrites remote history"),
         Rule(
-            start + #"git\s+(reset\s+--hard|clean\s+-[a-z]*f|checkout\s+--\s|restore\s)"#, .dangerous,
+            start
+                + #"git\s+(reset\s+--hard|clean\s+-[a-z]*f|checkout\b[^;&|]*\s--\s|restore\s(?![^;&|]*--staged)|restore\b[^;&|]*\s(--worktree|-W)\b)"#,
+            .dangerous,
             "discards local changes"),
         Rule(start + #"git\s+branch\s+-D\b"#, .dangerous, "deletes a branch without merge check"),
         Rule(
@@ -97,24 +99,38 @@ public struct RuleRiskClassifier: RiskClassifier {
             start + #"find\s+(/|~|\$HOME)\S*\s.*-exec(dir)?\s+(cat|cp|tar|zip|base64|curl|scp|rsync|xxd|strings)\b"#,
             .dangerous, "reads or copies every file a search of the home folder or the disk matches"),
         Rule(
-            start + #"security\s+(find-(generic|internet)-password\b.*\s-w\b|dump-keychain\b|export\b)"#,
+            start + #"security\s+(find-(generic|internet)-password\b.*\s-[wg]\b|dump-keychain\b|export\b)"#,
             .dangerous, "prints stored passwords or keys"),
         Rule(start + #"(chmod|chown)\s+(-R|--recursive)"#, .dangerous, "recursive permission change"),
+        Rule(
+            start + #"git\s+(reflog\s+(expire|delete)\b|gc\b[^;&|]*--prune=now)"#, .dangerous,
+            "destroys the history git keeps for recovery"),
+        // Publishing is public and irreversible, as the labels have it; a dry run is not.
+        Rule(
+            start
+                + #"((npm|pnpm|yarn)\s+publish\b|cargo\s+publish\b|gem\s+push\b|twine\s+upload\b|mvn\b[^;&|]*\bdeploy\b|docker\s+push\b|pod\s+trunk\s+push\b)(?![^;&|]*--dry-run)"#,
+            .dangerous, "publishes to a registry"),
+        Rule(
+            start + #"aws\s+s3\s+(rb\b[^;&|]*--force|rm\b[^;&|]*--recursive)"#, .dangerous,
+            "deletes remote storage"),
         // A credential printed goes into the model's context and the audit log, sent or not. A variable
         // named for one, printed by value; `${X:+set}` and `${#X}` show only whether it is set or its length.
         Rule(start + #"printenv\s+(-\S+\s+)*"# + credentialName + #"\b"#, .dangerous, "prints a credential"),
         Rule(
-            start + #"(echo|printf)\b[^;&|]*?\$\{?"# + credentialName + #"\b(?!:[+?-])"#, .dangerous,
+            // A quote may come first: `sh -c 'echo "$TOKEN"'` prints it as surely.
+            #"(^|[\s;&|(`'"]|\$\()(echo|printf)\b[^;&|]*?\$\{?"# + credentialName + #"\b(?!:[+?-])"#, .dangerous,
             "prints a credential"),
         Rule(
             start + #"env\b[^;&]*\|\s*grep\b.*(?i:token|secret|passw|credential|api_?key|private_key)"#,
             .dangerous, "prints credentials from the environment"),
         Rule(
             start
-                + #"(gh\s+auth\s+token\b|op\s+read\b|op\s+item\s+get\b.*--reveal|aws\s+configure\s+get\s+\S*(?i:secret|token)|kubectl\s+get\s+secrets?\b.*\s-o\s*=?\s*(yaml|json|jsonpath|go-template))"#,
+                + #"(gh\s+auth\s+token\b|op\s+read\b|op\s+item\s+get\b.*--reveal|aws\s+configure\s+get\s+\S*(?i:secret|token)|kubectl\b[^;&|]*\bget\s+secrets?\b[^;&|]*\s-o\s*=?\s*(yaml|json|jsonpath|go-template)|kubectl\b[^;&|]*\bconfig\s+view\b[^;&|]*--raw|az\s+keyvault\s+secret\s+(show|download)\b|gcloud\s+secrets\s+versions\s+access\b|vault\s+(kv\s+get|read)\b|gpg\b[^;&|]*--export-secret-(sub)?keys)"#,
             .dangerous, "prints a stored credential"),
         Rule(
-            start + #"(mkfs|diskutil\s+(erase|partition)|newfs_|dd\s.*\bof=/dev/)"#, .dangerous,
+            start
+                + #"(mkfs|diskutil\s+(erase|partition|zeroDisk|secureErase|reformat|apfs\s+(delete|erase))|newfs_|dd\s.*\bof=/dev/)"#,
+            .dangerous,
             "destroys a disk or volume"),
         Rule(
             #"(\.ssh/|id_rsa|id_ed25519|\.aws/credentials|\.netrc|\.gnupg|keychain|\.config/gh/hosts\.yml|\.git-credentials|\.npmrc|\.pypirc|\.docker/config\.json|\.kube/config)"#,

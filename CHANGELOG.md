@@ -4,6 +4,28 @@ Notable changes per release, written for people who run wisp. The release script
 section for the version being cut as the GitHub release notes and refuses to release without one.
 Keep an `Unreleased` section at the top while working; the version-bump commit renames it.
 
+## Unreleased
+
+Changed:
+
+- The risk rules rate more dangerous commands dangerous:
+  - credential reads: `kubectl config view --raw`, `kubectl … get secret -o yaml` with flags before
+    `get`, `az keyvault secret show`, `gcloud secrets versions access`, `vault kv get`,
+    `gpg --export-secret-keys`, `security find-generic-password -g`, and a credential echoed inside
+    `sh -c '…'`;
+  - publishing to a registry (`npm publish`, `cargo publish`, `mvn deploy`, `docker push`, and others),
+    except as a dry run;
+  - deleting remote storage (`aws s3 rb --force`, `aws s3 rm --recursive`);
+  - `diskutil apfs deleteVolume`;
+  - `git reflog expire`, `git gc --prune=now`, and `git checkout <ref> -- <paths>`.
+
+  Measured by cross-validation over 403 dangerous commands, the gate rates 1.5% of them safe, down from
+  4.2%, with no more prompts on safe commands.
+
+Fixed:
+
+- `git restore --staged`, which only unstages, no longer counts as discarding local changes.
+
 ## 0.13.1
 
 Changed:

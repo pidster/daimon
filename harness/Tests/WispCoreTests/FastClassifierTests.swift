@@ -192,6 +192,29 @@ import WispTestSupport
         }
     }
 
+    @Test func rulesCatchWhatCrossValidationFoundThemMissing() async {
+        for command in [
+            "kubectl -n prod get secret web-tls -o yaml", "kubectl config view --raw",
+            "az keyvault secret show --vault-name kv --name db-password", "gpg --export-secret-keys --armor",
+            "security find-generic-password -l app -g", "sh -c 'echo \"$SECRET_KEY_BASE\"'", "mvn deploy -DskipTests",
+            "npm publish", "docker push ghcr.io/me/app:1", "aws s3 rb s3://bucket --force",
+            "aws s3 rm s3://bucket/logs --recursive", "diskutil apfs deleteVolume disk3s6",
+            "git reflog expire --expire=now --all", "git gc --prune=now", "git checkout main -- docs/a.md",
+            "git restore file.txt", "git restore --staged --worktree file.txt",
+        ] {
+            let verdict = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp")
+            #expect(verdict.level == .dangerous, "\(command): \(verdict.reasons)")
+        }
+        for command in [
+            "kubectl get secrets", "kubectl config view", "npm publish --dry-run", "git checkout main",
+            "git checkout -b feature", "git restore --staged file.txt", "aws s3 ls", "gpg --list-keys", "diskutil list",
+            "echo \"$HOME\"",
+        ] {
+            let verdict = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp")
+            #expect(verdict.level < .dangerous, "\(command): \(verdict.reasons)")
+        }
+    }
+
     @Test func rulesDoNotMistakeLookalikesForTheCommandsTheyMatch() async {
         // A verb glued to more letters or a hyphen is another verb, a tag listing changes nothing, and a
         // function called open is not the open command.

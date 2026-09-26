@@ -319,3 +319,54 @@ The test set revealed this gap, so from here on its figure for `printenv POSTGRE
 independent. Across all three risk parts the rule fires on 14 commands, and all 14 are labelled
 dangerous. Real-shaped training examples of the same class, with safe near-misses, are added to train
 so the classifier learns the shapes a regex misses.
+
+## Amendment, 2026-09-26: cross-validation measures dangerous commands closely
+
+The frozen test set has 25 dangerous commands, too few to bound how often one is rated safe (4 of 25
+is an upper bound of about 35%). Writing hundreds more dangerous commands by hand was ruled out. The
+measurement instead uses the labelled data already here, by five-fold cross-validation.
+
+**Method.** Train and dev were pooled: 2,527 commands, 403 of them dangerous. `wisp classifier split`
+dealt them into five folds by family, so near-copies never straddle a fold. Each fold was scored by a
+classifier trained the shipped way (maxEnt, shell tokenisation) on the other four, and combined as the
+gate combines it:
+- the read-only list is final;
+- the rules are the floor;
+- a verdict below 0.6 confidence becomes moderate;
+- the higher level wins.
+
+Every command was scored once, by a model that never saw it or its family. The frozen test set took no
+part.
+
+**Results.**
+
+| | Dangerous rated safe, of 403 | 95% upper bound | Safe commands that ask, of 1,155 | Exact, of 2,527 |
+| --- | --- | --- | --- | --- |
+| before | 17 (4.2%) | 6.3% | 229 | 1,973 |
+| after the rule gaps were closed | 6 (1.5%) | 2.9% | 229 | 1,994 |
+| rules alone, after | 118 | | | |
+
+The 17 misses showed eleven rule gaps, each a class the labels call dangerous. The rules now cover:
+- `kubectl … get secret -o …` with flags before `get`, and `kubectl config view --raw`;
+- `az keyvault secret show`, `gcloud secrets versions access`, `vault kv get`, and
+  `gpg --export-secret-keys`;
+- `security find-generic-password -g` as well as `-w`;
+- a credential echoed after a quote (`sh -c 'echo "$X"'`);
+- publishing to a registry (`npm`, `cargo`, `gem`, `twine`, `mvn deploy`, `docker push`), except as a
+  dry run;
+- `aws s3 rb --force` and `aws s3 rm --recursive`;
+- `diskutil apfs deleteVolume` and other erasures;
+- `git reflog expire` and `git gc --prune=now`;
+- `git checkout <ref> -- <paths>`.
+
+`git restore --staged`, which only unstages, stops counting as discarding work. Across train, dev and
+test the new rules fire on no command labelled below dangerous.
+
+The six misses left are all credential reads a regex cannot tell from their safe look-alikes:
+- `sed` or `grep` of a key from a config or `.env` file;
+- `cat .env.local`;
+- `jq .private_key` of a service-account file;
+- Python printing an environment variable;
+- `docker inspect … | grep -i pass`.
+
+They are the classifier's to learn.
