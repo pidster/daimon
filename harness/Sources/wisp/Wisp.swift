@@ -895,6 +895,14 @@ struct ClassifierCommand: AsyncParsableCommand {
     /// Where `train` writes by default: the name `approval.coremlModel` resolves without a path.
     static let defaultModelName = "risk.mlmodel"
 
+    /// Every audit event on this Mac, oldest first: the rotated files, then the current one.
+    static func auditEvents(session: Session) -> [AuditEvent] {
+        let current = Wisp.home.auditFile
+        let files =
+            FileAuditSink.rotatedFiles(for: current, keep: session.config.auditLimits.keepFiles).reversed() + [current]
+        return files.flatMap { url in (try? Data(contentsOf: url)).map(AuditQuery.events(in:)) ?? [] }
+    }
+
     /// Labelled commands from a file, or the bundled training examples.
     ///
     /// - Throws: A usage error naming the file and the bad line.
@@ -922,10 +930,24 @@ struct ClassifierCommand: AsyncParsableCommand {
         @Option(name: .long, help: "Where to write the model. Defaults to ~/.wisp/models/coreml/risk.mlmodel.")
         var out: String?
 
+        @Flag(
+            name: .long,
+            help: "Also learn from the on-device model's verdicts in this Mac's audit log, secrets redacted.")
+        var fromAudit = false
+
         func run() async throws {
             let session = try Wisp.begin(.init(entryPoint: .classifier))
             defer { session.end() }
-            let (examples, source) = try ClassifierCommand.examples(examples)
+            var (examples, source) = try ClassifierCommand.examples(examples)
+            if fromAudit {
+                let harvest = RiskExamples.fromAudit(ClassifierCommand.auditEvents(session: session))
+                print(
+                    "from the audit log: \(harvest.examples.count) commands from \(harvest.verdicts) model verdicts, "
+                        + "\(harvest.fallbacks) fallbacks left out, \(harvest.raised) raised after a refusal, "
+                        + "\(harvest.redacted) redacted")
+                examples = RiskExamples.merged(examples, with: harvest.examples)
+                source += " + audit"
+            }
             let url =
                 out.map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
                 ?? Wisp.home.models.appending(path: "coreml").appending(path: ClassifierCommand.defaultModelName)

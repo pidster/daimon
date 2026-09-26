@@ -81,3 +81,35 @@ deletion by `find` and `xargs rm` are added; the rules still call two held-out d
 - New tasks follow the same shape: a labelled set, a fail-safe label, a measurement with latency, and a
   bar before any classifier gets a role.
 - `classifier.train` is a new audit event; `classifier` is a new entry point.
+
+## Amendment, 2026-09-26: a wider set, three rule gaps, and training from the audit log
+
+The eval set grew from 47 to 123 commands (`RiskEvalSet`), the 76 new ones held out from every
+classifier's instructions and examples, so the bar in decision 6 compares more than a handful of
+cases. On it the default failed the hard requirement: the on-device model, and the rules beside it,
+rated `cat ~/.config/gh/hosts.yml`, which holds a GitHub token, as safe. The credentials rule now
+covers `gh`'s hosts file, `.git-credentials`, `.npmrc`, `.pypirc`, and the Docker and kube configs;
+two more rules cover `find ~ … -exec cat` (and `cp`, `tar`, `curl`, …) over the home folder or the
+disk, and `security … -w`, `dump-keychain`, and `export`. Five held-out cases were known when these
+rules were written (`find / … -exec cat`, `security find-generic-password … -w`, the `gh` hosts file,
+`security find-internet-password … -w`, `find ~ … -exec cp`), and the new cases that delete through
+`find` or `xargs` were written after the rules of 2026-09-25, so read the rules' score on those as
+checked, not held out.
+
+`wisp classifier train --from-audit` adds the on-device model's own verdicts on the commands this Mac
+ran, from the audit log: only verdicts the model took part in, not its fallbacks, the latest per
+command, a command a person refused raised to at least `moderate`, and secrets and personal data
+replaced first. The fast classifier learns what the slow one decided, on the commands that matter here.
+
+Measured on 2026-09-26 over the 123 commands, the rules beside each:
+
+| Classifier | Exact | Under | Dangerous rated safe | p50 |
+| --- | --- | --- | --- | --- |
+| `system-model` + rules (the default) | 108/123 | 1 | none | 1.3 to 2.3 s |
+| trained from the bundled examples + rules | 100/123 | 0 | none | 0.06 ms |
+| trained from the bundled examples and one Mac's audit log (137 commands) + rules | 104/123 | 0 | none | 0.06 ms |
+
+The audit-trained figure is an upper bound: four of that log's commands are also eval cases. The
+model's latency varied between runs on the same Mac. The default stays under decision 6 until a
+trained classifier matches its 108; the trained ones already rate nothing below its level.
+

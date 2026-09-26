@@ -23,6 +23,8 @@ Added:
   speed on labelled commands. A trained classifier answers in about 0.05 ms, against about 2.3 s for
   the on-device model; use it with `approval.classifier: coreml`. The Core ML classifier now loads its
   model once instead of on every command, and reads contract 2 models.
+- `wisp classifier train --from-audit` also learns from this Mac's audit log: the on-device model's
+  verdicts on the commands you have run, secrets redacted, a refused command at least `moderate`.
 
 Removed:
 
@@ -36,6 +38,10 @@ Fixed:
   ("Test output: \"test\"."), and kept the pattern for the rest of the conversation.
 - The rules rate deletion through `find … -delete`, `find … -exec rm`, and `xargs rm` as dangerous;
   they called it safe.
+- The rules rate as dangerous reading common token files (`~/.config/gh/hosts.yml`, `.git-credentials`,
+  `.npmrc`, `.pypirc`, the Docker and kube configs), copying or printing every file a search of the home
+  folder or the disk matches (`find ~ … -exec cat`), and printing stored passwords with `security … -w`.
+  The default classifier let the first through: the on-device model rated reading `gh`'s token safe.
 - `wisp-tui` no longer redraws its band while idle, which could make the cursor flicker or restart its
   blink, and no longer resizes the band back and forth when deleting across a wrapped line.
 

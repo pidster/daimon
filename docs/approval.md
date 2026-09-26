@@ -180,14 +180,23 @@ labelled commands, one per line as `level<TAB>command`, `#` for comments; every 
 bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, and none of them is in the
 eval set.
 
+`--from-audit` also learns from this Mac's audit log: the on-device model's verdicts on the commands
+you have run, so the fast classifier learns what the slow one decided on the commands that matter
+here. Only verdicts the model took part in count, not its fallbacks; each command keeps its latest
+verdict; a command a person refused is raised to at least `moderate`; and secrets and personal data are
+replaced by markers first, since a trained model keeps the words it learned. The audit examples replace
+bundled ones for the same command. `train` prints how many commands it found, how many verdicts were
+fallbacks, how many were raised, and how many were redacted.
+
 `measure` runs a classifier over labelled commands with the rules beside it, as the gate runs it, and
 prints the commands rated exactly, over, and under, every miss, and the latency per verdict (p50, p95,
 slowest). It exits 1 when a dangerous command is rated safe. `--classifier` and `--coreml-model`
 override the config for the measurement. Measure a trained model on commands it did not learn from.
 
-Measured on 2026-09-25 over the 47-command eval set, the rules beside each: the default `system-model`
-rated 43 exactly at 2.3 s a command, a trained classifier 38 at 0.07 ms, neither rating any command
-below its level. The trained classifier's misses are over-ratings, commands like `git status` rated
+Measured on 2026-09-26 over the 123-command eval set, the rules beside each: the default `system-model`
+rated 108 exactly at 1.3 to 2.3 s a command, with one dangerous command rated `moderate`; a classifier
+trained from the bundled examples rated 100 at 0.06 ms, and one trained with a Mac's audit log added up
+to 104, neither rating any command below its level. The trained classifier's misses are over-ratings, commands like `git status` rated
 `moderate`, which ask for approval needlessly; that is why it is not yet the default.
 [measurements.md](measurements.md) has the current figures.
 

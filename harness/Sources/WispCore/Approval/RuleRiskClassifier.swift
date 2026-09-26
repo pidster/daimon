@@ -88,12 +88,19 @@ public struct RuleRiskClassifier: RiskClassifier {
             start + #"find\b.*\s(-delete\b|-exec(dir)?\s+rm\b)"#, .dangerous,
             "deletes every file the search matches"),
         Rule(start + #"xargs\s+(-\S+\s+)*rm\b"#, .dangerous, "deletes every path given to it"),
+        Rule(
+            start + #"find\s+(/|~|\$HOME)\S*\s.*-exec(dir)?\s+(cat|cp|tar|zip|base64|curl|scp|rsync|xxd|strings)\b"#,
+            .dangerous, "reads or copies every file a search of the home folder or the disk matches"),
+        Rule(
+            start + #"security\s+(find-(generic|internet)-password\b.*\s-w\b|dump-keychain\b|export\b)"#,
+            .dangerous, "prints stored passwords or keys"),
         Rule(start + #"(chmod|chown)\s+(-R|--recursive)"#, .dangerous, "recursive permission change"),
         Rule(
             start + #"(mkfs|diskutil\s+(erase|partition)|newfs_|dd\s.*\bof=/dev/)"#, .dangerous,
             "destroys a disk or volume"),
         Rule(
-            #"(\.ssh/|id_rsa|id_ed25519|\.aws/credentials|\.netrc|\.gnupg|keychain)"#, .dangerous, "touches credentials"
+            #"(\.ssh/|id_rsa|id_ed25519|\.aws/credentials|\.netrc|\.gnupg|keychain|\.config/gh/hosts\.yml|\.git-credentials|\.npmrc|\.pypirc|\.docker/config\.json|\.kube/config)"#,
+            .dangerous, "touches credentials"
         ),
         Rule(start + #"(kill\s+-9\s+-1|killall|pkill\s+-9)\b"#, .dangerous, "kills processes broadly"),
         Rule(start + #"(launchctl|systemsetup|nvram|csrutil|spctl)\b"#, .dangerous, "changes system configuration"),

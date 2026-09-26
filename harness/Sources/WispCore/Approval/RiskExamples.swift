@@ -56,6 +56,74 @@ public enum RiskExamples {
         return examples
     }
 
+    /// What the audit log yielded for training.
+    public struct Harvest: Equatable, Sendable {
+        /// One example per distinct command, labelled by the model's verdict, latest first seen last.
+        public var examples: [RiskExample]
+        /// Model verdicts read, repeats included.
+        public var verdicts: Int
+        /// Verdicts left out because the model could not judge and the level was a fallback.
+        public var fallbacks: Int
+        /// Examples raised to `moderate` because a person refused the command.
+        public var raised: Int
+        /// Examples with a secret or personal value replaced before training.
+        public var redacted: Int
+    }
+
+    /// Labelled commands from the audit log: the on-device model's verdicts on the commands this Mac
+    /// actually ran, so a fast classifier can learn what the slow one decided (ADR 0038).
+    ///
+    /// Only verdicts the model took part in count (`sources` includes `model`), and not its fallbacks.
+    /// Each distinct command keeps its latest verdict. A command a person refused is raised to at least
+    /// `moderate`: a refusal says it should not run unasked, never that it was harmless. Secrets and
+    /// personal data are replaced by markers first, since a trained model keeps the words it learned.
+    ///
+    /// - Parameter events: Audit events in time order.
+    /// - Returns: The examples and what was left out.
+    public static func fromAudit(_ events: [AuditEvent]) -> Harvest {
+        let refused = Set(
+            events.filter { $0.kind == .approvalDecided && $0.details["decision"]?.stringValue == "denied" }
+                .map { refusalKey($0) })
+        var harvest = Harvest(examples: [], verdicts: 0, fallbacks: 0, raised: 0, redacted: 0)
+        var byCommand: [String: (index: Int, example: RiskExample, raised: Bool, redacted: Bool)] = [:]
+        for event in events where event.kind == .classifierVerdict {
+            let details = event.details
+            guard let sources = details["sources"]?.arrayValue, sources.contains("model"),
+                let command = details["command"]?.stringValue, let label = details["level"]?.stringValue,
+                var level = RiskLevel(rawValue: label)
+            else { continue }
+            harvest.verdicts += 1
+            if details["metadata"]?.objectValue?[RiskAssessment.failureKey] != nil {
+                harvest.fallbacks += 1
+                continue
+            }
+            let wasRefused = refused.contains(refusalKey(event)) && level < .moderate
+            if wasRefused { level = .moderate }
+            var redactor = Redactor()
+            let clean = redactor.apply(SecretScanner.scan(command), to: command)
+            let key = CoreMLRiskClassifier.Contract.preprocess(clean, version: "1")
+            let index = byCommand[key]?.index ?? byCommand.count
+            byCommand[key] = (index, RiskExample(command: clean, level: level), wasRefused, clean != command)
+        }
+        let kept = byCommand.values.sorted { $0.index < $1.index }
+        harvest.examples = kept.map(\.example)
+        harvest.raised = kept.filter(\.raised).count
+        harvest.redacted = kept.filter(\.redacted).count
+        return harvest
+    }
+
+    /// The command a verdict or a refusal is about, in its session and turn.
+    private static func refusalKey(_ event: AuditEvent) -> String {
+        "\(event.session)|\(event.turn ?? -1)|\(event.details["command"]?.stringValue ?? "")"
+    }
+
+    /// `base` with `additions` merged in: an addition for a command already in `base` replaces it.
+    public static func merged(_ base: [RiskExample], with additions: [RiskExample]) -> [RiskExample] {
+        let key = { (example: RiskExample) in CoreMLRiskClassifier.Contract.preprocess(example.command, version: "1") }
+        let replaced = Set(additions.map(key))
+        return base.filter { !replaced.contains(key($0)) } + additions
+    }
+
     /// Reads and parses a file of labelled lines.
     ///
     /// - Throws: A read error, or `Problem`.

@@ -343,9 +343,11 @@ current run; a second Ctrl-C stops at once.
 
 ### `wisp classifier`
 
-`wisp classifier train [--examples <file>] [--out <path>]` trains a risk classifier on this Mac with
-Create ML, from labelled commands (`level<TAB>command` per line) or the bundled examples, into
-`~/.wisp/models/coreml/risk.mlmodel`, and prints the config that makes the approval gate use it.
+`wisp classifier train [--examples <file>] [--out <path>] [--from-audit]` trains a risk classifier on
+this Mac with Create ML, from labelled commands (`level<TAB>command` per line) or the bundled examples,
+into `~/.wisp/models/coreml/risk.mlmodel`, and prints the config that makes the approval gate use it.
+`--from-audit` adds the on-device model's verdicts on the commands in this Mac's audit log (see
+[approval.md](approval.md)).
 `wisp classifier measure [--examples <file>] [--classifier rules|system-model|coreml] [--coreml-model <path>]`
 runs a classifier, with the rules beside it, over labelled commands and prints its exact, over-, and
 under-ratings, misses, and latency per verdict; it exits 1 when a dangerous command is rated safe.

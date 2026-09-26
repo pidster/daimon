@@ -29,6 +29,11 @@ import WispTestSupport
             try RiskExamples.parse("safe\t   ")
         }
         #expect("\(RiskExamples.Problem(line: 3, reason: "x"))" == "line 3: x")
+        let file = scratch("examples.tsv")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        try Data("moderate\tnpm install\n".utf8).write(to: file)
+        #expect(try RiskExamples.load(file) == [RiskExample(command: "npm install", level: .moderate)])
         let levels = Set(RiskExamples.bundled.map(\.level))
         #expect(levels == Set(RiskLevel.allCases) && RiskExamples.bundled.count > 200)
     }
@@ -121,7 +126,7 @@ import WispTestSupport
             RiskMeasurement.percentile([1, 2, 3, 4], 0.5) == 2 && RiskMeasurement.percentile([1, 2, 3, 4], 0.95) == 4)
     }
 
-    @Test func rulesCatchDeletionBySearchAndByPipe() async {
+    @Test func rulesCatchDeletionAndReadingSecretsBySearch() async {
         for command in [
             "find . -name '*.tmp' -delete", "find /tmp -type f -exec rm {} +", "find ~ -execdir rm -f {} ;",
             "git ls-files -d | xargs rm", "xargs -0 rm -f",
@@ -129,8 +134,20 @@ import WispTestSupport
             let level = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp").level
             #expect(level == .dangerous, "\(command)")
         }
-        let search = await RuleRiskClassifier.standard.classify(command: "find . -name x", workingDirectory: "/tmp")
-        #expect(search.level == .safe)
+        for command in [
+            "find / -name '*.pem' -exec cat {} +", "find ~/Library -type f -execdir cp {} /tmp \\;",
+            "security find-generic-password -a me -w", "security find-internet-password -s x.example -w",
+            "security export -k login.keychain -o keys.p12",
+            "cat ~/.config/gh/hosts.yml", "cat ~/.git-credentials", "cp ~/.npmrc /tmp", "cat ~/.pypirc",
+            "cat ~/.docker/config.json", "cat ~/.kube/config",
+        ] {
+            let level = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp").level
+            #expect(level == .dangerous, "\(command)")
+        }
+        for command in ["find . -name x", "find . -name '*.swift' -exec wc -l {} +", "security find-certificate -a"] {
+            let level = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp").level
+            #expect(level < .dangerous, "\(command)")
+        }
     }
 
     @Test func measurementsShowTheirSpeedWhenTheyHaveOne() {

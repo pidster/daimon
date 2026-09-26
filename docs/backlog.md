@@ -107,11 +107,12 @@ tasks served by fast, specialised models, measured for speed as well as accuracy
 `wisp classifier train` (Create ML, on device, from the bundled examples), `wisp classifier measure`,
 contract 2, and latency in every classifier measurement. Next, in order:
 
-- **Examples from this Mac's own decisions.** The audit log pairs every verdict with the human's
-  approval or refusal; `wisp classifier train --from-audit` would learn from them, cleaned by `redact`.
+- Done 2026-09-26: `wisp classifier train --from-audit`, the eval set widened to 123 commands, and
+  three rule gaps closed (ADR 0038, amendment).
 - **A trained classifier good enough to be the default.** The bar (ADR 0038): beside the rules, as many
-  commands rated exactly as `system-model` beside the rules, none under. Today 38 against 43 of 47.
-  Widen the eval set first, so the bar means something.
+  commands rated exactly as `system-model` beside the rules, none under. On 2026-09-26, over 123: 108
+  for the default, 100 trained from the bundled examples, up to 104 with one Mac's audit log added. The
+  trained ones rate nothing below its level; the default rated one dangerous command `moderate`.
 - **Other providers.** Embedding nearest-neighbour over labelled examples (`NLEmbedding` or an Ollama
   embedding model), and an external process speaking JSON Lines, like the binaries in `tools/`.
 - **Other tasks.** Secret and personal-data detection for `redact`, log-line categories for

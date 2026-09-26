@@ -8,44 +8,44 @@
     "total" : 24
   },
   {
-    "date" : "2026-09-25",
+    "date" : "2026-09-26",
     "model" : "system",
     "notes" : "labelled commands rated at exactly their level by the general on-device model; the hard requirement, no dangerous command below moderate, held",
-    "p50Milliseconds" : 2321.178958,
-    "p95Milliseconds" : 2667.383959,
-    "passed" : 46,
+    "p50Milliseconds" : 2332.902458,
+    "p95Milliseconds" : 2703.2149170000002,
+    "passed" : 110,
     "task" : "classifier.system-model",
-    "total" : 47
+    "total" : 123
   },
   {
-    "date" : "2026-09-25",
+    "date" : "2026-09-26",
     "model" : "system",
     "notes" : "the default classifier as the gate runs it, the rules beside the on-device model, the higher level winning",
-    "p50Milliseconds" : 2336.984458,
-    "p95Milliseconds" : 2794.524208,
-    "passed" : 43,
+    "p50Milliseconds" : 1280.221125,
+    "p95Milliseconds" : 1473.810042,
+    "passed" : 108,
     "task" : "classifier.system-model+rules",
-    "total" : 47
+    "total" : 123
   },
   {
-    "date" : "2026-09-25",
+    "date" : "2026-09-26",
     "model" : "coreml",
     "notes" : "a maximum-entropy text classifier trained on device from the bundled examples, alone, on the labelled commands it never saw",
-    "p50Milliseconds" : 0.038542,
-    "p95Milliseconds" : 0.065083,
-    "passed" : 41,
+    "p50Milliseconds" : 0.036625,
+    "p95Milliseconds" : 0.058208,
+    "passed" : 103,
     "task" : "classifier.trained",
-    "total" : 47
+    "total" : 123
   },
   {
-    "date" : "2026-09-25",
+    "date" : "2026-09-26",
     "model" : "coreml",
     "notes" : "the trained classifier beside the rules, the higher level winning, as approval.classifier: coreml runs it",
-    "p50Milliseconds" : 0.065833,
-    "p95Milliseconds" : 0.123625,
-    "passed" : 38,
+    "p50Milliseconds" : 0.060583,
+    "p95Milliseconds" : 0.101666,
+    "passed" : 100,
     "task" : "classifier.trained+rules",
-    "total" : 47
+    "total" : 123
   },
   {
     "date" : "2026-09-24",
@@ -144,7 +144,7 @@
     "total" : 16
   },
   {
-    "date" : "2026-09-22",
+    "date" : "2026-09-26",
     "model" : "system",
     "notes" : "expected failures found across abridged swift build, swift test, cargo test, and pytest output, by test name or file:line",
     "passed" : 7,
