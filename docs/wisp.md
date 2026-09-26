@@ -131,7 +131,7 @@ What a session shows, and where it goes:
 | `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
 | `/stats` | Timings of this session's recent model turns and classifier calls: per kind and model, the count, failures, mean, P50, P95, and maximum seconds, and the mean prompt tokens where the runtime reports them (Ollama); then the latest eight calls by start time. Kept in memory only, the latest 256 calls; see below. |
 | `/history` | The lines typed this session, numbered, oldest first: the latest 100, blank lines and a line repeating the one before it left out. |
-| `/config`, `/config list` | The effective configuration, as `/inspect config` shows it; `list` shows the settings that can be changed here, each with its value in `config.json` (or `(default)`) and what it does. |
+| `/config`, `/config list` | The effective configuration as YAML (`/inspect config` and `wisp config` give the same as JSON); `list` shows the settings that can be changed here, each with its value in `config.json` (or `(default)`) and what it does. |
 | `/config set KEY VALUE`, `/config unset KEY` | Change `~/.wisp/config.json`, as `wisp config set` does (below). Leave out the value and chat offers the setting's choices; leave out the key too and it offers the settings first. `unset` without a key offers the settings set in the file. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |

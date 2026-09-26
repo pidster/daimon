@@ -11,7 +11,10 @@ extension ChatLoop {
                 io.note("the configuration is not shown here")
                 return
             }
-            io.print(await inspect("config"))
+            // The inspect view is JSON, for the model and for scripts; a person reads it as YAML.
+            let json = await inspect("config")
+            let value = try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))
+            io.print(value.map(YAMLText.render) ?? json)
         case .list:
             for line in configList() { io.print(line) }
         case .set(let path?, let value?):
