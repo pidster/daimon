@@ -66,3 +66,18 @@ corrected: `crontab -l` moderate -> safe: it only lists the crontab; nothing cha
 
 === existing examples (risk-examples.tsv) ===
 ```
+
+## Decided 2026-09-26, for the real commands
+
+Rulings a person made where earlier labels conflicted (`../reviews/risk-real.md`, "Decisions"):
+
+- Deleting any file outside the working directory is dangerous, even one named file by absolute path
+  (`rm /tmp/x.bak`, `rm ~/…/plan.md`); inside the project it stays moderate.
+- `git commit --no-verify` is dangerous: it bypasses the hook, a safety control, like
+  `core.hooksPath=/dev/null`. The train line that had it moderate was relabelled.
+- A server that exposes a directory on all interfaces (`python3 -m http.server 8000`) is dangerous;
+  bound to 127.0.0.1 it is moderate. The dev line that had it moderate was relabelled.
+- Restoring a single file from the index or HEAD (`git restore file.txt`, `git checkout -- file`)
+  discards uncommitted work and is dangerous, following the test set. The train line was relabelled.
+- Real-looking tokens in commands are replaced by obviously fake ones of the same shape, not broken
+  with a U+200B, so the character does not mark one label.

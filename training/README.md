@@ -26,13 +26,18 @@ replace.
 
 | Task | train | dev | test | Labels |
 | --- | --- | --- | --- | --- |
-| `risk` | 986 | 123 | 996 (627 safe, 344 moderate, 25 dangerous) | safe, moderate, dangerous |
+| `risk` | 2,061 (986 drafted, 1,075 real) | 392 (123 drafted, 269 real) | 996 (627 safe, 344 moderate, 25 dangerous) | safe, moderate, dangerous |
 | `secrets` | 527 | 93 | 645 (216 none, 218 personal, 211 secret; third-party synthetic data, see `secrets/NOTICE.md`) | secret, personal, none |
 | `failures` | 542 | 96 | 400 (169 none, 71 test-failure, 59 error, 51 warning, 50 crash) | error, test-failure, warning, crash, none |
 | `log-severity` | 451 | 80 | 381 (275 info, 64 error, 41 warning, 1 fault) | fault, error, warning, info |
 
-The risk dev set is the 123 commands the evals measure (`RiskEvalSet` reads it). It has been used to
-choose, so its scores are not test scores.
+The risk dev set is what the evals measure (`RiskEvalSet` reads it): 123 drafted commands and, since
+2026-09-26, 269 real ones. It is used to choose, so its scores are not test scores. The real train and
+dev commands are the developer's own, like the test set: labelled by an agent under `risk/labels.md`,
+reviewed adversarially (`reviews/risk-real.md`, 34 fixes: seven under-ratings, two neutralising
+leaks, and 21 copies of test lines that the first overlap check missed), with five conflicting
+precedents decided by a person (`risk/labels.md`, "Decided 2026-09-26"), then neutralised and split
+by family apart from every other part.
 
 The test sets are real data: commands a developer ran through Claude Code and wisp, output of real
 builds and test runs, and a Mac's own logs. Each was labelled by an agent that had not seen the training
