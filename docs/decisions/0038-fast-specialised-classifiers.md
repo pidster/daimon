@@ -178,3 +178,47 @@ repeats within a part, and overlap between the shipped examples and the test set
 the parts lost a few examples each, and eight more bundled examples joined dev families and were
 removed, with the shipped default retrained.
 
+
+## Amendment, 2026-09-26: measured on the three-way split
+
+Every choice below was made on dev, and each test set was scored once. Both the model and the trainer
+are deterministic, so each figure comes from a single run.
+
+**Risk.** Trained alone, the classifier's dev macro-F1 rises with the share of train it learns from:
+0.55 at 20%, 0.66 at 40%, 0.69 at 60%, 0.71 at 80%, and 0.71 at 100%. It flattens after 80%. Plain
+tokenisation came out ahead on dev. On the 996 real test commands, the same classifier reaches 52%
+accuracy and macro-F1 0.43. As the gate runs it, with the rules beside it:
+
+| Classifier | Test exact | Over | Under | Dangerous rated safe | Per verdict |
+| --- | --- | --- | --- | --- | --- |
+| rules alone | 574 | 222 | 200 | 7 | under 1 ms |
+| shipped default + rules | 376 | 587 | 33 | 0 | about 1 ms |
+| trained on all of train + rules | 391 | 580 | 25 | 0 | about 1 ms |
+| on-device model + rules | 506 | 433 | 57 | 1 | 1.6 s at P50 |
+
+On dev, the same configurations rated 97 to 107 of 123 exactly. The trained classifiers over-rate real
+commands. Of the shipped default's test misses, 173 are safe commands rated dangerous and 294 are safe
+commands rated moderate, so it would ask about three quarters of the safe commands. The drafted
+examples are short and clean. Real commands carry long paths, variables, quoting, pipes, and wrappers,
+and the classifier has learned that style, not risk. Since the composite takes the maximum, its
+over-ratings always win. The one dangerous command the on-device model rated safe was
+`scripts/release 0.1.0`, which publishes a release. The rules miss it too.
+
+**Failures.** With shell tokenisation, chosen on dev, the classifier scores dev accuracy 80% and
+macro-F1 0.80. On the 400 real test lines it scores 62% and 0.60. Today's rules (`KnownFailures`)
+score 52% and 0.34 on test, and they find no crashes.
+
+**Log severity.** With shell tokenisation, the classifier scores dev accuracy 66% and macro-F1 0.45.
+On the 381 real test lines it scores 65% and 0.36. `LogDigest`'s keywords score 85% and 0.62 on test.
+Their weakness is warnings, at 5% recall.
+
+**Decisions.**
+- **No default changes.** `system-model` stays the default risk classifier. A trained risk
+  classifier is not recommended for use until it is trained on data shaped like real commands.
+- **Next training data.** More drafted examples will not close a dev-to-test gap this large. The
+  next training data for risk and failures comes from real use, labelled and neutralised the way the
+  test sets were, and kept apart from them by the same checks.
+- **Failures classifier.** A trained failures classifier is worth building. It already beats the
+  rules.
+- **Log severity.** Log severity stays with the rules. Improving their warning keywords is the
+  cheaper fix.

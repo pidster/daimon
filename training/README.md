@@ -68,17 +68,10 @@ then, by hand:
 
 ## Measured
 
-The risk set against `RiskEvalSet`'s 123 held-out commands, the rules beside it, three training runs each
-(`wisp classifier measure`):
-
-| Trained on | Exact | Under | Dangerous rated safe |
-| --- | --- | --- | --- |
-| the bundled 292 | 97 to 101 | 0 | none |
-| the draft, 955 | 101 to 104 | 2 to 3 | none |
-| this set, 1,002 | 97 to 99 | 4 | none |
-
-The draft scored higher partly through the `x.example` shortcut: two of this set's four under-ratings
-are eval commands on that host that the draft caught by it. The other two (`kubectl delete deployment
-… --all`, `gh repo edit --visibility public`) are real gaps, left as they are because they are held-out
-cases. Before this set replaces the bundled examples, the eval set's own reliance on `x.example` needs
-the same treatment, so the comparison is fair.
+On the three-way split, with every choice made on dev and each test set scored once; the figures and
+the decisions they led to are in [ADR 0038](../docs/decisions/0038-fast-specialised-classifiers.md)'s amendment "measured on the three-way split". In short: the
+trained risk classifier over-rates real commands (376 of 996 exact with the rules, against 574 for the
+rules alone), because the drafted training data is shorter and cleaner than real commands; a trained
+failures classifier beats `KnownFailures` (macro-F1 0.60 against 0.34 on test); and `LogDigest`'s
+keywords beat a trained log-severity classifier (0.62 against 0.36). Every task scores well below
+its dev figure on test, so the next training data comes from real use, not more drafting.
