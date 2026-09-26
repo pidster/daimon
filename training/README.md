@@ -27,7 +27,7 @@ replace.
 | Task | train | dev | test | Labels |
 | --- | --- | --- | --- | --- |
 | `risk` | 986 | 123 | 996 (627 safe, 344 moderate, 25 dangerous) | safe, moderate, dangerous |
-| `secrets` | 527 | 93 | to come | secret, personal, none |
+| `secrets` | 527 | 93 | 645 (216 none, 218 personal, 211 secret; third-party synthetic data, see `secrets/NOTICE.md`) | secret, personal, none |
 | `failures` | 542 | 96 | 400 (169 none, 71 test-failure, 59 error, 51 warning, 50 crash) | error, test-failure, warning, crash, none |
 | `log-severity` | 451 | 80 | 381 (275 info, 64 error, 41 warning, 1 fault) | fault, error, warning, info |
 
@@ -42,6 +42,12 @@ neutralised for publication (names of the user, machines, networks, and projects
 session ids, time zones, and credentials removed) and checked with `wisp scan --personal` and a search
 for every replaced value. The risk test set's original wording stays on the Mac it came from, in
 `~/.wisp/classifiers/risk/held-out.tsv`, so `wisp classifier train --from-audit` there never learns it.
+
+The secrets test set is the exception: it is third-party synthetic data (scanner fixtures and
+synthetic PII sets, attributed in `secrets/NOTICE.md`), relabelled by `secrets/labels.md`, reviewed
+adversarially (`reviews/secrets-test.md`), and neutralised the same way. Its labels come mostly from
+their own sources, so code against prose predicts the class, and it has no home paths or private
+hostnames; report it by source and by its hard-negative slice.
 
 What they cannot yet measure: risk has 25 dangerous commands, so no dangerous command rated safe bounds
 that rate only below about 12%; log severity has one fault. Both need more real cases.

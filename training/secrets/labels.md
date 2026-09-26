@@ -48,6 +48,11 @@ Judgement rules
   8. A Firebase web config apiKey (AIza...) is secret, as the scanner treats it, though Google calls it
      public.
   9. Password hashes (bcrypt, sha512-crypt in a shadow line) are secret: crackable credential material.
+  10. Added for the test set (2026-09-26): an account user name, a device id (MAC address, IMEI, VIN),
+      precise coordinates, and a bank account number or IBAN are personal; a bank code alone (BIC,
+      SWIFT, routing number, sort code) is none. A card's CVV, alone or with its card, is personal. A
+      PIN that unlocks an account or a device is secret. A public figure's name in context is personal,
+      like any other full name.
 
 ---------------------------------------------------------------------------------------------------
 secret: env files and shell exports
