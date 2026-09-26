@@ -21,7 +21,8 @@ Two run and the higher verdict wins (`CompositeRiskClassifier`): the rules, and 
 not given to the second at all:
 
 - **Rules** (`RuleRiskClassifier`): regexes with a level and a reason each, covering privilege, deletion,
-  history rewriting, credentials, uploads, network use, package installs, file modification, and build
+  history rewriting and git's recovery data, credentials read or printed, uploads, publishing to a
+  registry, deleting remote storage, network use, package installs, file modification, and build
   steps that write outside the project or discard build output (`xcodebuild`, `make clean`, `cargo
   clean`). Building and testing the project are safe, as the training labels have them. Cheap,
   deterministic, tested against a labelled set. Rules cover the model's weak spot: ordinary modifications it
