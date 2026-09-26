@@ -6,7 +6,7 @@ import WispTestSupport
 
 /// The training sets under `training/` stay apart: no two parts of a task, and not the shipped examples
 /// and the dev set, share an example exactly, after normalising, by family, or by near match.
-@Suite struct TrainingSetsTests {
+@Suite(.serialized) struct TrainingSetsTests {
     static let root = RiskEvalSet.file.deletingLastPathComponent().deletingLastPathComponent()
 
     /// Each task's labels: a part with any other label fails.
@@ -102,6 +102,20 @@ import WispTestSupport
         #expect(family.contains(5) && family.contains(0), "a family stays in one part: \(family)")
         #expect(TrainingSplit.split(examples, fractions: [0.8, 0.2], seed: 7) == parts)
         #expect(TrainingSplit.overlaps(parts[0], parts[1]).isEmpty)
+    }
+
+    @Test func theNearIndexMissesNoNearMatchThatComparingEveryPairFinds() throws {
+        let bags = try #require(part("risk", "train")).prefix(400).map { TrainingSplit.words($0.text) }
+        let index = NearIndex(Array(bags), nearAt: 0.8)
+        var pairs = 0
+        for i in bags.indices {
+            let candidates = Set(index.candidates(for: bags[i]))
+            for j in bags.indices where j != i && TrainingSplit.near(bags[i], bags[j], nearAt: 0.8) {
+                pairs += 1
+                #expect(candidates.contains(j), "\(bags[i]) and \(bags[j])")
+            }
+        }
+        #expect(pairs > 0)
     }
 
     @Test func overlapsAreFoundByEachKind() {

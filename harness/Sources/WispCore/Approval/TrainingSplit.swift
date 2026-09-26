@@ -195,9 +195,10 @@ public enum TrainingSplit {
             if let first = byFamily[key] { join(index, first) } else { byFamily[key] = index }
         }
         let bags = examples.map { words($0.text) }
+        let index = NearIndex(bags, nearAt: nearAt)
         for i in examples.indices {
-            for j in examples.indices.dropFirst(i + 1)
-            where root(i) != root(j) && near(bags[i], bags[j], nearAt: nearAt) {
+            for j in index.candidates(for: bags[i])
+            where j > i && root(i) != root(j) && near(bags[i], bags[j], nearAt: nearAt) {
                 join(i, j)
             }
         }
@@ -215,6 +216,7 @@ public enum TrainingSplit {
         let canonicals = Dictionary(first.map { (canonical($0.text), $0.text) }, uniquingKeysWith: { a, _ in a })
         let families = Dictionary(first.map { (family(of: $0.text), $0.text) }, uniquingKeysWith: { a, _ in a })
         let firstWords = first.map { ($0.text, words($0.text)) }
+        let index = NearIndex(firstWords.map(\.1), nearAt: nearAt)
         var found: [Overlap] = []
         for example in second {
             if exact.contains(clean(example.text)) {
@@ -225,12 +227,67 @@ public enum TrainingSplit {
                 found.append(Overlap(kind: .family, first: match, second: example.text))
             } else {
                 let mine = words(example.text)
-                if let match = firstWords.first(where: { near(mine, $0.1, nearAt: nearAt) }) {
-                    found.append(Overlap(kind: .near, first: match.0, second: example.text))
+                if let match = index.candidates(for: mine).first(where: { near(mine, firstWords[$0].1, nearAt: nearAt) }
+                ) {
+                    found.append(Overlap(kind: .near, first: firstWords[match].0, second: example.text))
                 }
             }
         }
         return found
+    }
+}
+
+/// The word sets that could nearly match a given one, without comparing every pair: prefix filtering.
+/// Words are ordered rarest first; two sets of three or more words sharing `nearAt` of their union must
+/// share a word among the first `n - ceil(nearAt * n) + 1` of each, so only sets sharing such a word are
+/// candidates. Sets under three words nearly match only an equal set, found by a lookup. Candidates are a
+/// superset of the near matches, in ascending order; `TrainingSplit.near` still decides each.
+struct NearIndex {
+    /// Each word's position in the rarest-first order.
+    private let rank: [String: Int]
+    /// The sets whose prefix holds each word.
+    private let postings: [String: [Int]]
+    /// The sets under three words, by their sorted words.
+    private let small: [[String]: [Int]]
+    /// The share of words two sets must have in common.
+    private let nearAt: Double
+
+    /// Indexes `bags` for near matches at `nearAt`.
+    init(_ bags: [Set<String>], nearAt: Double) {
+        self.nearAt = nearAt
+        var counts: [String: Int] = [:]
+        for bag in bags { for word in bag { counts[word, default: 0] += 1 } }
+        let order = counts.keys.sorted { (counts[$0] ?? 0, $0) < (counts[$1] ?? 0, $1) }
+        let rank = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, $0) })
+        self.rank = rank
+        var postings: [String: [Int]] = [:]
+        var small: [[String]: [Int]] = [:]
+        for (index, bag) in bags.enumerated() where !bag.isEmpty {
+            if bag.count < 3 {
+                small[bag.sorted(), default: []].append(index)
+                continue
+            }
+            for word in Self.prefix(bag, rank: rank, nearAt: nearAt) { postings[word, default: []].append(index) }
+        }
+        self.postings = postings
+        self.small = small
+    }
+
+    /// The first words of `bag` in rarest-first order that any near match must share; a word the index
+    /// has never seen sorts first, as the rarest.
+    private static func prefix(_ bag: Set<String>, rank: [String: Int], nearAt: Double) -> ArraySlice<String> {
+        let ordered = bag.sorted { (rank[$0] ?? -1, $0) < (rank[$1] ?? -1, $1) }
+        let length = bag.count - Int((nearAt * Double(bag.count) - 1e-9).rounded(.up)) + 1
+        return ordered.prefix(max(1, length))
+    }
+
+    /// The indexed sets that could nearly match `bag`.
+    func candidates(for bag: Set<String>) -> [Int] {
+        guard !bag.isEmpty else { return [] }
+        if bag.count < 3 { return small[bag.sorted()] ?? [] }
+        var found = Set<Int>()
+        for word in Self.prefix(bag, rank: rank, nearAt: nearAt) { found.formUnion(postings[word] ?? []) }
+        return found.sorted()
     }
 }
 
