@@ -14,6 +14,11 @@ Added:
   show the settings that can be changed and their values. A change that weakens the approval gate or the
   audit is flagged.
 
+Fixed:
+
+- The chat status line shows the branch in a git worktree or a submodule, where `.git` is a file that
+  points at the repository's own git directory; it showed none.
+
 ## 0.11.0
 
 Added:

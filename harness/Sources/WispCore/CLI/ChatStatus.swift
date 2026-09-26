@@ -69,7 +69,7 @@ public enum GitState {
     /// The branch and dirty state of `directory`.
     public static func read(in directory: String) -> (branch: String?, dirty: Bool?) {
         guard let root = repositoryRoot(of: directory) else { return (nil, nil) }
-        let head = (try? String(contentsOfFile: root + "/.git/HEAD", encoding: .utf8))?
+        let head = (try? String(contentsOfFile: gitDirectory(of: root) + "/HEAD", encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let branch: String?
         if let head, head.hasPrefix("ref: refs/heads/") {
@@ -78,6 +78,17 @@ public enum GitState {
             branch = head.map { String($0.prefix(8)) }
         }
         return (branch, isDirty(root))
+    }
+
+    /// Where a repository's own git files are: `.git` itself, or, in a worktree or a submodule, where
+    /// the `.git` file's `gitdir:` line points, relative to the root when it is not absolute.
+    static func gitDirectory(of root: String) -> String {
+        let dotGit = root + "/.git"
+        guard let text = try? String(contentsOfFile: dotGit, encoding: .utf8),
+            let line = text.split(separator: "\n").first, line.hasPrefix("gitdir: ")
+        else { return dotGit }
+        let target = line.dropFirst("gitdir: ".count).trimmingCharacters(in: .whitespaces)
+        return target.hasPrefix("/") ? target : URL(fileURLWithPath: root).appending(path: target).standardized.path
     }
 
     /// The nearest ancestor of `directory` (itself included) holding a `.git` entry.

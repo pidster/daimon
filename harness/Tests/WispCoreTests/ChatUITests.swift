@@ -42,6 +42,20 @@ import WispTestSupport
         #expect(ChatStatus.approvalMode(threshold: .never, autoApprove: true) == "--yes")
     }
 
+    @Test func aWorktreesGitFilePointsAtItsOwnHead() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-worktree-\(UUID().uuidString)")
+        let gitdir = dir.appending(path: "main/.git/worktrees/wt")
+        try FileManager.default.createDirectory(at: gitdir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dir.appending(path: "wt"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data("ref: refs/heads/chat-config\n".utf8).write(to: gitdir.appending(path: "HEAD"))
+        try Data("gitdir: \(gitdir.path)\n".utf8).write(to: dir.appending(path: "wt/.git"))
+        #expect(GitState.read(in: dir.appending(path: "wt").path).branch == "chat-config")
+        // A relative gitdir is taken from the root.
+        try Data("gitdir: ../main/.git/worktrees/wt\n".utf8).write(to: dir.appending(path: "wt/.git"))
+        #expect(GitState.gitDirectory(of: dir.appending(path: "wt").path).hasSuffix("main/.git/worktrees/wt"))
+    }
+
     @Test func gitStateReadsThisRepositoryAndNothingElsewhere() throws {
         let here = FileManager.default.currentDirectoryPath
         let state = GitState.read(in: here)
