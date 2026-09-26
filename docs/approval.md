@@ -199,6 +199,12 @@ replaced by markers first, since a trained model keeps the words it learned. The
 bundled ones for the same command. `train` prints how many commands it found, how many verdicts were
 fallbacks, how many were raised, and how many were redacted.
 
+A test set of commands actually run on this Mac must never be trained on, and `--from-audit` would
+otherwise learn exactly those. `train` always leaves out any example that overlaps
+`~/.wisp/classifiers/risk/held-out.tsv` (labelled commands, one `level<TAB>command` per line), exactly,
+after normalising, by family, or by near match, and says how many it left out; `--exclude <file>` adds
+more files to leave out. Keep the test set there, or pass it with `--exclude`.
+
 `measure` runs a classifier over labelled commands with the rules beside it, as the gate runs it, and
 prints the commands rated exactly, over, and under, every miss, and the latency per verdict (p50, p95,
 slowest). It exits 1 when a dangerous command is rated safe. Given a version it measures that one, and

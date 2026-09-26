@@ -403,9 +403,11 @@ Risk classifier versions live in `~/.wisp/classifiers/risk`: the default each re
 `risk@X.Y.Z-default`, never changed, and those trained here, `risk@X.Y.Z-local.<n>`, never overwritten.
 
 `wisp classifier list` shows them, the one in use marked `*`, each with its source and latest
-measurement. `wisp classifier train [--examples <file>] [--from-audit] [--use]` trains a new version with
+measurement. `wisp classifier train [--examples <file>] [--from-audit] [--exclude <file>]… [--use]` trains a new version with
 Create ML from labelled commands (`level<TAB>command` per line) or the bundled examples; `--from-audit`
 adds the on-device model's verdicts on the commands in this Mac's audit log, and `--use` switches to it.
+Anything overlapping `~/.wisp/classifiers/risk/held-out.tsv`, or a file given with `--exclude`, is left
+out, so a test set of this Mac's commands is never trained on.
 `wisp classifier use risk@<version>` sets `approval.classifier` to `coreml` and `approval.coremlModel`
 to it, from the next session; `wisp classifier remove risk@<version>` deletes one trained here, not the
 default or the one in use.

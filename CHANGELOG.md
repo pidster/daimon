@@ -13,6 +13,8 @@ Added:
   needs no training. `wisp classifier train` adds a new version, `risk@X.Y.Z-local.<n>`, and never
   overwrites one; `wisp classifier list`, `use`, and `remove` manage them, and `measure` records each
   result in the version's manifest. Versions live in `~/.wisp/classifiers/risk`.
+- `wisp classifier train` leaves out every example that overlaps `~/.wisp/classifiers/risk/held-out.tsv`
+  or a file given with `--exclude`, so a test set of commands run on this Mac is never trained on.
 - `/config` in chat shows the configuration as YAML; `wisp config` and `/inspect config` stay JSON.
 
 Fixed:

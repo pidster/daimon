@@ -52,6 +52,24 @@ import Testing
         }
     }
 
+    @Test func heldOutCommandsNeverTrain() throws {
+        let home = try home()
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let store = ClassifierStore(home: home)
+        let examples = [
+            RiskExample(command: "git push origin main", level: .moderate),
+            RiskExample(command: "cat notes.txt", level: .safe), RiskExample(command: "ls", level: .safe),
+        ]
+        #expect(store.withoutHeldOut(examples).removed == 0, "no held-out file, nothing left out")
+        try FileManager.default.createDirectory(at: store.root, withIntermediateDirectories: true)
+        try Data("moderate\tgit push origin main\nsafe\tcat other.txt\n".utf8).write(to: store.heldOut)
+        let held = store.withoutHeldOut(examples)
+        #expect(held.removed == 2 && held.kept.map(\.command) == ["ls"], "exact and family overlaps both go")
+        let extra = home.root.appending(path: "more.tsv")
+        try Data("safe\tls\n".utf8).write(to: extra)
+        #expect(store.withoutHeldOut(examples, also: [extra]).kept.isEmpty)
+    }
+
     @Test func removingSparesTheDefaultAndTheVersionInUse() throws {
         let home = try home()
         defer { try? FileManager.default.removeItem(at: home.root) }

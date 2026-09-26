@@ -1086,6 +1086,9 @@ struct ClassifierCommand: AsyncParsableCommand {
         @Flag(name: .long, help: "Use the new version at once, as 'wisp classifier use' would.")
         var use = false
 
+        @Option(name: .long, help: "Labelled commands to leave out of training, such as a test set; repeatable.")
+        var exclude: [String] = []
+
         func run() async throws {
             let session = try Wisp.begin(.init(entryPoint: .classifier))
             defer { session.end() }
@@ -1098,6 +1101,12 @@ struct ClassifierCommand: AsyncParsableCommand {
                         + "\(harvest.redacted) redacted")
                 examples = RiskExamples.merged(examples, with: harvest.examples)
                 source += " + audit"
+            }
+            let held = ClassifierCommand.store.withoutHeldOut(
+                examples, also: exclude.map { URL(filePath: ($0 as NSString).expandingTildeInPath) })
+            if held.removed > 0 {
+                print("left out \(held.removed) examples that overlap held-out commands")
+                examples = held.kept
             }
             let parent = session.config.approvalClassifier == .coreml ? ClassifierCommand.inUse(session.config) : nil
             let trained: (manifest: ClassifierStore.Manifest, outcome: RiskClassifierTraining.Outcome)

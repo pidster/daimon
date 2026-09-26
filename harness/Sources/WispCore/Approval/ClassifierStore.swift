@@ -114,6 +114,25 @@ public struct ClassifierStore: Sendable {
     /// The reference for `version`, as config names it.
     public static func reference(_ version: String) -> String { "\(task)@\(version)" }
 
+    /// Labelled commands kept out of every training run on this Mac: a test set of commands actually run
+    /// here, which `--from-audit` would otherwise learn from. `train` always leaves out anything that
+    /// overlaps it.
+    public var heldOut: URL { root.appending(path: "held-out.tsv") }
+
+    /// `examples` without any that overlap `heldOut` (exactly, after normalising, by family, or by near
+    /// match), and how many were left out.
+    public func withoutHeldOut(_ examples: [RiskExample], also extra: [URL] = []) -> (kept: [RiskExample], removed: Int)
+    {
+        let files = ([heldOut] + extra).filter { FileManager.default.fileExists(atPath: $0.path) }
+        let held = files.flatMap { url in (try? String(contentsOf: url, encoding: .utf8)).map(TrainingSplit.parse) ?? []
+        }
+        guard !held.isEmpty else { return (examples, 0) }
+        let asExamples = examples.map { TrainingSplit.Example(label: $0.level.rawValue, text: $0.command) }
+        let clashing = Set(TrainingSplit.overlaps(held, asExamples).map(\.second))
+        let kept = examples.filter { !clashing.contains($0.command) }
+        return (kept, examples.count - kept.count)
+    }
+
     /// The directory of `version`.
     public func directory(_ version: String) -> URL { root.appending(path: version) }
 
