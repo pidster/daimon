@@ -1256,8 +1256,10 @@ struct ClassifierCommand: AsyncParsableCommand {
         @Option(name: .long, help: "Part names and shares, such as train=0.85,dev=0.15.")
         var parts: String = "train=0.85,dev=0.15"
 
-        @Option(name: .long, help: "A set whose overlaps are removed from the input first, such as a fixed dev set.")
-        var exclude: String?
+        @Option(
+            name: .long,
+            help: "A set whose overlaps are removed from the input first, such as a fixed dev set; repeat for more.")
+        var exclude: [String] = []
 
         @Option(name: .long, help: "The seed that deals the families.")
         var seed: UInt64 = 1
@@ -1271,7 +1273,7 @@ struct ClassifierCommand: AsyncParsableCommand {
             let before = examples.count
             examples = examples.filter { seen.insert(TrainingSplit.canonical($0.text)).inserted }
             if examples.count < before { print("dropped \(before - examples.count) repeated examples") }
-            if let exclude {
+            for exclude in exclude {
                 let fixed = TrainingSplit.parse(try String(contentsOfFile: exclude, encoding: .utf8))
                 let clashing = Set(TrainingSplit.overlaps(fixed, examples).map(\.second))
                 examples.removeAll { clashing.contains($0.text) }
