@@ -23,6 +23,8 @@ Added:
   `/inspect status|approvals|audit`, `/approvals revoke [ID]` removes a standing approval at once, and
   `/inspect` stays as an alias. Tab completes the new words and approval ids.
 
+Changed:
+
 - The shipped risk classifier is trained from 2,061 examples, 1,075 of them real commands from
   development sessions, instead of 292 drafted ones. On a frozen set of 996 real commands, beside
   the rules, it rates 817 exactly, where the previous default rated 376.

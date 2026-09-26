@@ -26,6 +26,7 @@ availability and shapes the API.
 | `harness/` | Swift package: the `wisp` binary and `WispCore` |
 | `tools/` | Cargo workspace: one crate per Rust tool binary |
 | `docs/` | This documentation and the ADRs |
+| `training/` | Labelled train, dev, and test sets for the fast classifiers; only `risk/train.tsv` is built in, as `Resources/risk-examples.tsv` |
 | `scripts/check` | The quality gate for both toolchains |
 
 ## Targets
@@ -92,6 +93,14 @@ uses in `TimedRiskClassifier` and `CachingRiskClassifier`. `RiskClassifierTraini
 model with Create ML from `RiskExample`s (the bundled `Resources/risk-examples.tsv`, a file, or
 `RiskExamples.fromAudit`), and `RiskMeasurement` measures any classifier's accuracy and latency; `wisp
 classifier` is their CLI ([ADR 0038](decisions/0038-fast-specialised-classifiers.md)).
+`KnownSafeCommands` is the rules' short list of read-only commands: a verdict it gives is known safe
+(`RiskAssessment.isKnownSafe`), and `CompositeRiskClassifier` then does not ask the model. `ClassifierStore`
+keeps the versions under `~/.wisp/classifiers/risk`, one directory each with a read-only
+`model.mlmodel` and a `manifest.json` of its training and measurements; `ShippedClassifier` is the
+release's default, embedded from `Resources/risk-default.json` and installed as `risk@X.Y.Z-default` by
+`installDefault()` when a session or `wisp classifier` first needs it. `TrainingSplit` parses the sets
+under `training/`, deals them into parts by family, and finds overlaps between parts, for `wisp
+classifier split` and `TrainingSetsTests`.
 
 ### Audit and diagnostics
 
@@ -111,7 +120,8 @@ see about the set-up (the `--unsafe` warning, the off-device model note) comes b
 face to print; library code never writes to stderr.
 
 What a session builds from its config is injected through `Session.Dependencies`: `live` makes the
-on-device classifier when `approval.useModel` is set and appends to the audit file; `testing()` is
+classifier `approval.classifier` names (the on-device model, or a Core ML model resolved by
+`Session.coremlModelURL`, the shipped default when none is set) and appends to the audit file; `testing()` is
 rules only with a memory sink. Every unit test passes `testing()`, which is how "tests never need the
 model" holds for sessions as well as for gates.
 
@@ -273,7 +283,8 @@ rules alone, and a classifier's fallback verdict carries `RiskAssessment.failure
 failure. `ChatLoop.history` keeps the latest 100 typed lines for `/history`; `wisp-tui` keeps its own
 list for Up and Down. `wisp chat --json` is the same loop with its IO mapped onto a JSON Lines protocol
 (`ChatProtocol`, `LineRouter`, `JSONApprover`), so a front end in another process, `tools/wisp-tui`,
-can own the screen while the session stays here. `/config` and `wisp config set` go through
+can own the screen while the session stays here. `/config` shows the configuration as YAML through
+`YAMLText`; `/config set` and `wisp config set` go through
 `ConfigSettings` (the settings that can change, and what each takes) and `ConfigEdit` (one path set or
 removed, the result validated as start-up would before it is written); a chat command that needs an
 answer asks a `ChatChoice` through `ChatLoop.IO.choose`, a numbered list in the plain chat and a

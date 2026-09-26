@@ -60,11 +60,12 @@ so it can try something else.
 ### Risk classification and approval
 
 A line is split into its simple commands (chains, pipes, subshells, substitutions), and each part is
-classified `safe`, `moderate`, or `dangerous` by rules plus the on-device model; at `moderate` or above a
+classified `safe`, `moderate`, or `dangerous` by rules plus a classifier (the on-device model or a Core ML
+classifier; commands on the rules' read-only list skip it); at `moderate` or above a
 human is asked for that part, with the line shown for context, and approvals are remembered by program
 (`head *`): on the terminal in `chat`, through MCP elicitation in
 `mcp`, and refused in non-interactive `respond` unless `--yes`. Denials come back as
-`error: command not approved: …`. Configure with `approval.threshold` and `approval.useModel`. See
+`error: command not approved: …`. Configure with `approval.threshold` and `approval.classifier`. See
 [approval.md](../approval.md).
 
 ### Symlinks

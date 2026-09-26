@@ -27,7 +27,7 @@ only what applies everywhere and to every agent.
 | `harness/` | Swift package. Targets: `WispCore` (all logic), `WispCoreAI` (Core AI model backend), `WispMLX` (MLX backend, real only under the `MLX` trait), `WispMCP` (MCP server), `wisp` (CLI, argument parsing only, registers backends), tests. |
 | `tools/` | Cargo workspace. `wisp-tui`, the terminal front end over `wisp chat --json` (ADR 0029); future tool binaries go here too. The gate runs fmt, pedantic clippy, and tests on it. |
 | `docs/` | Documentation and ADRs. Part of every change (see Definition of done). |
-| `training/` | Labelled training sets for the fast classifiers, with their adversarial reviews (ADR 0038). Not built into the binary. |
+| `training/` | Labelled training sets for the fast classifiers, with their adversarial reviews (ADR 0038). Only `risk/train.tsv` is built in, copied to `Resources/risk-examples.tsv` by `scripts/check classifier-default`. |
 | `scripts/check` | The quality gate and the pre-commit hook's body. |
 
 ## Commands
@@ -67,9 +67,9 @@ subshell); the server exits on EOF. `docs/mcp.md` has a ready-made example.
 `Agent` wraps one `LanguageModelSession` created by a `ResolvedModel` (`ModelSelection`: `system` or
 `private-cloud`, or `ollama:<name>` through wisp's own executor, ADR 0016; adapters are obsoleted on macOS 27, ADR 0013); the framework runs the tool loop. `ToolRegistry` is the single
 list of tools the model sees (`current_date`, `run_command`, `read_file`, `edit_file`, `inspect`, `notify`, `system_info`), each wrapped by `AuditedTool`.
-`CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus on-device
-model classifier, ask at `moderate` and above through an `Approver` per entry point), then runs `/bin/sh -c`
-under `sandbox-exec` with a generated profile, bounded output and a timeout. `FileReader` pages files.
+`CommandRunner` checks `CommandPolicy` (deny/allow regexes), consults `ApprovalGate` (rules plus an on-device
+classifier, the language model or a Core ML version from `ClassifierStore`; ask at `moderate` and above
+through an `Approver` per entry point), then runs `/bin/sh -c` under `sandbox-exec` with a generated profile, bounded output and a timeout. `FileReader` pages files.
 `Home`, `Config`, and `TranscriptStore` are `~/.wisp`. `Prompting` layers wisp's own system prompt (the
 file `harness/Sources/WispCore/Resources/system-prompt.md`, embedded at build time by the
 `EmbedSystemPrompt` plugin), the operator's `systemPromptExtension`, and the caller's instructions (ADR 0017). `AuditLog` writes JSON Lines; `Diagnostics` wraps

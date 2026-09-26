@@ -94,3 +94,6 @@ rules alone), because the drafted training data is shorter and cleaner than real
 failures classifier beats `KnownFailures` (macro-F1 0.60 against 0.34 on test); and `LogDigest`'s
 keywords beat a trained log-severity classifier (0.62 against 0.36). Every task scores well below
 its dev figure on test, so the next training data comes from real use, not more drafting.
+It did: with 1,075 real commands added to `risk/train.tsv`, the shipped default rates 817 of the 996
+test commands exactly beside the rules, and four of the 25 dangerous ones safe (ADR 0038, amendment
+"trained on real commands, and the rules follow the labels").

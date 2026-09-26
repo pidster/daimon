@@ -32,13 +32,15 @@ command output stay local.
 
 If you choose `--model private-cloud`, prompts and tool output go to Apple's Private Cloud Compute under
 Apple's privacy guarantees. wisp prints a note on stderr when that model is selected and records it in
-every session's audit event. The risk classifier always uses the on-device model, whatever the session
-runs on ([ADR 0013](decisions/0013-model-selection.md)).
+every session's audit event. The risk classifier always runs on the Mac (the on-device model or a Core
+ML classifier), whatever the session runs on ([ADR 0013](decisions/0013-model-selection.md)).
 
 ## When you are asked
 
-Every simple command in a line is classified `safe`, `moderate`, or `dangerous` by rules plus the
-on-device model ([approval](approval.md)). At `moderate` and above a person is asked: on the terminal in
+Every simple command in a line is classified `safe`, `moderate`, or `dangerous` by rules plus an
+on-device classifier, the model or a trained Core ML classifier (`approval.classifier`); a short list of
+read-only commands the rules know, such as `ls` or `git status`, is `safe` without asking a classifier
+([approval](approval.md)). At `moderate` and above a person is asked: on the terminal in
 `chat`, through a dialog in your MCP client, and never in plain `wisp "…"`, which refuses instead
 unless you pass `--yes`.
 
@@ -83,3 +85,4 @@ remembered as ([logging](logging.md)).
 | `~/.wisp/logs/audit.jsonl` | the audit log, rotated | user-only |
 | `~/.wisp/approvals.json` | remembered approvals | user-only |
 | `~/.wisp/transcripts/*.json` | saved chats | user-only |
+| `~/.wisp/classifiers/risk/` | risk classifier versions: the release's default and those `wisp classifier train` makes | models read-only |

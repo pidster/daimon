@@ -54,7 +54,7 @@ in both.
 | Ctrl-U, Ctrl-K | Delete to the start or to the end. |
 | Alt-Enter | A newline, for a message of several lines. |
 | Paste | Inserted whole (bracketed paste), newlines kept, so pasting never sends. |
-| Tab | Complete the slash command being typed: the command, `/config`'s words, a setting, a setting's values, a model after `/model`, a view after `/inspect`. One match fills in; several fill in what they share and show above the input, and Tab again cycles through them. |
+| Tab | Complete the slash command being typed: the command, `/config`'s words, a setting, a setting's values, `/approvals`'s words and the approval ids after `/approvals revoke`, a model after `/model`, a view after `/inspect`. One match fills in; several fill in what they share and show above the input, and Tab again cycles through them. |
 
 A line you send goes into the scrollback styled like the input it came from, a shade darker: its tint
 edge to edge, halfway from the input's blue to black, with half-block strips above and below.
@@ -131,6 +131,7 @@ What a session shows, and where it goes:
 | `/status` | wisp's own state, as the model's `inspect` tool shows it, in YAML: the model, tools, policy, and session. |
 | `/approvals`, `/approvals revoke [ID]` | The standing approvals, in YAML; `revoke` removes one at once, in this session and later ones, and without an ID offers them to choose from. |
 | `/audit` | The latest audit events of this session, one line each. |
+| `/inspect [config\|status\|approvals\|audit]` | Kept as an alias: the same views as `/config`, `/status`, `/approvals`, and `/audit`; with no view, `/status`. |
 | `/last` | The last tool result in full; the live line shows only its first line. |
 | `/models` | The models this conversation could switch to: those that resolve and declare what its tools need, as `wisp models` decides. A table with a header (model, details, capabilities) and the current one marked `*`; `wisp models` keeps its tab-separated lines for scripts. |
 | `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
@@ -149,7 +150,7 @@ reply; the framework runs the tool loop inside it, so its time includes the tool
 any approval it waited for, and a turn that ends in an error counts as failed. A `classifier` call is one
 risk classification by the model classifier `approval.classifier` names (`system-model` or `coreml`);
 it fails when the classifier could not judge and fell back to `moderate`. The rules classifier is not
-timed: it answers in microseconds. The store is a fixed-size ring in the session's memory, shared by
+timed: it answers in microseconds, and a command on its read-only list never reaches the model classifier, so it is not counted. The store is a fixed-size ring in the session's memory, shared by
 every conversation of the session including `/model` switches; nothing is written to disk, and the audit
 log (`seconds` on `response` and `classifier.verdict`) is the durable record.
 
@@ -268,7 +269,7 @@ sets one and `wisp config unset KEY` removes one so its default applies
 
 ```
 wisp config set approval.classifier coreml
-wisp config set approval.coremlModel risk.mlmodel
+wisp config set approval.coremlModel risk@0.13.0-default
 wisp config set routing.ladder system ollama:qwen3.8:27b     # or a JSON array
 wisp config unset approval.timeoutSeconds
 ```
@@ -278,7 +279,7 @@ wisp config unset approval.timeoutSeconds
 | `model` | A model, as `--model` spells it. |
 | `approval.threshold` | `safe`, `moderate`, `dangerous`, or `never`. |
 | `approval.classifier` | `rules`, `system-model`, or `coreml`. |
-| `approval.coremlModel` | A Core ML model under `~/.wisp/models/coreml`, or an absolute or `~` path. |
+| `approval.coremlModel` | A classifier version, `risk@<version>` (`wisp classifier list`); a Core ML model under `~/.wisp/models/coreml`; or an absolute or `~` path. Unset, the default this release ships. |
 | `approval.coremlMinimumConfidence` | A number from 0 to 1. |
 | `approval.timeoutSeconds` | Seconds, 0 to 86,400; 0 waits forever. |
 | `approval.persistDays` | Days, 1 to 365. |
@@ -295,7 +296,7 @@ Each change is checked before it is written: an unknown setting, a value the set
 a file that would no longer load is refused with the reason, and nothing changes. The rest of the file,
 the command policy and custom tools included, is kept as it is; the file is written readable by its
 owner only. A change that weakens the gate or the audit (the threshold at `never` or `dangerous`, the
-classifier at `rules`, the audit off) prints a note, and so does `coreml` without a model. Changes are
+classifier at `rules`, the audit off) prints a note, and so does `coreml` without a model, which then uses the default this release ships. Changes are
 audited as `config.change` and apply from the next session: a running chat keeps the settings it
 started with. The model cannot change the configuration; there is no tool for it.
 
@@ -424,6 +425,10 @@ under-ratings, misses, and latency per verdict, recording them in the version's 
 when a dangerous command is rated safe.
 Training is audited as `classifier.train`. See [approval.md](approval.md), "Training and measuring a
 classifier".
+Three hidden subcommands serve the repository rather than users: `ship` trains the default a release
+embeds (`scripts/check classifier-default`, [release.md](release.md)), `split` deals a labelled set into
+parts by family, and `baseline` prints the label today's rules give each line; the last two are
+described in `training/README.md`.
 
 ### `wisp approvals`
 
@@ -456,6 +461,7 @@ State lives in `~/.wisp`, or `$WISP_HOME` when set. Any command that writes ther
 | `transcripts/<name>.json` | Saved conversations. |
 | `approvals.json` | Standing command approvals (`project` and `always` scopes), user-only. |
 | `logs/audit.jsonl` | The audit log, user-only, rotated by size. See [logging.md](logging.md). |
+| `classifiers/risk/<version>/` | Risk classifier versions, each a read-only `model.mlmodel` and a `manifest.json`; `held-out.tsv` beside them is never trained on. See `wisp classifier`. |
 
 `config.json` fields, all optional:
 

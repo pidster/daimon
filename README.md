@@ -12,8 +12,9 @@ It has two faces:
 
 - **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it;
   watch a build and hear when it breaks (`wisp watch`); scan a commit for secrets or redact a log before
-  you share it (`wisp scan`, `wisp redact`); draft a commit message (`wisp draft`); train a fast risk
-  classifier for its approval gate from your own history (`wisp classifier train --from-audit`).
+  you share it (`wisp scan`, `wisp redact`); draft a commit message (`wisp draft`); use the fast risk
+  classifier each release ships for its approval gate, or train one from your own history (`wisp
+  classifier train --from-audit`).
   On a terminal the chat runs in `wisp-tui`: the conversation scrolls in your terminal's own history
   above a pinned input and status line.
 - **An MCP server.** Other agent harnesses such as Claude Code or Codex can hand it self-contained work to do
@@ -126,6 +127,7 @@ The repository is laid out as:
 | `harness/` | The Swift package: the `wisp` binary, `WispCore`, `WispMCP`, and the model backends |
 | `tools/` | The Cargo workspace: `wisp-tui`, the terminal front end over `wisp chat --json` |
 | `docs/` | Documentation and decision records |
+| `training/` | Labelled training sets for the fast classifiers, with their reviews |
 | `scripts/check` | The quality gate: lint, warnings-as-errors build, tests, hygiene, coverage, model eval |
 
 How we work, in short:

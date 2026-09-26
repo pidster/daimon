@@ -65,7 +65,9 @@ for a multi-line message, done 2026-09-25. The `turn` event and the rendered `te
 events, done 2026-09-25 (ADR 0029, amendment), a bordered approval dialog with the reasons inside it,
 and Markdown rendering of replies as they are committed, the same day. Done 2026-09-26: `/config` from
 chat with a picker for choices and Tab completion ([ADR 0040](decisions/0040-config-from-chat.md)).
-Nothing further is planned for the front end; tables and links in replies are shown as typed.
+Done 2026-09-26 too: `/config` as YAML and `/config get`; `/status`, `/approvals` (with `revoke`), and
+`/audit` in place of `/inspect`, kept as an alias, with Tab completing them and approval ids; and sent
+lines styled in the scrollback like the input box. Nothing further is planned for the front end; tables and links in replies are shown as typed.
 
 ## When wisp can be signed
 
@@ -110,14 +112,29 @@ contract 2, and latency in every classifier measurement. Next, in order:
 
 - Done 2026-09-26: `wisp classifier train --from-audit`, the eval set widened to 123 commands, and
   three rule gaps closed (ADR 0038, amendment).
+- Done 2026-09-26: classifier versions. Each release ships a fixed default, `risk@X.Y.Z-default`, used
+  by `approval.classifier: coreml` when no model is named; `wisp classifier train` adds
+  `risk@X.Y.Z-local.<n>` and never overwrites one; `list`, `use`, and `remove` manage them. Training is
+  deterministic and never uses `held-out.tsv` or an `--exclude` set (ADR 0038, amendments).
+- Done 2026-09-26: train, dev, and test sets for risk, secrets, failures, and log severity under
+  `training/`, kept apart by family, with frozen test sets of real data; the shipped risk default is
+  trained from `training/risk/train.tsv`, drafted and real commands. The rules know a short list of
+  read-only commands, which skip the model, and rate printing a credential dangerous (ADR 0038,
+  amendments).
 - **A trained classifier good enough to be the default.** The bar (ADR 0038): beside the rules, as many
   commands rated exactly as `system-model` beside the rules, none under. On 2026-09-26, over 123: 108
   for the default, 100 trained from the bundled examples, up to 104 with one Mac's audit log added. The
   trained ones rate nothing below its level; the default rated one dangerous command `moderate`.
+  On the 996 real test commands, the shipped default trained from real commands rates 817 exactly
+  beside the rules, against 732 for the rules alone, but rates four of the 25 dangerous commands safe;
+  and `system-model` is still `approval.classifier`'s default (ADR 0038, amendment "trained on real
+  commands").
 - **Other providers.** Embedding nearest-neighbour over labelled examples (`NLEmbedding` or an Ollama
   embedding model), and an external process speaking JSON Lines, like the binaries in `tools/`.
 - **Other tasks.** Secret and personal-data detection for `redact`, log-line categories for
-  `condense_log`, failure kinds for `triage`, and the bulk classification chosen for later.
+  `condense_log`, failure kinds for `triage`, and the bulk classification chosen for later. Their
+  training sets exist (above); on test a trained failures classifier beats `KnownFailures`, and
+  `LogDigest`'s keywords beat a trained log-severity classifier. None is wired in yet.
 
 ## Model backends, deferred
 

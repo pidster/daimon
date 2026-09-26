@@ -59,8 +59,9 @@ public struct Session: Sendable {
             self.makeSink = makeSink
         }
 
-        /// The real thing: the on-device classifier when `approval.useModel` is set, and the audit
-        /// file under the home directory, which is created on demand.
+        /// The real thing: the classifier `approval.classifier` names beside the rules (the rules alone, the
+        /// on-device model, or a Core ML version), and the audit file under the home directory, which is
+        /// created on demand.
         public static let live = Dependencies(
             makeClassifier: { config, home in
                 switch config.approvalClassifier {

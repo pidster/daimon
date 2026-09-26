@@ -14,7 +14,7 @@
 | [local-model-installation.md](local-model-installation.md) | Selected model revisions, local installation, offline smoke results, and remaining integration work |
 | [on-device-ai-todo.md](on-device-ai-todo.md) | Draft backlog for four on-device AI use cases, model routing, and prompt-linked transcript/audit records |
 | [model-controls.md](model-controls.md) | Draft common controls for reasoning mode, effort, native speed mode, performance preferences, and reasoning output |
-| [approval.md](approval.md) | Risk classification (rules + on-device model), approval scopes and persistence, eval results |
+| [approval.md](approval.md) | Risk classification (rules plus the on-device model or a Core ML classifier), classifier versions, approval scopes and persistence, eval results |
 | [logging.md](logging.md) | The audit log (format, kinds, `wisp logs`) and diagnostics (`WISP_LOG`, unified logging) |
 | [context-management.md](context-management.md) | The small context window: framework APIs, what wisp does, design rules |
 | [policy-and-sandboxing.md](policy-and-sandboxing.md) | Survey of tool policy and sandboxing options and which layers are implemented |
@@ -41,7 +41,7 @@
 | [decisions/0035-change-drafts.md](decisions/0035-change-drafts.md) | Change drafts are written from the diff summary, with the subject and body shape enforced in code |
 | [decisions/0036-custom-tools.md](decisions/0036-custom-tools.md) | Custom tools are command templates in the user's own config, run through `run_command`'s gate |
 | [decisions/0037-routing-by-input-size.md](decisions/0037-routing-by-input-size.md) | Route a task to a model by the size of its input, from measured size bands and a configured ladder |
-| [decisions/0038-fast-specialised-classifiers.md](decisions/0038-fast-specialised-classifiers.md) | Classifiers are tasks served by fast, specialised models, measured for speed; `wisp classifier train` and `measure` |
+| [decisions/0038-fast-specialised-classifiers.md](decisions/0038-fast-specialised-classifiers.md) | Classifiers are tasks served by fast, specialised models, measured for speed; `wisp classifier`, versions with a fixed shipped default, train/dev/test sets under `training/`, the rules' read-only list |
 | [decisions/0039-exact-condensers.md](decisions/0039-exact-condensers.md) | Triage reads known failure formats exactly first; `dependency_audit`, `flaky_tests`, and `hot_paths` without a model |
 | [decisions/0040-config-from-chat.md](decisions/0040-config-from-chat.md) | Change the configuration from chat or `wisp config set`, checked, audited, and only by a person |
 | [decisions/0029-tui-front-end.md](decisions/0029-tui-front-end.md) | The terminal chat is a Rust front end (`wisp-tui`, ratatui) over a headless `wisp chat --json`; one palette for both faces |
