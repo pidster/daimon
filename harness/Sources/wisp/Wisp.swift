@@ -974,7 +974,7 @@ struct Approvals: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Show or revoke standing command approvals.",
         discussion:
-            "Project and always approvals outlive the process. They are exact command lines, expire, and never cover dangerous commands.",
+            "Project and always approvals outlive the process. They are remembered by program and verb (git push *), expire, and never cover dangerous commands.",
         subcommands: [List.self, Revoke.self, Clear.self], defaultSubcommand: List.self)
 
     /// Prints live approvals, newest first.

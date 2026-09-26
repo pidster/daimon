@@ -1,60 +1,52 @@
 # wisp
 
-**wisp** is a small, on-device AI agent for the Mac. It runs Apple's built-in Foundation Model, the same
-one behind Apple Intelligence and the `fm` command, and gives it tools: it can run shell commands, read
-and edit files, answer questions about the Mac (ports, disk, processes, battery), tell the time, look at
-its own state, and send you a macOS notification, and it can be extended with more. With the default model nothing leaves your
-machine; Apple's Private Cloud Compute model is available as an explicit opt-in, and any model served by a
-local Ollama can be chosen with `--model ollama:<name>`. Commands the model runs
-may use the network unless you turn that off.
+**wisp** is a small AI agent that runs on your Mac and stays there. It drives Apple's on-device
+Foundation Model, the one behind Apple Intelligence, and gives it tools: it can run a command, read
+and edit a file, report on the machine, and send you a notification. You use it from the terminal, as
+a command or a chat, and your coding agent uses it as an MCP server, handing it the local chores that
+would otherwise fill the agent's context: run the tests and return the failures, condense a log,
+summarise a diff, scan a commit for secrets. Every command the model runs passes a policy, a sandbox,
+a risk classifier, and, when it matters, you, and every step is written to an audit log you can read
+back.
 
-It has two faces:
+## What you can do with it
 
-- **A command-line tool.** Ask it a question, have it run your tests and explain a failure, or chat with it;
-  watch a build and hear when it breaks (`wisp watch`); scan a commit for secrets or redact a log before
-  you share it (`wisp scan`, `wisp redact`); draft a commit message (`wisp draft`); use the fast risk
-  classifier each release ships for its approval gate, or train one from your own history (`wisp
-  classifier train --from-audit`).
-  On a terminal the chat runs in `wisp-tui`: the conversation scrolls in your terminal's own history
-  above a pinned input and status line.
-- **An MCP server.** Other agent harnesses such as Claude Code or Codex can hand it self-contained work to do
-  locally: run a build and return only its failures, condense a log or a large JSON file, reduce a
-  dependency audit or a profile, find flaky tests across runs, scan or redact text, summarise a diff or
-  draft its commit message, classify some text.
+### At the terminal
 
-It is deliberately a *microharness*: the smallest correct agent loop, not a framework. What makes it worth
-using is the care around that loop. Every command the model wants to run passes a deny list, runs inside a
-sandbox that confines what it can write, is classified for risk, and needs your approval when it matters.
-Everything that happens is written to an audit log you can read back, and anything it remembers can be
-listed and revoked. [trust.md](docs/trust.md) states exactly what it can and cannot do to your Mac.
-
-Apple's Private Cloud Compute model is not available from this build: it needs an entitlement Apple
-grants only to signed App Store apps ([backends.md](docs/backends.md), "Private Cloud Compute").
-
-## Quick start
-
-Requirements: an Apple silicon Mac on macOS 27 or later with Apple Intelligence enabled, and Homebrew.
+Ask it something, or hand it a task:
 
 ```bash
-brew install pidster/tap/wisp
-wisp doctor                     # checks the model, sandbox, config, and home directory
 wisp "What is the date in Tokyo?"
-wisp chat                       # interactive; /help for commands, /models and /model to switch models
-wisp --yes "Run the tests in $PWD and tell me if they pass"   # non-interactive: approve risky commands
-wisp logs --last 20             # what just happened, from the audit log
-wisp approvals                  # what it has been told to remember; revoke or clear here
-make test; wisp notify "Tests finished" --sound   # a macOS notification, from you or from the model
-wisp watch 'swift test 2>&1'    # rerun on every save; a notification when it starts or stops failing
-git diff --cached | wisp scan   # credentials in a commit, before it is made
+wisp "What is listening on port 8080, and how much disk is free?"
+wisp --yes "Run the tests in $PWD and tell me if they pass"
+wisp chat                              # a conversation; /help lists the commands
 ```
 
-Running tests is a "moderate" action, so `chat` asks you before doing it; plain `wisp "…"` cannot ask
-and refuses unless you pass `--yes`. State lives in `~/.wisp`: an optional `config.json` (change it
-with `/config set` in chat or `wisp config set`), saved chat transcripts, remembered approvals, and the
-audit log. Upgrade with `brew upgrade wisp`, remove with
-`brew uninstall wisp` and `rm -rf ~/.wisp`.
+Running tests changes state, so it counts as a `moderate` action: `chat` asks you before doing it, and
+plain `wisp "…"` cannot ask, so it refuses unless you pass `--yes`. In `chat` you answer each request
+once, for the session, for this project, or always, and `/model` switches models mid-conversation. On a
+terminal the chat runs in `wisp-tui`, installed beside `wisp`: the conversation scrolls in your
+terminal's own history above a pinned input and status line, with the model's tool calls shown as they
+happen.
 
-To let another harness use it, register it as an MCP server. For Claude Code, in `.mcp.json`:
+Some subcommands need no prompt at all. They put the model, or plain rules, to one job each:
+
+```bash
+wisp watch 'swift test 2>&1'           # rerun on every save; a notification when it starts or stops failing
+git diff --cached | wisp scan          # credentials in a commit, before it is made; exits 1 on a finding
+wisp redact crash.log | pbcopy         # secrets and personal data replaced by markers, ready to paste
+wisp draft > /tmp/msg && $EDITOR /tmp/msg && git commit -F /tmp/msg   # a commit message from the staged diff
+make test; wisp notify "Tests finished" --sound                        # a macOS notification
+wisp logs --last 20                    # what just happened, from the audit log
+wisp approvals                         # what it has been told to remember; revoke or clear here
+```
+
+`wisp --help` lists every subcommand; [wisp.md](docs/wisp.md) is the reference.
+
+### From your coding agent
+
+Register wisp as an MCP server and Claude Code, Codex, or any other MCP client can delegate work to it.
+For Claude Code, in `.mcp.json`:
 
 ```json
 {
@@ -67,20 +59,87 @@ To let another harness use it, register it as an MCP server. For Claude Code, in
 }
 ```
 
-It exposes `respond` (run a task on the on-device model, with wisp's tools; pass back the returned
-`thread_id` to continue a conversation), `triage` (run or read build and test output and get back only
-the failures), `summarise_diff` (a diff as per-file lines and review flags), `draft_change` (a commit
-message, PR description, or changelog line from a diff), `scan_secrets` (credentials
-and personal data found, masked), `redact` (text with them replaced), `condense_log` (a log as its distinct messages, or a crash report as
-what explains it), `json_shape` (a JSON file's structure without its data), `dependency_audit` (an npm,
-cargo, or pip audit as what needs action), `flaky_tests` (tests that pass and fail across runs),
-`hot_paths` (a profile's folded stacks as where the time goes), and `close_thread`. The raw output
-behind the condensing tools never leaves the Mac. wisp's own tools are used by the
-model, not called directly.
+The agent then has `respond`, which runs a task on the local model with wisp's tools and returns the
+reply with a receipt of what it did, and ten condensing tools that read something large on your Mac
+and return something small:
+
+| Tool | Gives back |
+| --- | --- |
+| `respond` | The model's reply to a task, on a named thread you can continue; with a JSON Schema, a reply of that shape |
+| `triage` | Only the failures from a build or test run, read exactly from known formats or judged by the model |
+| `summarise_diff` | A diff as one line per file, with review flags: a deleted test, a credential, a binary |
+| `draft_change` | A commit message, PR description, or changelog line from a diff |
+| `scan_secrets` | Where credentials, and optionally personal data, occur, with the values masked |
+| `redact` | The text with them replaced by numbered markers |
+| `condense_log` | A log as its distinct messages, ranked by severity; a crash report as what explains it |
+| `json_shape` | A JSON document's structure without its data |
+| `dependency_audit` | An npm, cargo, or pip audit as what needs action, most severe first |
+| `flaky_tests` | Tests that pass in some runs and fail in others |
+| `hot_paths` | A profile's folded stacks as where the time goes |
+| `close_thread` | Frees a `respond` thread |
+
+A failing `swift test` run comes back as a headline and a few `file:line: message` findings; two
+minutes of the unified log, 14,333 lines, came back as its top thirty message templates in about 10 KB. The raw output never
+leaves the Mac and never enters the calling agent's context. When the model inside `respond` wants to
+run a risky command, the approval dialog reaches you through your client, and a client that cannot show
+one gets a refusal, never a silent run. [mcp.md](docs/mcp.md) has each tool's arguments and result.
+
+## Why it is different
+
+**Nothing leaves your machine.** The default model runs on your Apple silicon, so prompts, files, and
+command output stay local, and there is no API key, no account, and no bill. Apple's Private Cloud
+Compute is an explicit opt-in (`--model private-cloud`), noted on stderr and in the audit log; it needs
+an entitlement that an unsigned command-line binary cannot carry, so it is refused from this build
+([backends.md](docs/backends.md)). Any model a local Ollama serves can be chosen with `--model
+ollama:<name>` when a task needs a larger window than the on-device model's 4k tokens; `wisp models`
+lists what will work.
+
+**Every command passes a gate, and the gate is fast.** Before a command runs it must clear a deny list
+(`sudo`, `rm -rf /`, piping into a shell, disk tools), and it runs under a Seatbelt sandbox that
+confines writes to the directory wisp was launched in, the temporary directory, and configured build
+caches. Then a classifier rates each simple command in the line `safe`, `moderate`, or `dangerous`.
+Rules set the floor and a Core ML text classifier, shipped with each release and trained on 2,135
+labelled commands, 1,075 of them real, can only raise the level; it answers in under a millisecond
+however busy the Mac is. On 996 real commands it rated 817 exactly, against 664 for the on-device
+language model at 2.5 seconds a verdict ([approval.md](docs/approval.md)). A command the rules know
+to be read-only, such as `git status`, never reaches a classifier at all. You can train a version on
+your own history with `wisp classifier train --from-audit`.
+
+**You decide, at the level you choose.** At `moderate` and above wisp asks. Your answer has a scope,
+this turn, this session, this project for 30 days, or always for 30 days, and is remembered by the
+program and its verb, so approving `git commit` never approves `git push`. A `dangerous` verdict is
+never remembered beyond the session, so a stored `rm` approval never covers `rm -rf build`. A dialog
+nobody answers is a refusal. `wisp approvals` shows what is remembered; `revoke` and `clear` forget it.
+
+**You can see exactly what happened.** `~/.wisp/logs/audit.jsonl` records every prompt, reply, tool
+call, policy decision, classifier verdict, approval, and command outcome, verbatim, in order. `wisp
+logs` reads it, and `respond` returns each turn's receipt folded from the same events, so a calling
+agent can check delegated work without reading the log. [trust.md](docs/trust.md) states in one page
+what wisp can and cannot do to your Mac.
+
+**It is a microharness.** One binary, one session, a registry of seven tools, and the smallest correct
+agent loop; the framework runs the loop and wisp puts the care around it. Your own tools are command
+templates in `~/.wisp/config.json`, run through the same gate as everything else
+([tools/custom.md](docs/tools/custom.md)). State is a directory, `~/.wisp`, that you can read, edit,
+and delete.
+
+## Install
+
+An Apple silicon Mac on macOS 27 or later with Apple Intelligence enabled, and Homebrew.
+
+```bash
+brew install pidster/tap/wisp   # installs wisp and wisp-tui
+wisp doctor                     # checks the model, sandbox, classifier, config, and home directory
+wisp "What is the date in Tokyo?"
+```
+
+State lives in `~/.wisp`: an optional `config.json` (change it with `wisp config set` or `/config set`
+in chat), saved transcripts, remembered approvals, the audit log, and the classifier versions. Upgrade
+with `brew upgrade pidster/tap/wisp`; remove with `brew uninstall wisp` and `rm -rf ~/.wisp`.
 
 ## Documentation
 
-Everything is under [docs/](docs/README.md). Start with the one that matches your question.
+Everything is under [docs/](docs/README.md). Start with the row that matches your question.
 
 | If you want to… | Read |
 | --- | --- |
@@ -98,11 +157,12 @@ Everything is under [docs/](docs/README.md). Start with the one that matches you
 | Work on the code to the project's standard | [engineering.md](docs/engineering.md) |
 | Cut a release | [release.md](docs/release.md) |
 
-Two background pages record what we learned about the platform: [context-management.md](docs/context-management.md)
-on living inside a 4k-token window, and [policy-and-sandboxing.md](docs/policy-and-sandboxing.md) on what
-macOS and the framework offer for confinement.
+Two background pages record what we learned about the platform:
+[context-management.md](docs/context-management.md) on living inside a 4k-token window, and
+[policy-and-sandboxing.md](docs/policy-and-sandboxing.md) on what macOS and the framework offer for
+confinement.
 
-## Setup for developers
+## Developing wisp
 
 You need macOS 27 and Xcode 27 (the Command Line Tools alone lack the `@Generable` macro plugin), and
 Rust 1.98 or later for the terminal front end in `tools/`.
@@ -110,17 +170,13 @@ Rust 1.98 or later for the terminal front end in `tools/`.
 ```bash
 git clone git@github.com:pidster/wisp.git
 cd wisp
-scripts/check install-hooks       # once: enables the pre-commit gate
-cd harness
-swift build
-.build/debug/wisp tools
-.build/debug/wisp "What is the date in Tokyo?"
-cd ../tools
-cargo build                       # wisp-tui, the terminal front end
-WISP_BIN=../harness/.build/debug/wisp target/debug/wisp-tui
+scripts/check install-hooks                        # once: enables the pre-commit gate
+swift build --package-path harness
+harness/.build/debug/wisp tools
+harness/.build/debug/wisp "What is the date in Tokyo?"
+cargo build --manifest-path tools/Cargo.toml       # wisp-tui, the terminal front end
+WISP_BIN=harness/.build/debug/wisp tools/target/debug/wisp-tui
 ```
-
-The repository is laid out as:
 
 | Path | What it is |
 | --- | --- |
@@ -132,14 +188,14 @@ The repository is laid out as:
 
 How we work, in short:
 
-- `scripts/check` is the whole gate and the pre-commit hook runs it. Lint is strict, warnings are errors,
-  Swift 6 strict concurrency stays on, and no escape hatches.
+- `scripts/check` is the whole gate and the pre-commit hook runs it. Lint is strict, warnings are
+  errors, Swift 6 strict concurrency stays on, and there are no escape hatches.
 - Tests never need the model. The model is exercised by running the binary, and by `scripts/check eval`
   for the classifier and every delegated task ([measurements.md](docs/measurements.md)).
-- A change is done when it is tested, documented in code, and documented in `docs/`, in the same commit.
-  Non-obvious or hard-to-reverse choices get a decision record.
-- Dogfooding: `.mcp.json` registers this repository's own release build (`swift build -c release`) as an
-  MCP server, so Claude Code sessions here can use it.
+- A change is done when it is tested, documented in code, and documented in `docs/`, in the same
+  commit. A choice that is non-obvious or hard to reverse gets a decision record.
+- Dogfooding: `.mcp.json` registers this repository's own release build (`swift build -c release`) as
+  an MCP server, so Claude Code sessions here use it.
 
-See [engineering.md](docs/engineering.md) for the full standard and [AGENTS.md](AGENTS.md) for the
-orientation given to AI agents working in this repository.
+[engineering.md](docs/engineering.md) is the full standard, and [AGENTS.md](AGENTS.md) the orientation
+given to AI agents working in this repository.
