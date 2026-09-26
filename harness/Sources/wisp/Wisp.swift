@@ -1231,6 +1231,9 @@ struct ClassifierCommand: AsyncParsableCommand {
         @Option(name: .long, help: "The seed that deals the families.")
         var seed: UInt64 = 1
 
+        @Option(name: .long, help: "Keep at most this many examples of any one family, so no template dominates.")
+        var cap: Int?
+
         func run() async throws {
             var examples = TrainingSplit.parse(try String(contentsOfFile: input, encoding: .utf8))
             var seen = Set<String>()
@@ -1242,6 +1245,12 @@ struct ClassifierCommand: AsyncParsableCommand {
                 let clashing = Set(TrainingSplit.overlaps(fixed, examples).map(\.second))
                 examples.removeAll { clashing.contains($0.text) }
                 print("removed \(clashing.count) examples that overlap \(exclude)")
+            }
+            if let cap {
+                let before = examples.count
+                let kept = Set(TrainingSplit.clusters(examples).values.flatMap { $0.prefix(cap) })
+                examples = examples.filter(kept.contains)
+                print("capped families at \(cap): kept \(examples.count) of \(before)")
             }
             let named = parts.split(separator: ",").compactMap { part -> (String, Double)? in
                 let pieces = part.split(separator: "=")

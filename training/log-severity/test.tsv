@@ -1,0 +1,387 @@
+# The log-severity classifier's TEST set: frozen, for reporting only.
+# Source: real lines from a Mac's install.log, wifi.log, system.log, and Ollama's server log, 2026-09;
+# no log show output, since that declares its level. Labelled by an agent that had not written the
+# training data, by labels.md; reviewed adversarially. Neutralised: user, machine, network, and model
+# names, time zone offsets, and Messages lines removed. Apart from train and dev by family.
+# Only one real fault occurred, so fault is not measurable here; it measures error, warning, and info.
+info	time=2026-09-23T15:26:16.752+00 level=INFO source=sched.go:1332 msg="updated VRAM based on existing loaded models" gpu=0 library=Metal total="37.4 GiB" available="19.5 GiB"
+info	Sun Sep 20 19:21:37.085 [airport]/629 @[285150.766734] (CWXPCSubsystem.m:9912) dq:'xpc-subsystem.internal'/tid[0x8ea47b] WoW ENABLED (assert=yes, pref=yes activity=no, ps=ac, icloud=yes, tcpka=enabled, pno=enabled, lpas=no)
+info	srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+warning	2025-04-08 13:12:39+00 mac system_installd[538]: Package Authoring Error: PackageInfo bundle reference found without top-level bundle definition. Bundle will be skipped: <bundle id="*"></bundle>
+info	2025-03-23 22:55:00+00 mac Installer Progress[53]: Progress app is loading…
+info	    Those messages may not appear in standard system log files or in the ASL database.
+info	llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [session] Trigger - fired node event 'register' for '/Local/Default'
+info	2025-07-09 06:49:13+00 mac softwareupdated[670]: BackgroundActions: 2 enabled config-data product(s): 072-96750, 082-72557 (want active updates only)
+info	Thu Sep 17 12:10:25.305 Usb Host Notification Activated
+warning	2025-06-05 22:01:21+00 mac softwareupdated[670]: SoftwareUpdate: request for status for unknown product 082-41241
+error	May  9 12:59:01 mac opendirectoryd[67]: [session] ODNodeCreateWithNameAndOptions failed with result 2000
+error	May  9 12:59:37 mac opendirectoryd[67]: [session] ODNodeCreateRecord failed with result 4102
+info	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: + /bin/launchctl bootstrap system //Library/Apple/System/Library/LaunchDaemons/com.apple.usbmuxd.plist
+info	Feb 17 23:41:35 mac opendirectoryd[69]: [session] UID: 0, EUID: 0, GID: 0, EGID: 0, PID: 90, PROC: templateMigrator ODSessionCreate request, Path: /Volumes/Data//private/var/db/dslocal/nodes/Default/
+info	2026-09-20 13:05:02+00 mac system_installd[8809]: PackageKit: Skipping component "com.apple.AirTrafficHost" (4026.110.1-4026.110.1-4026110001000000) because the version 4026.140.1-4026.140.1-4026140001000000 is already installed at /Library/Apple/System/Library/PrivateFrameworks/AirTrafficHost.framework/Versions/A.
+info	2025-04-06 16:32:54+00 mac installd[554]: PackageKit: Wrote MAS Metadata into Applications/Developer.app
+info	Sat Sep 19 00:34:55.630 [airport]/629 @[131149.339991] (configdIODriverInterface.m:2177) dq:'com.apple.main-thread'/tid[0x14fc] @[131149.189000] WoWWakeUpCommand: 'E_RX_IP_PACKET'
+info	time=2026-09-05T10:38:58.219+00 level=INFO source=routes.go:1957 msg="Ollama cloud disabled: false"
+info	Sep 20 12:39:50 mac login[2513]: DEAD_PROCESS: 2513 ttys007
+info	load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+info	2025-12-10 10:23:47+00 mac SoftwareUpdateSettingsExtension[97416]: Product.swift:loadEncodedUIBundle(product:):207: Initialized encodedUI bundle vendor for /System/Library/AssetsV2/com_apple_MobileAsset_SoftwareUpdateDocumentation/2e07f857eb638285e4d60e95545323f996696001.asset/AssetData/EncodedUIv2.suda and product <SUOSUMajorProduct: MSU_UPDATE_25B78_patch_26.1_major>(Title:macOS Tahoe 26.1 Version:26.1, Identifier:(null), IconSize:132966, Deferred:0, Deferred Until:(null))
+error	2025-06-08 13:09:36+00 mac SoftwareUpdateSettingsExtension[27007]: SUAppStoreUpdateController: Download failed due to error: (null)
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [session] Internal: ODNodeCreateWithNameAndOptions request, SessionID: 00000000-0000-0000-0000-000000000000, Name: /Local/Default, Options: 0x0
+warning	2025-07-12 07:34:55+00 mac installd[1774]: PackageKit: Archive at path (/Volumes/VirtualBox/VirtualBox.pkg) could not be opened readwrite (Read-only file system), falling back to readonly.
+info	2025-04-06 16:34:01+00 mac softwareupdated[275]: Remaining packages to install for product 082-12052 : com.apple.pkg.CLTools_Executables,com.apple.pkg.CLTools_SwiftBackDeploy,com.apple.pkg.CLTools_macOS_SDK,com.apple.pkg.CLTools_SDK_macOS_NMOS,com.apple.pkg.CLTools_SDK_macOS12,com.apple.pkg.CLTools_SDK_macOS110,com.apple.pkg.CLTools_SDK_macOS13,com.apple.pkg.CLTools_SDK_macOS14,com.apple.pkg.CLTools_SDK_macOS_LMOS
+error	2025-12-10 13:54:53+00 mac SoftwareUpdateSettingsExtension[2678]: BetaUpdatesManager.swift:fetchPrograms():151: An error occurred while trying to load Beta MDM configuration: nilError
+info	Fri Sep 18 18:55:59.876 [airport]/629 @[110813.579939] (CWXPCSubsystem.m:5291) dq:'com.apple.wifi.power'/tid[0x2f9689] Best effort disassociate on user wifi power off
+info	Sun Sep 20 18:53:16.489 [airport]/629 @[283450.171267] (configdIODriverInterface.m:5925) dq:'com.apple.main-thread'/tid[0x14fc] TCP keep-alive enabled on en0, allowed[1]
+error	2026-03-04 23:49:27+00 mac Safari[7137]: +[SUOSUSafariUpdateContent(Private) safariUpdateContentWithProduct:bundleURL:error:]: Failed to initalize NSBundle from path:(null)
+info	time=2026-09-05T10:38:58.222+00 level=INFO source=images.go:964 msg="total unused blobs removed: 0"
+info	May  9 12:59:03 mac opendirectoryd[67]: [session] flushing dirty record '/System/Volumes/Data/private/var/db/dslocal/nodes/Default/computers/localhost' from line 4920
+info	May  9 12:59:02 mac opendirectoryd[67]: [session] Performing first connection tasks for node configuration /Local/Default with path /Volumes/Data//private/var/db/dslocal/nodes/Default/
+error	2025-03-23 22:55:05+00 mac Installer Progress[53]: Unable to quit because there are connected processes
+info	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: No process to signal.
+error	2025-09-16 16:02:48+00 mac softwareupdated[587]: PKDistributionHelperController: Connection to the service was invalidated.
+info	May  9 12:59:01 mac imklaunchagent[58]: Use NVRAM prev-lang:kbd value (2) as default ASCII input source: British
+error	May  9 12:59:25 mac opendirectoryd[67]: [auth] Failed to load access token at <private>
+info	Thu Sep 17 12:10:27.796 [airport]/629 @[81.453646] (configdIODriverInterface.m:4410) dq:'com.apple.main-thread'/tid[0x14fc] Added success for node en0, node[0x102bcafc0], ifName['en0'] enableFreedList[1] removed[0], interfaceFound[1]
+info	cmn  common_param: common_params_print_info: build 1 (0f3a71be1) with AppleClang 21.0.0.21000099 for Darwin arm64
+info	Sep 26 00:30:04 mac newsyslog[86173]: logfile turned over
+info	llama_model_loader: - type q4_K:  289 tensors
+info	Sun Sep 20 18:53:16.478 [airport]/629 @[283450.159443] (configdIODriverInterface.m:6721) dq:'com.apple.main-thread'/tid[0x14fc] UUID:'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA09': messageType[0xe0000280], caps = CPU Net Disk , description:'DarkWake:cpu disk net ', dark:1 user:0, err[0] kern.wakereason['smc.sysState.Wake(0x70070000) lid SMC.OutboxNotEmpty RTP.multi-touch']
+error	2025-04-06 08:01:07+00 mac softwareupdated[275]: Package Authoring: error running installation-check script: TypeError: null is not an object (evaluating 'cpuFeatures.split') at x-distribution:///installer-gui-script%5B1%5D/installation-check%5B1%5D/@script
+info	Sep 20 13:08:44 mac CoreDeviceService[45526]: This is here just to make sure we empty our found devices queue
+info	llama_prepare_model_devices: using device MTL0 (Apple M4 Max) (unknown id) - 38338 MiB free
+info	ggml_metal_init: found device: Apple M4 Max
+error	2026-07-22 18:24:04+00 mac softwareupdated[725]: Scan got error The network connection was lost.
+info	2025-04-06 16:35:05+00 mac root[3474]: End script: developer_mode_enable_terminal
+info	time=2026-09-23T15:27:31.281+00 level=INFO source=images.go:424 msg="template selection" model=registry.ollama.ai/library/granite4.1:8b selected=go_template renderer="" parser="" go_template="[completion tools]" chat_template="[tools completion]" harmony=null renderer_parser=null
+info	slot create_check: id  0 | task 0 | created context checkpoint 1 of 32 (pos_min = 536, pos_max = 536, n_tokens = 537, size = 50.251 MiB)
+info	2026-02-28 19:01:37+00 mac softwareupdated[719]: SUOSUTonightObserver: Predicted start date: 1 Mar 2026 at 02:00
+warning	2025-07-12 07:35:01+00 mac package_script_service[72154]: ./postflight: WARNING: Installation path is not in current module search path!
+error	2025-07-12 07:34:47+00 mac Installer[72143]: Failed to load specified background image
+info	srv  get_availabl: updating prompt cache
+error	2025-04-08 13:12:49+00 mac system_installd[538]: postinstall: Could not kickstart service "com.apple.XProtect.agent.scan": 1: Operation not permitted
+error	2026-03-18 22:39:07+00 mac loginwindow[957]: SUOSULoginCredentialPolicy: Set externalized LAContext with result: ERROR
+info	Sat Sep 26 05:16:43.239 [airport]/629 @[752856.650025] (airportProcessCommand.m:223) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] DHCP airport_changed = 1, service:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA08
+info	2025-05-09 17:02:19+00 mac softwareupdated[517]: -[SUOSUManagedServiceDaemon invalidAndRemoveOldDeclarations]_block_invoke: Removed 0 invalid declarations
+warning	srv  llama_server: this can be a security risk (cross-origin attacks)
+info	load_tensors: offloaded 49/49 layers to GPU
+info	May  9 12:59:02 mac opendirectoryd[67]: [default] Loaded bundle at path '/System/Library/OpenDirectory/Modules/configure.bundle'
+info	2026-02-15 18:26:21+00 mac SoftwareUpdateSettingsExtension[49617]: SUOSUShimController: User-side stash during queue for later succeeded
+info	Thu Sep 17 12:10:27.796 [airport]/629 @[81.453723] (configdIODriverInterface.m:4512) dq:'com.apple.main-thread'/tid[0x14fc] en0 is an AirPort interface.
+info	May  9 12:59:02 mac opendirectoryd[67]: [session] /Local/Default nodestate: starting check
+error	Thu Sep 17 12:10:27.734 <airport[629]> _initInterface: Unable to initialize unified logger, 'en0'
+error	2026-07-23 00:38:45+00 mac softwareupdated[725]: Scan got error Didn’t get a response from the Apple Software Update server.
+info	2025-03-23 22:58:49+00 mac installer[798]: Create temporary directory "/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T//Install.798uAOOqL"
+info	2025-03-23 22:59:21+00 mac installd[764]: PackageKit: Writing receipt for com.apple.cdm.pkg.Numbers_MASReceipt to /
+error	May  9 12:59:33 mac storagekitd[195]: [getEFILProxyForConnection_block_invoke:151]: Connection error: Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.efilogin-helper was invalidated: failed at lookup with error 3 - No such process." UserInfo={NSDebugDescription=The connection to service named com.apple.efilogin-helper was invalidated: failed at lookup with error 3 - No such process.}
+info	2025-03-23 22:57:32+00 mac softwareupdated[185]: -[SUOSUManagedServiceDaemon allDeclarationsRemovingInvalidDeclarations:]_block_invoke: Removing any invalid declarations
+error	2025-12-16 01:48:53+00 mac SoftwareUpdateNotificationManager[1339]: SecKeychainStash() failed: 0xe00002e6
+info	time=2026-09-19T23:17:04.186+00 level=INFO source=llama_server.go:1295 msg="waiting for llama-server to start responding"
+info	srv    load_model: prompt cache is enabled, size limit: 8192 MiB
+info	Sun Sep 20 16:28:14.869 [airport]/629 @[274748.575977] (configdIODriverInterface.m:4458) dq:'com.apple.main-thread'/tid[0x14fc] utun10 Adding, eventClass[0x00000002] eventType[0x00000009], function:'_dlilEventCallback'/4764
+info	    Output parameters from ASL Module "com.apple.asl" override any specified in ASL Module "com.apple.authd".
+error	May  9 12:59:01 mac mobileassetd[124]: SUPreferenceManager: Connection proxy failure with error:Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.softwareupdated was invalidated: failed at lookup with error 3 - No such process." UserInfo={NSDebugDescription=The connection to service named com.apple.softwareupdated was invalidated: failed at lookup with error 3 - No such process.}
+info	Sep 24 11:37:56 mac login[89531]: USER_PROCESS: 89531 ttys008
+info	load: special tokens cache size = 27
+info	time=2026-09-19T23:17:12.018+00 level=INFO source=sched.go:728 msg="loaded runners" count=1
+info	2025-04-08 13:12:49+00 mac softwareupdated[275]: Background actions complete, posting com.apple.SoftwareUpdate.updatesAvailable notification
+info	Sun Sep 20 18:53:16.488 [airport]/629 @[283450.169847] (configdIODriverInterface.m:6498) dq:'com.apple.main-thread'/tid[0x14fc] Acknowledging sleep event, connection[0x7b5b112da0] token[0x00000000]
+info	2025-05-17 09:58:46+00 mac softwareupdated[517]: SUOSUTonightObserver: Padded expiration date to 19 May 2025 at 04:00
+info	Fri Sep 18 18:55:59.665 [airport]/629 @[110813.368864] (CWXPCSubsystem.m:5207) dq:'com.apple.wifi.power'/tid[0x2f9689] setWiFiPowerState: @[110813.364144], powerState[0] isUserPowerOff[1] hadSSID[1], installer[0] internal[0] skipChipReset[0] platformNonFatalChipReset[0] platformChipResetSupported[1]
+info	time=2026-09-05T10:28:20.167+00 level=INFO source=server.go:444 msg="starting runner" cmd="/Applications/Ollama.app/Contents/Resources/ollama runner --ollama-engine --port 49259"
+info	Sun Sep 20 16:28:14.991 [airport]/629 @[274748.698096] (configdIODriverInterface.m:4512) dq:'com.apple.main-thread'/tid[0x14fc] utun10 is not an AirPort interface.
+info	srv          init: using 15 threads for HTTP server
+info	[GIN] 2026/09/19 - 23:42:58 | 200 |  8.773185667s |       127.0.0.1 | POST     "/api/chat"
+info	2026-09-20 10:43:51+00 mac softwareupdated[75669]: Previous System Version : 27.0 (26A428), Current System Version : 27.0 (26A428)
+error	2025-08-10 09:02:25+00 mac softwareupdated[587]: SUOSUServiceDaemon: Create & persist stash failed with error: Error Domain=SUMacControllerError Code=7749 "[SUMacControllerErrorCommitStashInvalidState=7749] Access control was denied, but no prepare is available for committing the stash (prepared update for another client): [SUMacControllerError:7507]" UserInfo={NSLocalizedDescription=Unable to save user credentials for software update at this time., SUMacControllerErrorIndicationsMask=0, NSDebugDescription=[SUMacControllerErrorCommitStashInvalidState=7749] Access control was denied, but no prepare is available for committing the stash (prepared update for another client): [SUMacControllerError:7507], NSUnderlyingError=0xbbfc8be10 {Error Domain=SUMacControllerError Code=7507 "[SUMacControllerErrorAccessRequestDenied=7507] Context (softwareupdated) already has control, but priority downgrades are not allowed (current:ClientInitiated requesting:Background)" UserInfo={NSDebugDescription=[SUMacControllerErrorAccessRequestDenied=7507] Context (softwareupdated) already has control, but priority downgrades are not allowed (current:ClientInitiated requesting:Background), NSLocalizedDescription=The software update request for this process was denied as another process is currently performing an operation. Please try again later.}}}
+info	2025-07-12 07:34:47+00 mac Installer[72143]: Env: XPC_SERVICE_NAME=application.com.apple.installer.1152921500312078607.1152921500312078612
+info	cmn  common_init_: warming up the model with an empty run - please wait ... (--no-warmup to disable)
+info	Dec 10 12:08:04 mac Installer Progress[67]: IASGetCurrentInstallPhase: Current phase name is "Template Migration"
+info	2025-04-06 16:25:17+00 mac installd[554]: PackageKit: Touched bundle /Applications/Slack.app/Contents/Frameworks/Slack Helper (GPU).app
+warning	2026-02-15 14:09:48+00 mac accessoryupdaterd[336]: SUOSUExternalUpdateProvider: Service connection interrupted!
+error	2025-05-22 17:33:31+00 mac MiniLauncher[1097]: SUOSUUpdateController: Error making connection to softwareupdated: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.softwareupdated.OSUpdate" UserInfo={NSDebugDescription=connection to service named com.apple.softwareupdated.OSUpdate}
+info	2025-04-08 13:12:39+00 mac softwareupdated[275]: PackageKit: Enqueuing install with default quality of service (background)
+info	2026-03-28 08:23:53+00 mac appstoreagent[2240]: PackageKit: Bundle com.apple.SourceKitService.6.3.0.123.5_default is nested inside upgrade-bundle or atomic-update-bundle and will not be version-checked
+info	2025-05-17 09:51:58+00 mac SoftwareUpdateSettingsExtension[89961]: SettingsState.swift:scanCompleted(scanError:):164: Scan completed with error: nil
+warning	2025-08-19 00:40:32+00 mac SoftwareUpdateSettingsExtension[54823]: Not authorized to write preference DoItLaterTonightAttemptsCount
+error	2025-11-06 13:27:32+00 mac system_installd[1572]: postinstall: chmod: Failed to set ACL on file '/': Read-only file system
+info	[GIN] 2026/09/19 - 23:15:45 | 200 |    8.861458ms |       127.0.0.1 | GET      "/api/tags"
+info	2025-03-23 22:56:39+00 mac installer[530]: -[IFDInstallController(Private) _buildInstallPlanReturningError:]: location = file://localhost
+info	Sun Sep 20 16:28:14.868 [airport]/629 @[274748.575265] (configdIODriverInterface.m:4763) dq:'com.apple.main-thread'/tid[0x14fc] utun10: KEV_DL_IF_ATTACHED
+info	May  9 12:59:03 mac opendirectoryd[67]: [session] UID: 0, EUID: 0, GID: 0, EGID: 0, PID: 193, PROC: ReportCrash ODNodeRelease request, NodeID: AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA03
+info	2026-04-18 09:26:25+00 mac installd[13969]: Installed "Xcode" (26.4.1)
+info	time=2026-09-19T23:17:11.992+00 level=INFO source=llama_server.go:1362 msg="llama-server started in 7.81 seconds"
+error	2026-03-04 23:49:27+00 mac Safari[7137]: SUOSUSafariController: Failed to deserialize content: (null)
+info	2025-04-06 16:34:01+00 mac softwareupdated[275]: Changing status (_startDownloadingUpdateWithProduct) for key 082-12052 from "not running" to "downloading"
+warning	2025-05-22 17:33:31+00 mac MiniLauncher[1097]: SoftwareUpdate: failed to authorize rights 32 with helper (Attempt:1)
+info	slot   operator(): id  0 | task 182 | erased invalidated context checkpoint (pos_min = 536, pos_max = 536, n_tokens = 537, n_swa = 0, pos_next = 0, size = 50.251 MiB)
+info	time=2026-09-23T15:26:00.881+00 level=INFO source=download.go:181 msg="downloading 151be780af0c in 1 236 B part(s)"
+error	2025-04-09 15:57:25+00 mac softwareupdated[519]: Scan got error Can’t connect to the Apple Software Update server because you are not connected to the internet.
+error	2025-03-23 22:55:00+00 mac Installer Progress[53]: IASGetCurrentInstallPhase: Unable to get the current phase name
+info	Sun Sep 20 18:53:16.612 [airport]/629 @[283450.293636] (configdIODriverInterface.m:6065) dq:'com.apple.main-thread'/tid[0x14fc] <en0> Scan offloads will be ENABLED (lpas_supported=yes, softap=disabled, wow=disabled, tcpka=inactive, allow_unassoc_wakes=yes, allow_disconn_sleeps=yes, aj_disabled=no, scan_offload_disabled_until=(null))
+warning	2025-05-09 13:53:19+00 mac suhelperd[515]: IARStashAPFSIfApproprate() is not supported on Apple Silicon but proceed anyway.
+error	2025-12-10 12:09:33+00 mac softwareupdated[720]: SUOSUServiceDaemon: Error scanning: Error Domain=SUMacControllerError Code=7507 "[SUMacControllerErrorAccessRequestDenied=7507] Access request was denied" UserInfo={NSDebugDescription=[SUMacControllerErrorAccessRequestDenied=7507] Access request was denied, NSLocalizedDescription=The software update request for this process was denied as another process is currently performing an operation. Please try again later.}
+info	2025-04-06 16:25:08+00 mac installd[554]: PackageKit: Parent bundle com.1password.safari will be atomically shoved.
+error	May  9 12:59:25 mac opendirectoryd[67]: [auth] Failed to read access token plist
+info	May  9 12:59:03 mac opendirectoryd[67]: [session] re-indexing '/System/Volumes/Data/private/var/db/dslocal/nodes/Default/computers/localhost.plist' with type 'computers'
+info	2025-04-08 13:12:39+00 mac shove[10707]: [src=noflags] /Library/Apple: restored flags 0x80000 and storage class
+error	2025-05-22 17:40:22+00 mac installd[1774]: AOT translation failed for /Applications/Slack.app/Contents/Resources/app-x64.asar.unpacked/node_modules/registry-js/build/Release/registry.node
+info	2025-03-23 22:54:56+00 mac Language Chooser[227]: no reachability flags returned
+info	srv   prompt_save:  - saving prompt with length 35, total state size = 3.283 MiB (draft: 0.000 MiB)
+error	May  9 12:59:33 mac storagekitd[195]: [openEFILConnection_block_invoke_2:138]: Connection invalidated
+info	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: + /bin/launchctl kill SIGKILL system/com.apple.dt.RemotePairingDataVaultHelper
+info	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: + /usr/bin/killall -SIGUSR1 iTunesHelper AMPDeviceDiscoveryAgent AMPDevicesAgent MDRemoteServiceSupport remotepairingd CoreDeviceService
+error	2025-04-09 15:57:25+00 mac softwareupdated[519]: SUScan: Fetching the catalog failed due to an error. Although our catalogTestMode is nil, we will not exit a TestMode (if we are in one).
+info	2026-03-28 08:28:32+00 mac appstoreagent[2240]: PackageKit: Registered bundle file:///Applications/Xcode.app/ for uid 501
+info	2025-03-23 22:59:04+00 mac installer[798]: PackageKit: Registered bundle file:///Applications/Keynote.app/ for uid 0
+info	time=2026-09-19T23:17:04.179+00 level=INFO source=server.go:109 msg="using llama-server for model" model=/Users/me/.ollama/models/blobs/sha256-1194192cf2a187eb02722edcc3f77b11d21f537048ce04b67ccf8ba78863006a
+info	Fri Sep 25 08:33:34.184 Usb Host Notification Apple80211Set: seqNum 1399 Total 1 chg 1 en0
+info	time=2026-09-19T23:17:04.186+00 level=INFO source=sched.go:613 msg="system memory" total="48.0 GiB" free="11.8 GiB" free_swap="0 B"
+info	Sat Sep 26 05:16:43.242 [airport]/629 @[752856.653784] (airportProcessCommand.m:567) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] Router MAC Address: <redacted>
+info	2026-03-21 12:28:10+00 mac Safari[1415]: SUOSUShimController: Armed: 1, with mode: 1, date: Sun Mar 22 02:00:00 2026, updates queued for later: (
+info	2026-01-30 18:02:08+00 mac installd[1557]: PackageKit: Applying atomic-update from bundle at Applications/Pages.app/Contents/Frameworks/AppAnalytics.framework
+info	2025-03-23 23:00:19+00 mac Language Chooser[268]: LCA: skipping WiFi scan because there default WiFi interface name is nil.
+info	2025-12-15 11:24:28+00 mac softwareupdated[720]: SUOSUTonightObserver: Predicted expiration date: 16 Dec 2025 at 04:00
+info	Thu Sep 17 12:10:27.796 [airport]/629 @[81.453568] (configdIODriverInterface.m:478) dq:'com.apple.main-thread'/tid[0x14fc] Remove FreedList ifName:'en0' count[0]
+info	2025-04-06 16:50:43+00 mac loginwindow[1032]: +[SUOSULoginCredentialPolicy currentLoginCredentialPolicy] = 0
+info	2025-03-23 22:54:45+00 mac softwareupdated[185]: softwareupdated: Starting with build 15.3.1 (24D70)
+info	2025-07-12 07:34:55+00 mac Installer[72143]: Free space on "Macintosh HD": 1.73 TB (1734670032896 bytes).
+info	Thu Sep 17 12:10:25.125 [airport]/629 @[78.778617] (configdIODriverInterface.m:404) dq:'com.apple.main-thread'/tid[0x14fc] FreedDeviceNodeListManager initialized, list[0x7b5b10a7c0] lock[0x7b5b10ea00]
+info	2025-05-17 09:51:58+00 mac SoftwareUpdateSettingsExtension[89961]: SettingsController.swift:client(_:scanDidFinishWithError:):907: Scan finished!
+info	Sun Sep 20 18:53:16.609 [airport]/629 @[283450.290758] (CWXPCSubsystem.m:9912) dq:'xpc-subsystem.internal'/tid[0x8e3390] WoW DISABLED (assert=no, pref=no activity=no, ps=battery (1), icloud=no, tcpka=enabled, pno=enabled, lpas=no)
+info	Sun Sep 20 18:53:16.642 [airport]/629 @[283450.323513] (configdIODriverInterface.m:6140) dq:'com.apple.main-thread'/tid[0x14fc] <en0> Successfully configured scan offloads, aj_disabled=no, PNO count[16]
+info	slot      release: id  0 | task 0 | stop processing: n_tokens = 35, truncated = 0
+info	Feb 17 23:41:43 mac opendirectoryd[69]: [session] ODNodeCreateRecord completed, delivered 1 result
+info	2025-04-06 16:08:47+00 mac softwareupdated[275]: -[SUOSUServiceDaemon _updateFilteredAvailableMobileSoftwareDescriptors:mdmInitiated:]: Resetting harvested passcode to nil
+info	2025-03-23 22:56:53+00 mac installer[537]: Running install actions
+info	print_info: model params          = 30.53 B
+info	2025-04-06 07:59:54+00 mac bootinstalld[340]: BootTimeInstall: Configuring sandbox...
+error	2026-05-23 10:01:20+00 mac Safari[1417]: SUOSUSafariController: Failed to load safari content from MSU_UPDATE_25F71_patch_26.5_minor.
+info	Sep 17 12:09:24 mac opendirectoryd[72]: [session] PID: 216, Client: 'ReportCrashService', exited with 0 session(s), 0 node(s) and 0 active request(s)
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [session] Trigger - new attribute trigger watching for 'opendirectoryd:records;modify;/Local/Default;dsRecTypeStandard:Config;CIFSServer;dsAttrTypeStandard:XMLPlist'
+warning	load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+info	2026-06-26 08:35:09+00 mac installer[65435]: Product archive /var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T/us.zoom.ZoomDaemon.hd44m8sj/zoomTmp.pkg trustLevel=350
+error	May  9 12:59:01 mac mobileassetd[124]: SUPreferenceManager: Service connection invalidated!
+info	slot init_sampler: id  0 | task 0 | init sampler, took 0.00 ms, tokens: text = 26, total = 26
+error	2025-04-06 08:01:07+00 mac softwareupdated[275]: Failed to get bridge device
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] Loading node configuration for /Local/Default
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] Loading node configuration for /Local
+error	2025-12-10 12:04:00+00 mac SoftwareUpdateSettingsExtension[13939]: SUOSUAuthenticationManager: Failed to set LACredentialTypeBootPassword (uid = 501)
+warning	2025-05-22 17:33:31+00 mac suhelperd[681]: Failed to authorize new client
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [session] Flagging configuration '/Local' as a system-owned configuration that cannot be deleted
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [session] Flagging configuration '/Configure' as a system-owned configuration that cannot be deleted
+info	time=2026-09-05T10:38:58.388+00 level=INFO source=model_recommendations.go:177 msg="model recommendations cache sleep scheduled" wait=4h1m43.438208335s consecutive_failures=0
+info	llama_model_loader: - kv   0:                       general.architecture str              = qwen3moe
+info	2025-08-15 21:28:47+00 mac softwareupdated[587]: SUOSUInactivityPredictor: Predicting an inactivity between Fri Aug 15 21:28:47 2025 and Sat Aug 16 21:28:47 2025
+error	2025-04-06 16:35:06+00 mac softwareupdated[275]: Failed to register application bundles:((
+info	time=2026-09-19T23:17:04.187+00 level=INFO source=llama_server.go:1350 msg="waiting for llama-server to become available" status="llm server not responding"
+error	Sat Sep 19 00:35:07.626 Usb Host Notification Error Apple80211Set: Device power is off seqNum 244 Total 1 chg 1 en0
+info	Sat Sep 26 05:16:43.257 [airport]/629 @[752856.668080] (airportProcessCommand.m:606) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] ARP offload settings ({
+error	2025-04-08 13:12:49+00 mac system_installd[538]: postinstall: Load failed: 5: Input/output error
+error	2025-11-06 13:27:31+00 mac system_installd[1572]: postinstall: Unload failed: 5: Input/output error
+info	2025-12-10 10:43:00+00 mac softwareupdated[659]: SUOSUServiceDaemon: Download/prepare already in progress, skipping background scan.
+info	2025-03-23 22:54:56+00 mac Language Chooser[227]: ISAP: hide progress UI called
+info	2025-07-12 07:34:55+00 mac Installer[72143]: Preparing disk for local booted install.
+info	2025-12-16 08:37:46+00 mac softwareupdated[705]: -[SUPreferenceManager migratePreferencesAfterUpdate]: Skipping SplatEnabled since it's already set (1)
+info	2025-03-23 22:57:27+00 mac system_installd[531]: Installed "MAContent10_AssetPack_0537_DrummerShaker" (2.0.0.0)
+info	2025-05-09 13:53:35+00 mac Software Update[76954]: SUOSUPostLogoutInstallOperation: Skipping creating APFS snapshot since request doesn't contain adopted manual or auto update tagged with 'macOS'
+error	2025-07-12 07:34:47+00 mac Installer[72143]: Could not load resource readme: (null)
+info	2025-05-04 14:53:13+00 mac softwareupdated[500]: SUOSUServiceDaemon: BackgroundActivity: Selected product to download: <SUOSUProduct: MSU_UPDATE_24E263_patch_15.4.1_minor>
+info	srv  llama_server: model loaded
+info	2026-09-05 10:30:02+00 mac softwareupdated[504]: SUOSUServiceDaemon: BackgroundActivity: Skipping background scan - Connected client preventing background scans
+error	May  9 12:59:02 mac opendirectoryd[67]: [session] unable to find session module 'keychain'
+info	Sep 26 00:30:04 mac syslogd[574]: Configuration Notice:
+info	2025-09-29 08:25:29+00 mac softwareupdated[565]: SoftwareUpdate: Added background transaction [0x1] for Safari26.0.1SequoiaAuto-26.0.1
+info	2025-05-04 15:04:36+00 mac softwareupdated[500]: SUOSUServiceDaemon: BackgroundActivity: Background download finished with error: (null)
+error	2025-08-17 08:38:00+00 mac softwareupdated[587]: SUOSUServiceDaemon: Failed to install product keys tonight: (
+info	Sat Sep 19 00:34:55.630 [airport]/629 @[131149.340042] (configdIODriverInterface.m:1707) dq:'com.apple.main-thread'/tid[0x14fc] @[131149.189000] IPv4 TCP info: src[203.0.113.13]/port[0x1467(5223)], dst[192.0.2.56]/port[0xfc82(64642)], seq[0x0(0)], ack[0x0(0)], ws[0x0(0)], len[0x28(40)] flags[0x00], ip chk[0xbd22] tcp chk[0x0000]
+info	sched_reserve:        CPU compute buffer size =    40.01 MiB
+info	srv  llama_server: listening on http://127.0.0.1:57274
+warning	2025-07-12 07:35:01+00 mac package_script_service[72154]: ./postflight: - Using setuptools directly might be deprecated on the distribution.
+info	2025-12-16 08:30:49+00 mac softwareupdated[720]: SUOSUServiceDaemon: Client connection invalidated: SoftwareUpdateNotificationManager (type = sunm, pid = 1339, uid = 501, path = /System/Library/PrivateFrameworks/SoftwareUpdate.framework/Versions/A/Resources/SoftwareUpdateNotificationManager.app/Contents/MacOS/SoftwareUpdateNotificationManager)
+info	2025-05-09 13:59:57+00 mac systemmigrationd[474]: Preventing machine sleep.
+info	llama_context: n_ctx                 = 32768
+warning	2025-12-14 10:09:46+00 mac softwareupdated[720]: SULocalProduct: 089-71960 is not completely downloaded (1 remaining).  Package(s) <PKDistributionPackageReference CLTools_Executables> not found:
+info	Sep 26 00:06:22 mac syslogd[574]: ASL Sender Statistics
+info	May  9 12:59:32 mac opendirectoryd[67]: [default] Added a value to users in groups/<private> (ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000050)
+info	srv  update_slots: all slots are idle
+error	May  9 12:59:02 mac OSInstaller[94]: SUSoftwareUpdateController: Service connection invalidated!
+info	Sat Sep 26 00:30:08.850 [airport]/629 @[735662.268902] (airportdMain.m:1950) dq:'com.apple.airportd.server.timer.q'/tid[0x18322ef] Health check alive, checkin@[735662.268742], fault[0] crash[0] threshold[5 sec], count[628530], gRunLoop: checkin@[735662.013985] count[718885] last[735662.013985] max[32.805039] diff[0.254756], faults[0], last faulted @count[0], thresholdExceeded[0]
+info	Sep 17 12:10:07 mac opendirectoryd[72]: [default] Not creating persona profile for UUID AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA05 UID 501, feature not enabled
+info	2025-04-06 16:21:39+00 mac softwareupdated[275]: SUOSUServiceDaemon: Adding client: AboutExtension (type = external, pid = 2714, uid = 501, path = /System/Library/ExtensionKit/Extensions/AboutExtension.appex/Contents/MacOS/AboutExtension)
+info	May  9 12:59:02 mac opendirectoryd[67]: [default] Completed first connection tasks for node configuration /Local/Default with path /Volumes/Data/private/var/db/dslocal/nodes/Default
+warning	Sun Sep 20 19:21:30.954 [airport]/629 @[285144.636106] (airportProcessCommand.m:512) dq:'com.apple.airportd.server.command.q'/tid[0x8e9e80] Invalid IPv4 state dictionary for 'en0'
+info	Sun Sep 20 18:53:16.473 [airport]/629 @[283450.154678] (configdIODriverInterface.m:6818) dq:'com.apple.airportd.server.timer.q'/tid[0x8e7348] UUID:'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA09': Received kIOMessageSystemWillSleep, stopping health check timers
+warning	time=2026-09-05T10:38:55.955+00 level=INFO source=runner.go:522 msg="failure during llama-server GPU discovery" OLLAMA_LIBRARY_PATH=[/Applications/Ollama.app/Contents/Resources] extra_envs=map[] error="context canceled" detail=""
+info	2025-12-10 10:23:47+00 mac SoftwareUpdateSettingsExtension[97416]: -[SUOSUShimController _latestQualifyingMajorOSProduct]: Evaluating products to determine the latest qualifying MajorOS product
+info	2025-05-09 13:53:35+00 mac Installer Progress[76964]:        and / or NOT booting from EFI loginwindow
+info	2026-09-17 11:42:27+00 mac softwareupdated[710]: Done setting externalized local authentication context
+info	May  9 12:59:02 mac opendirectoryd[67]: [auth] <private> (FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000) is not a SecureToken user: no auth authorities
+info	2025-04-06 16:33:51+00 mac softwareupdate[3399]: Query for available updates: FINISHED
+info	Sun Sep 20 19:21:31.176 [airport]/629 @[285144.857514] (configdIODriverInterface.m:6729) dq:'com.apple.main-thread'/tid[0x14fc] UUID:'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA09': Received kIOMessageSystemHasPoweredOn, err[0] kern.wakereason['pwrbtn IOPortFeatureLDCM.measurement']
+warning	2026-03-14 09:21:25+00 mac Safari[1415]: SUAppStoreUpdateController: Service connection interrupted.
+warning	2025-05-09 13:53:19+00 mac suhelperd[515]: User stash for nil will attempt fall back.
+info	2025-03-23 22:58:11+00 mac installer[776]: PackageKit: Bundle com.apple.motion.TextFramework is nested inside upgrade-bundle or atomic-update-bundle and will not be version-checked
+info	May  9 12:59:32 mac opendirectoryd[67]: [default] Set passwd in users/<private> (AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA05)
+info	2025-04-08 13:12:40+00 mac softwareupdated[275]: Skipping adding config-data update to the journal: 082-18269
+info	srv          init: The UI is disabled
+warning	2025-07-12 07:35:01+00 mac package_script_service[72154]: ./postflight: 'build/bdist.macosx-10.9-universal2' does not exist -- can't clean it
+info	slot get_availabl: id  0 | task -1 |  - checking sim = 0.010 (3/303) > 0.100
+info	May  9 12:59:02 mac opendirectoryd[67]: [session] /Local/Default service discovery: not needed, no discovery functions
+info	llama_model_loader: loaded meta data with 35 key-value pairs and 579 tensors from /Users/me/.ollama/models/blobs/sha256-1194192cf2a187eb02722edcc3f77b11d21f537048ce04b67ccf8ba78863006a (version GGUF V3 (latest))
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] Found subnode "Default" for /Local
+error	May  9 12:59:02 mac opendirectoryd[67]: [default] Failed to open file <private> [2: No such file or directory]
+info	2026-09-20 13:08:24+00 mac system_installd[8809]: preinstall: Executing: /usr/bin/kmutil unload -p //Library/Apple/System/Library/Extensions/AppleMobileDevice.kext
+error	2025-09-05 09:29:39+00 mac package_script_service[91021]: ./postinstall: Could not find service "us.zoom.updater.delay" in domain for user gui: 501
+info	srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+warning	May  9 12:59:32 mac opendirectoryd[67]: [session] query values were invalid for 'dsAttrTypeStandard:EMailAddress'
+info	Sun Sep 20 13:17:55.925 [airport]/629 @[263329.650791] (configdIODriverInterface.m:4768) dq:'com.apple.main-thread'/tid[0x14fc] vmenet3: KEV_DL_IF_DETACHED
+info	[GIN] 2026/09/23 - 15:26:05 | 200 |         1m13s |       127.0.0.1 | POST     "/api/pull"
+error	2025-07-16 15:31:32+00 mac Installer[72143]: Disk failed to eject disk: disk5s1 (VirtualBox)
+info	2025-09-05 10:23:02+00 mac installd[1479]: PackageKit: Will do receipt-based obsoleting for package identifier us.zoom.pkg.videomeeting (prefix path=Applications)
+info	2026-09-20 13:08:24+00 mac root[45187]: End script: 00_checkrestore
+info	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: + /bin/launchctl bootout --wait gui/501/com.apple.MDCrashReportd
+warning	2025-05-17 09:52:04+00 mac SoftwareUpdateSettingsExtension[89961]: SettingsController.swift:withActiveWindow(_:):695: Failed to retrieve the active window... attempting to fall back to the first application window.
+error	2025-07-12 07:35:01+00 mac package_script_service[72154]: ./postflight: Traceback (most recent call last):
+info	2025-05-09 13:53:19+00 mac softwareupdated[500]: SUOSUServiceDaemon: Queued overrides up for postlogout: (null)
+info	[GIN] 2026/09/20 - 09:55:23 | 200 |      652.25µs |       127.0.0.1 | HEAD     "/"
+info	2025-11-06 13:27:29+00 mac root[64251]: Begin script: ReloadXPCCache
+info	2026-03-17 18:27:03+00 mac Safari[1415]: -[SUOSUSafariController _selectProductForDisplayFromProducts:]: Skipping splat update: MSU_UPDATE_25D771280a_patch_26.3.1_rsr
+info	2026-04-01 22:34:51+00 mac shove[23611]: [src=noflags] /Applications/Pages Creator Studio.app: restored flags 0x0
+info	time=2026-09-05T10:38:55.955+00 level=INFO source=routes.go:2054 msg="vram-based default context" total_vram="0 B" default_num_ctx=4096
+info	Sep 20 13:08:44 mac CoreDeviceService[45526]: (null)
+info	srv          load:  - found better prompt with f_keep = 1.000, f_sim = 0.876
+error	2026-03-18 18:28:51+00 mac softwareupdated[66668]: -[SUOSUServiceDaemon _handleBackgroundSplatApply:]_block_invoke: Stash failed: Error Domain=SUMacControllerError Code=7748 "[SUMacControllerErrorCommitStashFailed=7748] Failed to commit stash: [MobileSoftwareUpdateErrorDomain(MSU):MSU_ERR_BOOTPOLICY_FAILURE(43)_1_MobileSoftwareUpdateErrorDomain(MSU):MSU_ERR_BOOTPOLICY_FAILURE(43)_2_com.apple.bootpolicy:7]" UserInfo={NSLocalizedDescription=Failed to save user credentials for software update., SUMacControllerErrorIndicationsMask=0, NSDebugDescription=[SUMacControllerErrorCommitStashFailed=7748] Failed to commit stash: [MobileSoftwareUpdateErrorDomain(MSU):MSU_ERR_BOOTPOLICY_FAILURE(43)_1_MobileSoftwareUpdateErrorDomain(MSU):MSU_ERR_BOOTPOLICY_FAILURE(43)_2_com.apple.bootpolicy:7], NSUnderlyingError=0x8cf0229a0 {Error Domain=MobileSoftwareUpdateErrorDomain Code=43 "Failed to update BootPolicy for splat-only update" UserInfo={NSUnderlyingError=0x8cf0228b0 {Error Domain=MobileSoftwareUpdateErrorDomain Code=43 "bootpolicy_update_local_policy_for_splat_update() failed" UserInfo={NSUnderlyingError=0x8cf023a20 {Error Domain=com.apple.bootpolicy Code=7 "ACM (7)" UserInfo=0x8d03d7260 (not displayed)}, NSLocalizedDescription=bootpolicy_update_local_policy_for_splat_update() failed, target_update=25D771280a}}, NSLocalizedDescription=Failed to update BootPolicy for splat-only update, target_update=25D771280a}}}
+error	2025-05-10 12:09:50+00 mac system_installd[1005]: postinstall: Could not kickstart service "com.apple.oahd": 150: Operation not permitted while System Integrity Protection is engaged
+info	Thu Sep 17 12:10:27.734 [airport]/629 @[81.392119] (configdSCInterface.m:239) dq:'com.apple.main-thread'/tid[0x14fc] scInitInterface for device en0
+info	2025-08-19 00:40:19+00 mac SoftwareUpdateSettingsExtension[54823]: Skipping showing the SLA
+info	Mar  8 09:25:35 localhost opendirectoryd[69]: [default] Initialize trigger support
+warning	2025-08-07 01:00:31+00 mac softwareupdated[587]: SUOSULoginCredentialPolicyManager: MSU_UPDATE_24G84_patch_15.6_minor is stale - using required interval 604800.000000
+error	2025-08-22 08:39:07+00 mac nbagent[2488]: NBUpdateController: Error registering catalog: Error Domain=MSUProductManagerErrorDomain Code=50 "(null)" UserInfo={NSUnderlyingError=0xa4401b690 {Error Domain=MSUDataDownloaderErrorDomain Code=1 "(null)" UserInfo={NSUnderlyingError=0xa4401a280 {Error Domain=NSURLErrorDomain Code=-1009 "The internet connection appears to be offline." UserInfo={_kCFStreamErrorCodeKey=50, NSUnderlyingError=0xa4401ab20 {Error Domain=kCFErrorDomainCFNetwork Code=-1009 "(null)" UserInfo=0xa44221f20 (not displayed)}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA02>.<82>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+info	Sun Sep 20 19:21:30.596 [airport]/629 @[285144.278086] (configdIODriverInterface.m:2308) dq:'com.apple.main-thread'/tid[0x14fc] driver available (reason=0xe0821803, subreason=0x0, flags=0x0), node:isDriverAvailable=0
+info	Sun Sep 20 18:53:18.395 [airport]/629 @[283452.076767] (configdIODriverInterface.m:2308) dq:'com.apple.main-thread'/tid[0x14fc] driver unavailable (reason=0xe0821804, subreason=0x0, flags=0x0), node:isDriverAvailable=1
+info	srv    load_model: loading model '/Users/me/.ollama/models/blobs/sha256-1194192cf2a187eb02722edcc3f77b11d21f537048ce04b67ccf8ba78863006a'
+info	srv        update:  - cache state: 1 prompts, 3.283 MiB (limits: 8192.000 MiB, 32768 tokens, 87340 est)
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] Initialization: Found configuration for node name '/Local' at path '/System/Library/OpenDirectory/Configurations/Local.plist'
+warning	cmn  common_init_: KV cache shifting is not supported for this context, disabling KV cache shifting
+warning	2025-07-16 09:06:02+00 mac nbagent[90779]: NBStateController: Connection interrupted
+info	2026-02-15 14:10:51+00 mac SoftwareUpdateSettingsExtension[5198]: SUAppStoreUpdateController: Observing SUSoftwareUpdateDaemonStarted
+fault	2025-09-05 09:29:43+00 mac package_script_service[91021]: ./postinstall: [91119:259:09-05/09:29:43.221:FATAL:CmmCommandLine.cc(337)] Check failed: current_process_commandline_.
+info	Sun Sep 20 18:53:16.489 [airport]/629 @[283450.170928] (configdIODriverInterface.m:5887) dq:'com.apple.main-thread'/tid[0x14fc] 'en0' TCP keep-alive offload: isUsingACPower[0], AC override[0]/value[0], allowed[1], recentWakeCount[0] (monitoring_period:15 mins, limit:5)
+warning	2025-05-09 13:53:19+00 mac suhelperd[515]: IARStashAPFSIfApproprate() is not supported on Apple Silicon.
+info	2025-06-08 13:06:52+00 mac SoftwareUpdateSettingsExtension[27007]: SUOSUShimController: No OS updates, skipping power check
+info	2025-04-08 13:12:49+00 mac system_installd[538]: Installed "XProtectPayloads" (151)
+info	2025-12-10 12:09:36+00 mac mbfloagent[1355]: _MDPerfWaitForStoreState /System/Volumes/Data
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] created endpoint for mach service 'com.apple.private.opendirectoryd.rpc'
+info	May  9 12:59:02 mac opendirectoryd[67]: [session] Trigger - notified opendirectoryd:nodes;online;/Local/Default
+info	May  9 12:59:02 mac opendirectoryd[67]: [session] /Local/Default nodestate: is now online
+info	Feb 17 23:41:35 mac opendirectoryd[69]: [session] /Configure nodestate: is now online
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] Node configuration for /Local/Default has a db path on on the booted OS
+warning	2025-05-22 17:33:31+00 mac softwareupdated[670]: SUOSUServiceDaemon: Rejecting incoming connection, missing com.apple.private.softwareupdated.OSUpdate entitlement: MiniLauncher (type = untracked, pid = 1097, uid = 501, path = /System/Library/CoreServices/Setup Assistant.app/Contents/SharedSupport/MiniLauncher)
+info	Thu Sep 17 12:10:25.001 <airport[629]> configdStart: ****** [AirPort logger started] ******
+error	2026-09-14 19:29:03+00 mac SoftwareUpdateSettingsExtension[69715]: BetaUpdatesManager.swift:fetchPrograms():206: Failed to query beta programs: SDBetaManagerErrorType(rawValue: 3), {
+error	2025-04-09 15:57:25+00 mac softwareupdated[519]: SUScan: Error encountered in scan: Error Domain=NSURLErrorDomain Code=-1009 "Can’t connect to the Apple Software Update server because you are not connected to the internet." UserInfo={_kCFStreamErrorCodeKey=50, NSLocalizedRecoverySuggestion=Make sure you’re connected to the internet, and then try again., NSLocalizedDescription=Can’t connect to the Apple Software Update server because you are not connected to the internet., SUErrorRelatedCode=SUErrorCodeScanCatalogNotFound, NSErrorFailingURLStringKey=https://swscan.apple.com/content/catalogs/others/index-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz, NSErrorFailingURLKey=https://swscan.apple.com/content/catalogs/others/index-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz, _kCFStreamErrorDomainKey=1}
+info	2026-09-20 13:08:40+00 mac system_installd[8809]: postinstall: + /usr/bin/killall -HUP kextd
+info	Thu Sep 17 12:10:27.815 [airport]/629 @[81.472755] (airportdPreferences.m:1473) dq:'com.apple.wifi.power'/tid[0x1800] SCDynamicStore save, @[81.453915] took 0.018823, aquired took 0.000664, unlock took 0.000242, SC commit/apply took 0.000000
+warning	time=2026-07-22T22:21:55.730+00 level=WARN source=model_recommendations.go:170 msg="model recommendations refresh failed" error="Get \"https://ollama.com/api/experimental/model-recommendations\": context deadline exceeded"
+info	[GIN] 2026/09/20 - 12:30:28 | 404 |     582.666µs |       127.0.0.1 | POST     "/api/show"
+info	2025-04-06 16:50:43+00 mac softwareupdated[275]: SUOSUServiceDaemon: Untracked client connected: loginwindow (type = untracked, pid = 1032, uid = 501, path = /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow)
+info	2025-04-06 16:25:17+00 mac shove[2937]: /Applications/Slack.app: restored [xattr=com.apple.appstore.metadata] with value size 1762
+info	slot print_timing: id  0 | task 500 | n_gen =    121, tg =  39.79 t/s, tg_3s =  40.12 t/s
+warning	2025-07-16 11:03:26+00 mac loginwindow[924]: SUOSUUpdateController: Service connection interrupted w/ scheduler!
+info	print_info: file size   = 17.28 GiB (4.86 BPW)
+info	2026-02-17 23:42:15+00 mac softwareupdated[719]: SoftwareUpdate: Fire periodic check after upgrade to 26.3 (25D125)
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [default] Loaded bundle at path '/System/Library/OpenDirectory/Modules/PlistFile.bundle'
+info	2025-11-06 13:27:29+00 mac root[64244]: End script: cleanupCryptex.sh
+error	2026-03-01 00:09:44+00 mac Safari[7137]: SUAppStoreUpdateController: Error -10819 registering file:///Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/ with LS
+info	2025-06-08 13:06:52+00 mac SoftwareUpdateSettingsExtension[27007]: InstallNowButton.swift:body:29: Clicked to install available updates: [[ ["[Command Line Tools for Xcode - 16.4; 082-41241]"] ]
+error	May  9 12:59:38 mac safecp[275]: safecp: failed to copy /Volumes/Data/Previous System/private/var/cron/tabs/* to /System/Volumes/macOS/private/var/at/tabs/*.
+warning	llama_context: n_ctx_seq (32768) < n_ctx_train (262144) -- the full capacity of the model will not be utilized
+warning	2026-04-01 22:34:16+00 mac installd[67516]: PackageKit: Bundle com.apple.Keynote is nested in an App Store package with an undefined (or) update overwrite type. Atomic swap of bundle will proceed, this may produce an invalid app bundle!
+warning	2026-03-14 09:21:25+00 mac Safari[1415]: SUOSUShimController: Connection interrupted with softwareupdated
+error	2025-05-09 13:53:35+00 mac Software Update[76954]: BridgeOSSoftwareUpdateController: Error retrieving updateState: Error Domain=BridgeOSSoftwareUpdateError Code=5 "[/AppleInternal/Library/BuildRoots/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA01/Library/Caches/com.apple.xbs/Sources/BridgeOSSoftwareUpdateController/bridgeOSUpdateProxy/BridgeOSUpdateBridgeIPCClient.m:148][-[BridgeOSUpdateBridgeIPCClient connectToRemoteDevice]] can't find device with type: 3" UserInfo={NSLocalizedDescription=[/AppleInternal/Library/BuildRoots/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA01/Library/Caches/com.apple.xbs/Sources/BridgeOSSoftwareUpdateController/bridgeOSUpdateProxy/BridgeOSUpdateBridgeIPCClient.m:148][-[BridgeOSUpdateBridgeIPCClient connectToRemoteDevice]] can't find device with type: 3}
+info	2026-08-27 15:33:03+00 mac SoftwareUpdateSettingsExtension[11987]: Hostname is (null)
+warning	Thu Sep 24 18:43:02.290 [airport]/629 @[628435.783466] (airportdMain.m:1981) dq:'com.apple.airportd.server.timer.q'/tid[0x14ee2ff] gRunLoop Health check NOT alive, now[628435.783440] checkin@[628430.448325] count[611759] last[628430.448325] max[32.805039] diff[5.335114], faults[0], last faulted @count[0], thresholdExceeded[1] - EXCEEDED threshold[5.000000]
+info	cmn  common_param:   - MTL0    : Apple M4 Max (38338 MiB, 38338 MiB free)
+info	2025-12-10 10:23:47+00 mac SoftwareUpdateSettingsExtension[97416]: -[SUOSUShimController _registerForScanCompletionNotification:outToken:]_block_invoke: Skipping refresh of updates on behalf of com.apple.softwareupdate.ClientInitiatedScanSucceeded notification as the notification was posted locally.
+info	sched_reserve: graph splits = 2
+info	2025-05-22 17:40:22+00 mac installd[1774]: PackageKit: Translated 10 binaries.
+info	2025-08-07 14:05:33+00 mac softwareupdated[587]: SUOSUServiceDaemon: Cancelling existing scheduled app close notification.
+info	Fri Sep 18 18:55:59.876 [airport]/629 @[110813.580237] (CWXPCSubsystem.m:5305) dq:'com.apple.wifi.power'/tid[0x2f9689] setWiFiPowerState: @[110813.364144], state[0], issuing Apple80211SetPower
+info	2025-04-06 16:33:56+00 mac softwareupdated[275]: PackageKit: Registered a global authorization to daemon, the daemon will be unable to idle exit.
+info	2025-05-17 09:52:06+00 mac SoftwareUpdateSettingsExtension[89961]: SheetCoordinator.swift:dismissSheet(_:):71: Dismissing sheet: type: License Agreement Sheet id: AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA04 nestedSheets: []
+info	2025-04-08 13:12:46+00 mac softwareupdated[275]: SUOSUServiceDaemon: DO MSU BACKGROUND ACTIONS!
+info	spec common_specu: no implementations specified for speculative decoding
+info	2025-04-06 16:34:23+00 mac system_installd[538]: PackageKit: Extracting file:///Library/Updates/082-12052/CLTools_macOSNMOS_SDK.pkg (destination=/Library/Apple/System/Library/InstallerSandboxes/.PKInstallSandboxManager-SystemSoftware/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA07.activeSandbox/Root, uid=0)
+info	2025-05-17 09:52:04+00 mac SoftwareUpdateSettingsExtension[89961]: Products require post-install action, skipping closing must-quit apps
+error	2025-03-23 22:55:00+00 mac Installer Progress[53]: IASGetCurrentInstallPhaseList: Unable to get phases
+info	time=2026-09-19T23:17:04.179+00 level=INFO source=sched.go:1147 msg="disabling mmap for llama-server load by default" model=/Users/me/.ollama/models/blobs/sha256-1194192cf2a187eb02722edcc3f77b11d21f537048ce04b67ccf8ba78863006a reason=metal_partial_offload
+info	slot create_check: id  0 | task 487 | erasing context checkpoint too close to an earlier one (pos_min = 372, pos_max = 372, n_tokens = 373, size = 50.251 MiB)
+info	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: + /bin/launchctl bootout gui/501/com.apple.mobiledeviceupdater
+error	2025-07-12 07:35:01+00 mac package_script_service[72154]: ./postflight: KeyError: 'install'
+warning	Sat Sep 26 00:37:10.126 [airport]/629 @[736083.545164] (airportProcessCommand.m:469) dq:'com.apple.airportd.server.command.q'/tid[0x1842435] No valid components format from SCDynamicStore: serviceKey:'State:/Network/Global/IPv4'
+info	2025-05-09 13:53:35+00 mac suhelperd[515]: Added Phase: Template Migration withProgress: 10
+error	2026-09-05 10:26:24+00 mac Software Update[11775]: SUOSUPostLogoutInstallOperation: Failed to configure operation
+info	srv          stop: cancel task, id_task = 164
+info	Fri Sep 25 08:33:34.198 Usb Host Notification metrics: usbChange=1, count=1, noiseDelta=-95
+warning	srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+info	2025-12-10 12:09:33+00 mac Setup Assistant[1334]: ISAP: Show progress UI called
+info	2025-08-19 00:40:32+00 mac SoftwareUpdateSettingsExtension[54823]: SUOSUShimController: countdownCompletionHandler(error=(null)), restart countdown is done.
+info	Dec 10 12:08:02 localhost opendirectoryd[69]: [session] Registered subnode with name '/Local/Default'
+warning	cmn  common_conte: the context does not support partial sequence removal
+info	2025-03-23 22:56:50+00 mac system_installd[531]: PackageKit: suspending backupd
+info	llama_context: flash_attn            = auto
+error	2025-03-23 22:56:51+00 mac shove[536]: [src=restricted,nounlink] /: unable to restore flags 0x80000 (error 30)
+error	May  9 12:59:01 mac mobileassetd[124]: SUPreferenceManager: Failed to get object of required class: NSNumber for key: AutomaticDownload with object class: (null) with error: Error Domain=SUPreferenceManagerErrorDomain Code=4 "(null)" UserInfo={NSUnderlyingError=0x6000021a7840 {Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.softwareupdated was invalidated: failed at lookup with error 3 - No such process." UserInfo={NSDebugDescription=The connection to service named com.apple.softwareupdated was invalidated: failed at lookup with error 3 - No such process.}}}
+info	Sat Sep 26 00:37:10.125 [airport]/629 @[736083.544055] (airportProcessCommand.m:461) dq:'com.apple.airportd.server.command.q'/tid[0x1842435] State:/Network/Global/IPv4
+error	2026-01-17 16:30:06+00 mac Safari[95525]: SUPreferenceManager: Failed to set object of class: __NSCFConstantString for key: LastRecommendedMajorOSBundleIdentifier with error: Error Domain=SUPreferenceManagerErrorDomain Code=1 "(null)"
+error	Fri Sep 25 08:33:34.165 Usb Host Notification Error Apple80211Set: Parameter error seqNum 1398 Total 1 chg 1 awdl0
+error	2026-09-20 13:08:42+00 mac system_installd[8809]: postinstall: Boot-out failed: 150: Operation not permitted while System Integrity Protection is engaged
+warning	time=2026-09-23T15:27:27.535+00 level=INFO source=sched.go:551 msg="llama-server model predicted to exceed available memory, evicting" predicted="6.2 GiB" predicted_num_ctx=8192 num_batch=512 available="5.9 GiB" gpu_free="13.8 GiB" system_free="5.9 GiB" system_limited=true
+info	2025-04-06 16:33:51+00 mac softwareupdate[3399]: SUOSUShimController: Start MSU scan
+info	Sat Sep 26 05:16:43.240 [airport]/629 @[752856.651811] (airportProcessCommand.m:508) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] IPV4 State change for en0
+info	2026-02-15 20:51:22+00 mac softwareupdated[548]: SUOSUBackgroundDownloadEvaluator: 25D125 is enabled for auto-install-tonight.
+info	Thu Sep 17 12:10:27.761 [airport]/629 @[81.419081] (configdIODriverInterface.m:4139) dq:'com.apple.main-thread'/tid[0x14fc] AirPort Interface <en0> <14>, added to device node list, interfaceFound[1] function['interfaceAdded']/4482
+error	Fri Sep 25 08:33:34.164 Usb Host Notification Error Apple80211Set: Unknown error seqNum 1397 Total 1 chg 1 nan0
+info	print_info: n_layer               = 48
+warning	2026-05-03 11:05:22+00 mac SoftwareUpdateSettingsExtension[5365]: SUOSUShimController: Last scan failed, should re-scan
+info	Sat Sep 26 05:16:43.241 [airport]/629 @[752856.652562] (airportProcessCommand.m:542) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] IP subnet mask: 255.255.255.0
+info	Sun Sep 20 19:21:31.187 [airport]/629 @[285144.868552] (configdIODriverInterface.m:5474) dq:'com.apple.main-thread'/tid[0x14fc] System woken[0] confirmed[0], up by WiFi(en0), NOT due to TCPKA timeout 0 times since '(null)', (monitoring_period:15 mins, limit:5), tag['__IOPMSystemPowerCallback'] tagid[0x0000000000001a55] type[0x00000000/0], wakeCounterTimeout[75] lastWakeCounter[78]
+info	Sat Sep 26 05:16:43.241 [airport]/629 @[752856.652369] (airportProcessCommand.m:520) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] IP Address: 192.0.2.56
+info	Thu Sep 17 12:10:25.311 [airport]/629 @[78.965264] (CWXPCSubsystem.m:10007) dq:'xpc-subsystem.internal'/tid[0x1800] AutoJoin ENABLED (assert=no, activity=no, join=no, until=(null), prev=DISABLED)
+info	2025-04-06 16:34:01+00 mac softwareupdated[275]: 082-12052: Starting download of CLTools_Executables.pkg (Size:715728331, HasIntegrityInformation:NO) with URL https://swcdn.apple.com/content/downloads/10/32/082-12052-A_AHPGDY76PT/1a419zaf3vh8o9t3c0usblyr8eystpnsh5/CLTools_Executables.pkg
+info	    ASL Module "com.apple.install" claims selected messages.
+warning	May  9 12:59:02 mac opendirectoryd[67]: [session] caller is using legacy node name of '/Local/Target', should use '/Local/Default' instead
+info	Sat Sep 26 05:16:43.241 [airport]/629 @[752856.652686] (airportProcessCommand.m:552) dq:'com.apple.airportd.server.command.q'/tid[0x18c305e] Default Gateway IP Address: 192.0.2.1
+info	2026-03-24 18:30:48+00 mac Safari[1415]: -[SUOSUSafariController _selectProductForDisplayFromProducts:]: Skipping non-recommended update: MSU_UPDATE_25E246_patch_26.4_minor
+info	2025-04-08 13:12:39+00 mac system_installd[538]: PackageKit: Executing script "preinstall" in /Library/Apple/System/Library/InstallerSandboxes/.PKInstallSandboxManager-SystemSoftware/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAA06.activeSandbox/OpenPath.sbJQGY/Scripts/com.apple.pkg.XProtectPlistConfigData_10_15.16U4363.T67ft1
+info	2025-04-06 16:35:06+00 mac softwareupdated[275]: Checking for inapplicable local products remaining on disk for cleanup
+info	Sat Sep 26 00:37:01.901 [airport]/629 @[736075.319662] (airportProcessCommand.m:1854) dq:'com.apple.airportd.server.command.q'/tid[0x1841aa8] Processed events, count[  2], @[736075.319612], took 0.000042
+warning	2025-11-26 04:44:54+00 mac installd[1948]: PackageKit: Cannot obsolete expected directory (/Applications/zoom.us.app/Contents/Frameworks/zChatUIEx.bundle/Contents/Frameworks/PTUIBridge.framework/Versions/A/_CodeSignature), because opening the parent directory failed. No such file or directory
+info	2025-03-23 22:54:56+00 mac Language Chooser[227]: SCNetworkSetEstablishDefaultConfiguration returned 0 error Success!
+info	Thu Sep 17 17:22:26.765 [airport]/629 @[18800.387427] (airportProcessCommand.m:1841) dq:'com.apple.airportd.server.command.q'/tid[0xa5d90] airportdProcessSystemConfigurationEvent - Autojoining on interface: en0
+info	2025-04-06 08:01:10+00 mac softwareupdated[275]: SUOSUMobileSoftwareUpdateController: Set bridgeOS catalog override to catalogURL default
+info	2025-07-12 07:34:55+00 mac Installer[72143]: -[IFDInstallController(Private) _buildInstallPlanReturningError:]: file://localhost/Volumes/VirtualBox/VirtualBox.pkg#VirtualBox.pkg
+info	2025-03-23 22:57:49+00 mac installd[764]: PackageKit: Adding client PKInstallDaemonClient pid=763, uid=0 (/usr/sbin/installer)
+error	2025-08-07 17:59:22+00 mac softwareupdated[587]: SUOSUMobileSoftwareUpdateController: Download finished: Error Domain=SUMacControllerError Code=7507 "[SUMacControllerErrorAccessRequestDenied=7507] Context (softwareupdated) already has control, but priority downgrades are not allowed (current:ClientInitiated requesting:Background)" UserInfo={NSDebugDescription=[SUMacControllerErrorAccessRequestDenied=7507] Context (softwareupdated) already has control, but priority downgrades are not allowed (current:ClientInitiated requesting:Background), NSLocalizedDescription=The software update request for this process was denied as another process is currently performing an operation. Please try again later.}
+info	May  9 12:59:37 mac opendirectoryd[67]: [default] Set generateduid in config/<private> (00000000-0000-0000-0000-000000000000)
+warning	time=2026-09-05T10:38:55.955+00 level=WARN source=runner.go:584 msg="llama-server GPU discovery watchdog timed out" OLLAMA_LIBRARY_PATH=[/Applications/Ollama.app/Contents/Resources] extra_envs=map[] error="context canceled"
+info	time=2026-09-05T10:38:58.221+00 level=INFO source=images.go:957 msg="total blobs: 14"
+info	llama_context: constructing llama_context
+info	time=2026-09-05T10:38:58.226+00 level=INFO source=model_list_cache.go:112 msg="model list cache hydration complete" models=3 failures=0 elapsed=2.264209ms
+info	Sun Sep 20 13:17:55.925 [airport]/629 @[263329.650932] (configdIODriverInterface.m:4544) dq:'com.apple.main-thread'/tid[0x14fc] vmenet3 Removing, eventClass[0x00000002] eventType[0x0000000b], function:'_dlilEventCallback'/4769
+info	slot   operator(): id  0 | task 0 | cached n_tokens = 0, memory_seq_rm [0, end)
+info	2025-06-05 22:01:21+00 mac softwareupdated[670]: BackgroundActions: 1 user-visible product(s): 082-41241
+info	common_fit_params: successfully fit params to free device memory
+info	May  9 12:59:02 mac opendirectoryd[67]: [session] found via filename '/Volumes/Data/private/var/db/dslocal/nodes/Default/users/root.plist'
+info	Feb 17 23:41:35 mac opendirectoryd[69]: [session] ODNodeRelease completed
+info	2025-05-17 09:51:58+00 mac SoftwareUpdateSettingsExtension[89961]: SUOSUShimController: Refreshed available updates; new updates: [MSU_UPDATE_24F74_patch_15.5_minor]; new major updates: [082-44432, 082-33200, 082-16524, 082-01336, 072-70706, 072-08251]
+warning	2026-02-15 14:11:07+00 mac SoftwareUpdateSettingsExtension[5198]: SettingsController.swift:connectionInterrupted(forClient:):1063: Connection interrupted
+error	2025-04-06 07:59:54+00 mac Language Chooser[250]: Error clearing paired BT accessories cookie: Error Domain=NSCocoaErrorDomain Code=4 "“.DeletePairedBluetoothAccessories” couldn’t be removed." UserInfo={NSUserStringVariant=(
+info	2026-03-28 08:27:50+00 mac installd[75863]: oahd translated /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/appletvsimulator/libswiftAVFoundation.dylib
+info	2025-09-05 09:29:55+00 mac installd[1479]: oahd translated /Applications/zoom.us.app/Contents/Frameworks/libswiftsimd.dylib
+info	srv         start: binding port with default address family
+warning	2025-05-22 17:33:31+00 mac suhelperd[681]: suhelperd failed to authorize 1097.
+info	2025-11-06 13:27:30+00 mac root[64258]: End script: ReloadXPCCache
+info	resolve_fused_ops: Flash Attention enabled
+info	2025-05-09 13:53:35+00 mac suhelperd[515]: Added Phase: Software Update Post Logout withProgress: 22

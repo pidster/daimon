@@ -178,7 +178,7 @@ public enum TrainingSplit {
 
     /// Examples grouped so that near-identical ones share a group: the same family, or a near match with
     /// any member, joined transitively. Keyed by the group's first family.
-    static func clusters(_ examples: [Example], nearAt: Double = 0.8) -> [String: [Example]] {
+    public static func clusters(_ examples: [Example], nearAt: Double = 0.8) -> [String: [Example]] {
         var parent = Array(examples.indices)
         func root(_ index: Int) -> Int {
             var index = index

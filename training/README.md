@@ -22,14 +22,25 @@ share an example exactly, after normalising, by family, or by near match. No ove
 
 | Task | train | dev | test | Labels |
 | --- | --- | --- | --- | --- |
-| `risk` | 986 | 123 | to come, from this Mac's own commands | safe, moderate, dangerous |
+| `risk` | 986 | 123 | 996 (627 safe, 344 moderate, 25 dangerous) | safe, moderate, dangerous |
 | `secrets` | 527 | 93 | to come | secret, personal, none |
-| `failures` | 542 | 96 | to come, from real build and test output | error, test-failure, warning, crash, none |
-| `log-severity` | 451 | 80 | to come, from this Mac's logs | fault, error, warning, info |
+| `failures` | 542 | 96 | 400 (169 none, 71 test-failure, 59 error, 51 warning, 50 crash) | error, test-failure, warning, crash, none |
+| `log-severity` | 451 | 80 | 381 (275 info, 64 error, 41 warning, 1 fault) | fault, error, warning, info |
 
 The risk dev set is the 123 commands the evals measure (`RiskEvalSet` reads it). It has been used to
-choose, so its scores are not test scores; the risk test set will come from commands actually run here,
-labelled by a person and never trained on (`--from-audit` must leave it out).
+choose, so its scores are not test scores.
+
+The test sets are real data: commands a developer ran through Claude Code and wisp, output of real
+builds and test runs, and a Mac's own logs. Each was labelled by an agent that had not seen the training
+data, reviewed adversarially by another (`reviews/*-test.md`, and `reviews/checks.md` for the overlap
+checks), corrected, and, for risk, had its 29 uncertain labels decided by a person. They were
+neutralised for publication (names of the user, machines, networks, and projects replaced; paths,
+session ids, time zones, and credentials removed) and checked with `wisp scan --personal` and a search
+for every replaced value. The risk test set's original wording stays on the Mac it came from, in
+`~/.wisp/classifiers/risk/held-out.tsv`, so `wisp classifier train --from-audit` there never learns it.
+
+What they cannot yet measure: risk has 25 dangerous commands, so no dangerous command rated safe bounds
+that rate only below about 12%; log severity has one fault. Both need more real cases.
 
 ## How they were made
 

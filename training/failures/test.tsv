@@ -1,0 +1,406 @@
+# The failure-kind classifier's TEST set: frozen, for reporting only.
+# Source: real output of throwaway projects built and tested on a Mac (swift build and test, cargo,
+# python3, node and tsc, ruby, clang and make with sanitizers, shell signals), 2026-09. Labelled by an
+# agent that had not written the training data, by labels.md; reviewed adversarially. Paths neutralised
+# to /Users/me/src/demo. Apart from train and dev by family; at most two examples per family.
+# Missing rather than invented: pytest, go, Java, Docker, and xcodebuild output.
+none	[28 / 43] Store
+none	ok
+test-failure	  ✖ throws on empty (0.09475ms)
+test-failure	FFFFFF
+warning	(node:92306) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 x listeners added to [EventEmitter]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+none	stack backtrace:
+none	  |     ^^^^^ use of unresolved module or unlinked crate `serde`
+error	SyntaxError: expected ':'
+crash	Store/Store.swift:3: Precondition failed: negative count
+none	test_known_bug (__main__.CartTests.test_known_bug) ... expected failure
+test-failure	ERROR: test_error_in_test (test_cart.CartTests.test_error_in_test)
+test-failure	test_error_in_test (__main__.CartTests.test_error_in_test) ... ERROR
+crash	bash: line 1: 89241 Killed: 9               python3 -c "import os; os.kill(os.getpid(), 9)"
+warning	Ignoring eventmachine-1.2.7 because its extensions are not built. Try: gem pristine eventmachine --version 1.2.7
+none	  Visit https://aka.ms/ts6 for migration information.
+none	  File "broken.py", line 2
+none	  File "/Users/me/src/demo/py/indent.py", line 2
+warning	conv.c:10:40: warning: non-void function does not return a value in all control paths [-Wreturn-type]
+error	error: could not compile `rsbin` (bin "rsbin") due to 4 previous errors
+error	error: could not compile `rsclippy` (bin "rsclippy") due to 4 previous errors
+none	  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+none	hint: See PEP 668 for the detailed specification.
+none	   | `- warning: 'oldThing()' is deprecated: use newThing [#DeprecatedDeclaration]
+error	/Users/me/src/demo/swwarn/Sources/W/main.swift:18:9: error: ambiguous use of 'init(cString:)'
+warning	/Users/me/src/demo/swerr/Sources/Demo/main.swift:9:1: warning: 'oldThing()' is deprecated: use newThing [#DeprecatedDeclaration]
+none	Some errors have detailed explanations: E0308, E0425, E0432, E0560.
+error	nomethod.rb:5: syntax error, unexpected end-of-input, expecting end
+error	syntax.rb:3: syntax error, unexpected end, expecting end-of-input
+none	> nodedemo@1.0.0 build
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/XCTestTests.swift:10: error: -[CalcTests.LegacyTests testThrows] : XCTAssertThrowsError failed: did not throw an error
+none	WRITE of size 4 at 0x602000000980 thread T0
+none	note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/MoreTests.swift:5: error: -[CalcTests.MoreXCTests testUnwrap] : XCTUnwrap failed: expected non-nil value of type "Int"
+none	  ﹣ network (0.029292ms) # SKIP
+none	clang -Wall -Wextra -g -Werror -Wshadow -o store-strict store.c unusedflag.c
+crash	bash: line 1: 89228 Segmentation fault: 11  ./store segv
+test-failure	FAILED (failures=5, errors=1, skipped=1, expected failures=1)
+crash	ModuleNotFoundError: No module named 'numpyy'
+none	  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+none	  [Previous line repeated 46 more times]
+none	    assert rows, "no rows loaded"
+none	test at test/cart.test.js:6:3
+warning	warning: `rsbin` (bin "rsbin") generated 5 warnings (run `cargo fix --bin "rsbin" -p rsbin` to apply 2 suggestions)
+none	let x = ;
+none	  |                                                ^^^^ `Config` does not have this field
+error	npm error A complete log of this run can be found in: /Users/me/.npm/_logs/2026-09-26T12_55_48_458Z-debug-0.log
+warning	/Users/me/src/demo/py/w.py:2: SyntaxWarning: "\d" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\d"? A raw string is also an option.
+crash	-e:1:in `fetch': key not found: :port (KeyError)
+none	   |       `- note: explicitly cast to 'Any' with 'as Any' to silence this warning
+warning	warning: useless use of `vec!`
+none	   Compiling rsbin v0.1.0 (/Users/me/src/demo/rsbin)
+none	   4: rsbin::main
+none	ℹ cancelled 0
+none	↳   a → [1]
+none	Build complete! (1.39 secs)
+none	Build complete! (4.08 secs)
+none	  3) Error:
+none	During handling of the above exception, another exception occurred:
+none	✔ handles error responses (0.057916ms)
+error	Makefile2:6: missing.mk: No such file or directory
+crash	order.rb:3:in `first_name': undefined method `name' for nil:NilClass (NoMethodError)
+error	error: fatalError
+error	src/cart.ts(4,39): error TS2339: Property 'cost' does not exist on type 'Item'.
+test-failure	  ✖ sums with tax (0.449834ms)
+none	   |                                          |- error: use of 'add' refers to instance method rather than global function 'add' in module 'Calc'
+none	    at f ([eval]:1:21)
+none	    test_calc.rb:6:in `fetch'
+test-failure	test tests::should_panic_but_doesnt - should panic ... FAILED
+crash	attempt to divide by zero
+warning	(node:87777) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+test-failure	CalcTest#test_sub [test_calc.rb:4]:
+warning	warn.rb:3: warning: possibly useless use of a variable in void context
+warning	conv.c:5:79: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+none	  code: 'ERR_MODULE_NOT_FOUND'
+error	src/cart.ts(9,25): error TS2307: Cannot find module './nothere.js' or its corresponding type declarations.
+none	  = note: `#[deny(clippy::eq_op)]` on by default
+warning	warning: use of deprecated function `load_v1`: use load_v2
+test-failure	✘ Test addsLargeNumbers() failed after 0.001 seconds with 1 issue.
+none	  p = re.compile("\d+")
+error	error: Build failed
+none	[eval]:1
+crash	internal error: entered unreachable code: state machine in state 7
+none	   |      `- warning: 'is' test is always true
+warning	warning: length comparison to zero
+crash	Swift/NativeDictionary.swift:823: Fatal error: Duplicate values for key: 'a'
+error	make: *** nosuchdir: No such file or directory.  Stop.
+test-failure	AssertionError: unexpectedly None
+none	----- Native stack trace -----
+none	ℹ duration_ms 104.136792
+none	    raise JSONDecodeError("Expecting value", s, err.value) from None
+none	  ✔ sums prices (0.321584ms)
+warning	test_warns (__main__.CartTests.test_warns) ... /Users/me/src/demo/py/test_cart.py:20: FutureWarning: float prices will be rounded
+crash	==88903==ABORTING
+test-failure	AssertionError: 'pear' not found in ['apple', 'plum']
+test-failure	  - LibTests (Swift Testing)
+warning	warning: /Users/me/src/demo/swwarn/Sources/W/main.swift:11:5 expression following 'return' is treated as an argument of the 'return'
+none	+ [('a', 2), ('b', 3)]
+none	  = help: if you wanted to use a crate named `serde`, use `cargo add serde` to add it to your `Cargo.toml`
+error	parse.c:13:26: error: expression is not assignable
+crash	/System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/lib/ruby/2.6.0/rubygems/core_ext/kernel_require.rb:54:in `require': cannot load such file -- nokogiri_missing (LoadError)
+none	  = note: `#[warn(clippy::len_zero)]` on by default
+none	  |                            expected `u32` because of return type
+none	   |                  `- error: cannot convert value of type 'String' to specified type 'Int'
+none	 1: 0x105cb28bc node::(anonymous namespace)::DefaultAbortHandler(char const*, char const*) [/opt/homebrew/Cellar/node/26.10.0_1/lib/libnode.147.dylib]
+warning	/Users/me/src/demo/py/w.py:7: RuntimeWarning: retrying connection
+none	test_remote (__main__.CartTests.test_remote) ... skipped 'needs network'
+none	3 | pub fn port(c: &Config) -> u32 { c.port.into() }
+none	<anonymous_script>:1
+warning	/Users/me/src/demo/py/w.py:8: PendingDeprecationWarning: pickle protocol 2 is pending removal
+none	  warnings.warn("pickle protocol 2 is pending removal", PendingDeprecationWarning)
+crash	attempt to add with overflow
+test-failure	✘ Test run with 2 tests in 0 suites failed after 0.001 seconds with 2 issues (including 1 known issue).
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/XCTestTests.swift:7: error: -[CalcTests.LegacyTests testParseNil] : XCTAssertNil failed: "42"
+test-failure	  - CalcTests (XCTest)
+crash	-e:1:in `read': No such file or directory @ rb_sysopen - /nonexistent/app.yml (Errno::ENOENT)
+none	✔ Test addsSmallNumbers() passed after 0.001 seconds.
+none	[32 / 55] Calc
+test-failure	CalcTest#test_nil [test_calc.rb:5]:
+error	npm error Missing script: "nosuch"
+error	make: *** [strict] Error 1
+crash	Error: upstream returned 502
+test-failure	AssertionError: 3 not greater than 7
+test-failure	✘ Test requireFails() recorded an issue at MoreTests.swift:9:61: Expectation failed: a.first(where: { $0 > 5 })
+warning	/Users/me/src/demo/py/inventory.py:9: UserWarning: prices are cached for 60s
+none	clang -o helper helper.c
+crash	-e:1: [BUG] Segmentation fault at 0x0000000000000000
+none	test tests::port_parses ... ok
+crash	-e:1:in `f': stack level too deep (SystemStackError)
+test-failure	✘ Test addsLargeNumbers() recorded an issue at SwiftTestingTests.swift:6:37: Expectation failed: add(200, 300) == 500
+error	syntax.rb:2: syntax error, unexpected tIDENTIFIER, expecting ')'
+none	For more information about an error, try `rustc --explain E0308`.
+none	-2147483648
+none	  Binary file "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Python", at _Py_DumpStack+0x44 [0x101a7ae5c]
+none	    at JSON.parse (<anonymous>)
+none	Note: Some test targets reported failures:
+none	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/cdefs.h:227:48: note: expanded from macro '__deprecated_msg'
+none	Ran 10 tests in 0.001s
+crash	failed to read settings: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+crash	not yet implemented
+crash	z/z.swift:4: Assertion failed: expected at least five arguments
+error	error: /Users/me/src/demo/swmod/Sources/App/main.swift:1:8 unable to resolve module dependency: 'Alamofire'
+test-failure	AssertionError: KeyError not raised
+test-failure	test tests::mean_is_wrong ... FAILED
+test-failure	  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+test-failure	  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+crash	Could not cast value of type 'Swift.String' (0x1efb6c910) to 'Swift.Int' (0x1efb6f2e8).
+none	conv.c:5:26: note: initialize the variable 'v2' to silence this warning
+none	test tests::error_handling_ok ... ok
+none	    4 | int main() { std::vector<Point> ps; ps.push_back("a"); std::string s = 5.0; auto q = ps[0].y; }
+error	src/cart.ts(3,9): error TS6133: 'unused' is declared but its value is never read.
+crash	tool/main.swift:6: Fatal error: configuration missing
+none	✔ Test homeKey() passed after 0.001 seconds.
+none	    4 |     int n = 0, unused;
+error	parse.c:14:12: error: call to undeclared function 'undefined_total'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+crash	make: *** [test] Segmentation fault: 11
+error	tmpl.cpp:4:40: error: no matching member function for call to 'push_back'
+crash	TypeError: unsupported operand type(s) for +: 'int' and 'str'
+error	The operation couldn’t be completed. Unable to locate a Java Runtime.
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/MoreTests.swift:6: error: -[CalcTests.MoreXCTests testGreater] : XCTAssertGreaterThan failed: ("1") is not greater than ("2")
+none	./store segv
+none	.
+none	=================================================================
+warning	conv.c:5:61: warning: implicit conversion loses integer precision: 'long' to 'int' [-Wshorten-64-to-32]
+none	━ Test knownIssue() recorded a known issue at MoreTests.swift:10:44: Expectation failed: Bool(false)
+none	      _main in helper-8021ca.o
+crash	ReferenceError: totalCount is not defined
+test-failure	  ✖ deep equal (0.539333ms)
+warning	/Users/me/src/demo/swwarn/Sources/W/main.swift:8:5: warning: result of call to 'compute()' is unused [#NoUsage]
+crash	SUMMARY: AddressSanitizer: heap-buffer-overflow store.c:10 in main
+warning	warning: `rsclippy` (bin "rsclippy") generated 2 warnings
+none	  |                            ---   ^^^^^^ expected `u32`, found `u16`
+none	             at ./src/main.rs:6:41
+none	clang -Wall -Wextra -g -o parse parse.c
+none	↳   "12x" → ()
+error	error[E0432]: unresolved import `serde`
+error	error: SwiftCompile normal arm64 /Users/me/src/demo/swerr/Sources/Demo/main.swift failed with a nonzero exit code. Command line:     cd /Users/me/src/demo
+error	error: SwiftDriver App normal arm64 com.apple.xcode.tools.swift.compiler failed with a nonzero exit code. Command line:     cd /Users/me/src/demo
+none	---- tests::should_panic_but_doesnt stdout ----
+test-failure	Expected [1, 2] to include 3.
+test-failure	FAIL: test_sub (__main__.RateTests.test_sub) (n=2)
+none	  File "/Users/me/src/demo/py/loader.py", line 4, in read
+none	╰─> To install Python packages system-wide, try brew install
+test-failure	Expected /ok/ to match "failed".
+test-failure	FAIL: test_contains (test_cart.CartTests.test_contains)
+test-failure	test_contains (__main__.CartTests.test_contains) ... FAIL
+none	Shadow byte legend (one shadow byte represents 8 application bytes):
+none	    code: 'ERR_ASSERTION',
+test-failure	✖ cart (2.368917ms)
+error	nomethod.rb:2: syntax error, unexpected '='
+none	Failed frontend command:
+error	make: *** No rule to make target `missing.mk'.  Stop.
+test-failure	AssertionError: False is not true : total should be positive
+none	     ... 10908 levels...
+test-failure	AssertionError: 5 != 6
+crash	Assertion failed: (v.size() == 3 && "expected three shards"), function main, file cfg.cpp, line 9.
+none	ℹ fail 0
+test-failure	ℹ fail 4
+test-failure	✖ async reject (0.067708ms)
+none	file:///Users/me/src/demo/nodedemo/typeerr.js:2
+test-failure	ArgumentError expected but nothing was raised.
+warning	Makefile2:3: warning: ignoring old commands for target `a'
+none	    will permanently disable this error.
+warning	(node:92304) ResourceWarning: pool size is below recommended minimum
+error	IndentationError: expected an indented block after function definition on line 1
+none	    ^^^^^^
+error	<stdin>:3:46: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'
+none	[#VariableNeverMutated]: <https://docs.swift.org/compiler/documentation/diagnostics/variable-never-mutated>
+crash	-e:1:in `/': divided by 0 (ZeroDivisionError)
+none	0x602000000980 is located 0 bytes after 16-byte region [0x602000000970,0x602000000980)
+warning	conv.c:9:24: warning: using the result of an assignment as a condition without parentheses [-Wparentheses]
+none	   Compiling rsdemo v0.1.0 (/Users/me/src/demo/rsdemo)
+test-failure	AssertionError: 2 not less than 2
+none	node:fs:620
+warning	conv.c:4:12: warning: unused function 'helper_unused' [-Wunused-function]
+none	[19 / 24]
+none	    return binding.readFileUtf8(path, stringToFlags(options.flag));
+error	src/cart.ts(8,44): error TS18048: 's' is possibly 'undefined'.
+none	[87776:0x79bc40c000]       21 ms: Mark-Compact (reduce) 14.9 (16.6) -> 14.9 (16.6) MB, pooled: 0.0 MB, 0.62 / 0.00 ms (average mu = 0.011, current mu = 0.005) last resort; GC in old space requested
+test-failure	AssertionError: "port" does not match "invalid literal for int() with base 10: 'x'"
+none	> nodedemo@1.0.0 lint
+test-failure	MoreTest#test_match [test_more.rb:4]:
+error	zsh:1: command not found: nosuchtool
+warning	warning: `rsdemo` (lib test) generated 3 warnings (3 duplicates)
+test-failure	assertion failed: 1 > 2
+none	2026-09-26 12:57:12.801176
+warning	/Users/me/src/demo/swwarn/Sources/W/main.swift:6:9: warning: variable 'names' was never mutated; consider changing to 'let' constant [#VariableNeverMutated]
+none	    Checking rsclippy v0.1.0 (/Users/me/src/demo/rsclippy)
+warning	/Users/me/src/demo/swwarn/Sources/W/main.swift:15:6: warning: 'is' test is always true
+none	      at TestContext.<anonymous> (file:///Users/me/src/demo/nodedemo/test/cart.test.js:6:40)
+none	      |                                     ~~~^~~~~~~~~
+none	      |                                                                                      ~~~~~ ^
+error	make: *** [parse] Error 1
+test-failure	  AssertionError [ERR_ASSERTION]: total must be positive
+crash	warn2.rb:5:in `<main>': invalid port: abc (ArgumentError)
+warning	warn2.rb:2: warning: already initialized constant FOO
+test-failure	✖ throws inside (0.2555ms)
+none	---- tests::ne_check stdout ----
+warning	warn.rb:4: warning: found `= literal' in conditional, should be ==
+none	Swift.String.init:3:21: note: found this candidate in module 'Swift'
+none	note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+test-failure	✘ Test "balance after deposit" recorded an issue at SwiftTestingTests.swift:8:85: Expectation failed: a.balance == 11.0
+test-failure	  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /ok/. Input:
+crash	Swift/arm64e-apple-macos.swiftinterface:45375: Fatal error: Division by zero
+warning	warning: unused variable: `count`
+none	?       ^
+none	  Actual: 2
+none	   13 |     if (strcmp(buf, "x") = 0) return 1;
+test-failure	FAILED (failures=6)
+none	    #0 0x000104bd8b50 in main store.c:10
+none	test tests::slow_one ... ignored
+none	You may have encountered a bug in the Ruby interpreter or extension libraries.
+error	error[E0308]: mismatched types
+none	9 |     let mut count = 0;
+test-failure	✘ Test positive(n:) with 3 test cases failed after 0.001 seconds with 1 issue.
+error	tmpl.cpp:4:92: error: no member named 'y' in 'Point'
+test-failure	test tests::ne_check ... FAILED
+crash	ValueError: invalid literal for int() with base 10: 'abc'
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/XCTestTests.swift:9: error: -[CalcTests.LegacyTests testFailMessage] : failed - not implemented yet
+error	tmpl.cpp:4:68: error: no viable conversion from 'double' to 'std::string' (aka 'basic_string<char>')
+none	test_empty_total (__main__.CartTests.test_empty_total) ... ok
+crash	Lib/Lib.swift:1: Fatal error: unknown key zzz
+test-failure	✘ Suite ArithmeticTests failed after 0.001 seconds with 5 issues.
+test-failure	✘ Test positive(n:) recorded an issue with 1 argument n → 3 at SwiftTestingTests.swift:9:57: Expectation failed: n < 3
+error	make: Target `all' not remade because of errors.
+test-failure	thread 'tests::ne_check' (27137766) panicked at src/lib.rs:32:21:
+crash	SyntaxError: Unexpected token 'o', "not json" is not valid JSON
+crash	libc++abi: terminating due to uncaught exception of type std::runtime_error: bad config: missing [server] section
+none	clang -Wall -Wextra -g -o store store.c
+error	SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior <stdin>:3:46
+none	        ^
+test-failure	AssertionError: 0.30000000000000004 != 0.31 within 3 places (0.009999999999999953 difference)
+warning	Makefile2:5: warning: overriding commands for target `a'
+test-failure	note: test did not panic as expected at src/lib.rs:35:8
+none	  throw error;
+warning	warning: unused import: `std::fmt::Write`
+none	    5 | int scale(int v) { int v2; long big = 1L << 40; int small = big; unsigned u = -1; if (u < 0) puts("neg"); return small * v2; }
+none	    from /System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/lib/ruby/2.6.0/rubygems/core_ext/kernel_require.rb:54:in `require'
+none	  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#len_zero
+none	  0x602000000700: fa fa 00 00 fa fa 00 00 fa fa 00 00 fa fa 00 00
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/MoreTests.swift:7: error: -[CalcTests.MoreXCTests testAccuracy] : XCTAssertEqualWithAccuracy failed: ("0.30000000000000004") is not equal to ("0.4") +/- ("0.01")
+none	  1) Failure:
+none	    at loadConfig (file:///Users/me/src/demo/nodedemo/server.js:2:44)
+none	                             output=stdout, stderr=stderr)
+test-failure	test_raises (__main__.CartTests.test_raises) ... FAIL
+test-failure	FAIL: test_raises (__main__.CartTests.test_raises)
+test-failure	AssertionError: {'a': 1} != {'a': 2}
+error	src/cart.ts(7,7): error TS2741: Property 'price' is missing in type '{ name: string; }' but required in type 'Item'.
+none	test tests::mean_of_two ... ok
+crash	RecursionError: maximum recursion depth exceeded
+error	× This environment is externally managed
+none	Finished in 0.000267s, 22471.9056 runs/s, 14981.2704 assertions/s.
+none	↳   a.balance → 10.5
+warning	warning: unused variable: `unused_total`
+error	3 warnings and 2 errors generated.
+test-failure	/Users/me/src/demo/swtest/Tests/CalcTests/XCTestTests.swift:6: error: -[CalcTests.LegacyTests testLargeAddition] : XCTAssertEqual failed: ("103") is not equal to ("102") - large sums are off
+warning	<string>:3: RuntimeWarning: coroutine 'f' was never awaited
+warning	warn2.rb:1: warning: previous definition of FOO was here
+warning	conv.c:6:30: warning: declaration shadows a local variable [-Wshadow]
+crash	report.rb:2:in `+': nil can't be coerced into Integer (TypeError)
+error	error[E0425]: cannot find function `undefined_fn` in this scope
+test-failure	  AssertionError [ERR_ASSERTION]: Missing expected exception.
+none	[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+error	error: equal expressions as operands to `==`
+error	error: approximate value of `f{32, 64}::consts::PI` found
+none	> nodedemo@1.0.0 test
+error	/Users/me/src/demo/swtest/Tests/CalcTests/XCTestTests.swift:5:42: error: use of 'add' refers to instance method rather than global function 'add' in module 'Calc'
+crash	Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'express' imported from /Users/me/src/demo/more/imp.mjs
+none	> tsc -p .
+none	The above exception was the direct cause of the following exception:
+warning	parse.c:11:23: warning: format specifies type 'char *' but the argument has type 'int' [-Wformat]
+error	/Users/me/src/demo/swerr/Sources/Demo/main.swift:4:18: error: cannot convert value of type 'String' to specified type 'Int'
+warning	(node:92304) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+error	make: *** [missing] Error 2
+none	Second list contains 1 additional elements.
+warning	conv.c:5:122: warning: variable 'v2' is uninitialized when used here [-Wuninitialized]
+crash	==88903==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x602000000980 at pc 0x000104bd8b54 bp 0x00016b2265f0 sp 0x00016b2265e8
+none	  "_helper", referenced from:
+none	ℹ pass 0
+crash	Error: ENOENT: no such file or directory, open './config.json'
+test-failure	    tests::mean_is_wrong
+none	  ✔ discounts (0.028792ms) # TODO
+none	   0: __rustc::rust_begin_unwind
+none	✔ Test errorHandlingPasses() passed after 0.001 seconds.
+test-failure	✘ Test parsesDigits() recorded an issue at SwiftTestingTests.swift:7:52: Expectation failed: parse("12x")
+warning	report.rb:4: warning: assigned but unused variable - x
+none	  ✔ error handling works (0.063917ms)
+none	    from -e:1:in `<main>'
+test-failure	test more::result_test ... FAILED
+error	tsconfig.json(1,82): error TS5011: The common source directory of 'tsconfig.json' is './src'. The 'rootDir' setting must be explicitly set to this or another path to adjust your output's file layout.
+error	make: *** No rule to make target `nosuchtarget'.  Stop.
+none	    at greet (file:///Users/me/src/demo/nodedemo/typeerr.js:2:46)
+none	running 1 test
+none	    return item["price"] * item["qty"]
+none	}
+none	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_stdio.h:260:1: note: 'gets' has been explicitly marked deprecated here
+warning	/Users/me/src/demo/py/w.py:6: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+crash	bash: line 1: 89232 Abort trap: 6           ./store abort
+none	✔ parses empty input (0.333042ms)
+test-failure	✘ Test throwsUnexpectedly() recorded an issue at SwiftTestingTests.swift:11:6: Caught error: Boom()
+none	  |      ----         ^^^^
+error	3 errors generated.
+warning	10 warnings generated.
+none	Don't forget to include the above Crash Report log file in bug reports.
+none	↳   add(200, 300) → 501
+none	conv.c:6:16: note: previous declaration is here
+error	bash: nosuchtool: command not found
+none	[20 / 25] Demo-product
+none	Please visit http://www.java.com for information on installing Java.
+crash	Swift/arm64e-apple-macos.swiftinterface:18535: Fatal error: Range requires lowerBound <= upperBound
+crash	RuntimeError: config missing.json unreadable
+none	/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__vector/vector.h:464:60: note: candidate function not viable: no known conversion from 'const char[2]' to 'const value_type' (aka 'const Point') for 1st argument
+test-failure	    tests::first_of_empty
+warning	RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+none	<--- Last few GCs --->
+none	    from order.rb:5:in `<main>'
+none	   |     |- warning: expression following 'return' is treated as an argument of the 'return'
+warning	/Users/me/src/demo/swerr/Sources/Demo/main.swift:11:7: warning: expression implicitly coerced from 'String?' to 'Any'
+test-failure	Expected 5 to be nil.
+warning	warning: function `unused_helper` is never used
+warning	warning: variant `Slow` is never constructed
+warning	conv.c:5:15: warning: unused parameter 'v' [-Wunused-parameter]
+crash	error: Process '/Applications/Xcode.app/Contents/Developer/usr/bin/xctest /Users/me/src/demo/swcrash/.build/out/Products/Debug/StoreTests.xctest' exited with unexpected signal code 5
+warning	/Users/me/src/demo/py/w.py:4: ResourceWarning: unclosed file <_io.TextIOWrapper name='/Users/me/src/demo/py/w.py' mode='r' encoding='UTF-8'>
+error	error[E0560]: struct `Config` has no field named `host`
+crash	called `Option::unwrap()` on a `None` value
+error	/Users/me/src/demo/swst/Sources/Lib/Lib.swift:2:35: error: initialization of variable 'n' was never used; consider replacing with assignment to '_' or removing it [#NoUsage]
+none	  |                                   `- error: initialization of variable 'n' was never used; consider replacing with assignment to '_' or removing it [#NoUsage]
+error	Found 8 errors in the same file, starting at: src/cart.ts:3
+error	SyntaxError: Unexpected token ';'
+error	clang: error: no such file or directory: 'unusedflag.c'
+crash	thread 'main' (27168604) panicked at ov.rs:1:93:
+crash	FileNotFoundError: [Errno 2] No such file or directory: 'missing.json'
+warning	conv.c:11:58: warning: 'gets' is deprecated: This function is provided for compatibility reasons only.  Due to security concerns inherent in the design of gets(3), it is highly recommended that you use fgets(3) instead. [-Wdeprecated-declarations]
+none	━ Test knownIssue() passed after 0.001 seconds with 1 known issue.
+none	/Applications/Xcode.app/Contents/Developer/usr/bin/make -C nosuchdir
+none	  src/cart.ts:1:39 - 'price' is declared here.
+test-failure	AssertionError: Lists differ: [('a', 2)] != [('a', 2), ('b', 3)]
+none	(Use `node --trace-deprecation ...` to show where the warning was created)
+none	(Use `node --trace-warnings ...` to show where the warning was created)
+crash	Fatal Python error: Aborted
+test-failure	Expected [1] to be empty.
+none	conv.c:9:24: note: place parentheses around the assignment to silence this warning
+error	error: length comparison to zero
+warning	/Users/me/src/demo/py/inventory.py:14: DeprecationWarning: load() without schema is deprecated
+test-failure	CalcTest#test_raises:
+error	/Users/me/src/demo/swerr/Sources/Demo/main.swift:5:30: error: cannot find 'missingValue' in scope
+crash	RefCell already borrowed
+none	allocated by thread T0 here:
+crash	subprocess.CalledProcessError: Command '['false']' returned non-zero exit status 1.
+none	help: you can convert a `u16` to a `u32`
+crash	/System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/lib/ruby/2.6.0/json/common.rb:156:in `parse': 767: unexpected token at '{bad' (JSON::ParserError)
+error	npm error request to https://registry.npmjs.org/left-pad-nonexistent-zz failed: cache mode is 'only-if-cached' but no cached response is available.
+warning	/Users/me/src/demo/py/w.py:9: SyntaxWarning: "is" with 'int' literal. Did you mean "=="?
+test-failure	  - StoreTests (XCTest)
+none	   |       |- note: provide a default value to avoid this warning
+none	 right: 2
+none	2 | @available(swift, deprecated: 6, message: "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination.")
+none	Shadow bytes around the buggy address:
+error	error: useless use of `vec!`
+crash	bash: line 1: 89251 Bus error: 10           perl -e "kill q(BUS), \$\$"
