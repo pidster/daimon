@@ -1,98 +1,98 @@
-# The dev part of failures-flat.tsv, split by family with seed 1
+# The dev part of failures-all.tsv, split by family with seed 1
 # (wisp classifier split); see training/README.md for the labels and rules.
-crash	Fatal error: 'try!' expression unexpectedly raised an error: Kit.DecodeError.truncated(offset: 12)
-crash	Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
-none	Working copy of https://github.com/apple/swift-log.git resolved at 1.6.1
-none	Run actions/checkout@v4
-none	Cloning into 'kit'...
-warning	➤ YN0000: · Done with warnings in 1s 204ms
-none	Starting a Gradle Daemon (subsequent builds will be faster)
-crash	Caused by: java.net.BindException: Address already in use
-none	[INFO] Scanning for projects...
-crash	thread 'main' has overflowed its stack
-none	0 errors, 0 warnings
-error	error[E0277]: the trait bound `Request: Serialize` is not satisfied
-none	Run options: --seed 51120
-error	error[E0061]: this function takes 3 arguments but 2 arguments were supplied
-none	main.main()
-none	Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.44s
-crash	Thread 0 Crashed::  Dispatch queue: com.apple.main-thread
-none	= help: consider removing the borrow: `path`
-warning	/Users/dev/src/NotesApp/Notes/Assets.xcassets: warning: The app icon set "AppIcon" has an unassigned child.
-error	> Could not find com.example:analytics:3.2.1.
-none	Finished `release` profile [optimized] target(s) in 1m 02s
-crash	panic: assignment to entry in nil map
-none	Fetching gem metadata from https://rubygems.org/.........
-error	Error: Cannot find module '@babel/preset-env'
-test-failure	test ledger::tests::rounds_half_even ... FAILED
-warning	warning: Run script build phase 'SwiftLint' will be run during every build because it does not specify any outputs.
-test-failure	retry_test.go:77: backoff exceeded budget: got 2.1s, want <= 2s
-error	FAIL    github.com/example/billing/internal/ledger [build failed]
-none	-- The C compiler identification is AppleClang 17.0.0.17000013
-test-failure	--- FAIL: TestMigrateUp/add_index (0.03s)
-none	12 |     let total = subtotal + tax;
-error	swift-format: /Users/dev/src/kit/Sources/Kit/Box.swift: error: expected '}' in struct
-warning	(node:5120) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
-none	#12 naming to docker.io/library/api:dev done
-error	npm ERR! ERESOLVE unable to resolve dependency tree
-warning	warning: unused import: `std::collections::HashMap`
-test-failure	[  FAILED  ] 2 tests, listed below:
-none	** TEST SUCCEEDED **
-error	/tmp/build/Sources/Model/Order.swift:77:5: error: 'async' call in a function that does not support concurrency
-warning	Sources/App/Settings.swift:22:10: warning: no calls to throwing functions occur within 'try' expression
-error	e: file:///Users/dev/android/app/src/main/java/com/example/Feed.kt:88:13 Unresolved reference: FeedAdapter
-test-failure	FAIL [   0.412s] ingest::parse tests::handles_bom
-none	# pass  12
-error	Sources/App/main.swift:3:8: error: no such module 'Collections'
-none	Resolved 3 packages in 212ms
-warning	DEPRECATION WARNING: `ActiveRecord::Base.default_timezone` is deprecated and will be removed in Rails 8.1
-none	✓ built in 3.82s
-test-failure	================= 2 failed, 118 passed, 3 skipped in 12.08s =================
-none	check yaml...........................................(no files to check)Skipped
-crash	ZeroDivisionError: float division by zero
-test-failure	1) checkout flow applies coupon:
-error	error: Dependencies could not be resolved because root depends on 'swift-argument-parser' 2.0.0..<3.0.0.
-crash	json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-test-failure	FAILED tests/unit/test_slugify.py::test_unicode_titles - AssertionError: assert 'caf' == 'cafe'
+none	[INFO] Downloading from central: https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.pom
+none	got: 100.0
+none	|
+none	added 1284 packages, and audited 1285 packages in 22s
+none	Requirement already satisfied: certifi in ./.venv/lib/python3.13/site-packages (2024.8.30)
+error	src/hooks/useCart.ts:18:24 - error TS2339: Property 'total' does not exist on type 'CartState'.
+none	##[endgroup]
+none	PASS
+none	Switched to a new branch 'fix/error-toast'
+error	go: updates to go.mod needed; to update it: go mod tidy
+warning	CMake Warning (dev) at CMakeLists.txt:5 (project):
 none	✓ shows the fallback when a child throws (14 ms)
-none	=========================== short test summary info ============================
-error	src/codec.c:212:10: error: use of undeclared identifier 'frame_len'
-crash	*** error for object 0x6000012a8000: pointer being freed was not allocated
-warning	warning: redirecting to https://github.com/example/kit.git/
-none	Test Case '-[NotesTests.SyncTests testMergeConflict]' started.
-error	Jest: "global" coverage threshold for lines (80%) not met: 74.12%
-test-failure	XCTAssertTrue failed - Save button did not appear
-none	make[1]: Entering directory '/Users/dev/src/engine/build'
-none	Doc-tests ingest
-none	Failing tests:
-warning	WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager.
-none	=============================== warnings summary ===============================
-crash	libc++abi: terminating due to uncaught exception of type std::out_of_range: vector
-test-failure	E       assert {'id': 7, 'state': 'open'} == {'id': 7, 'state': 'closed'}
-test-failure	FAILED (failures=2, errors=1)
-crash	Exception in thread "main" java.lang.NullPointerException: Cannot invoke "String.length()" because "name" is null
+none	tests/unit/test_errors.py::test_error_handling_returns_422 PASSED        [ 12%]
+warning	src/codec.c:98:15: warning: comparison of integers of different signs: 'int' and 'size_t' [-Wsign-compare]
 none	Randomized with seed 40211
-crash	# A fatal error has been detected by the Java Runtime Environment:
-error	CMake Error at CMakeLists.txt:23 (find_package):
-none	tests/unit/test_retry.py::test_fail_fast_disabled PASSED                 [ 30%]
-error	error: linking with `cc` failed: exit status: 1
-test-failure	NotesTests.SyncTests/testMergeConflict()
-warning	warning: `ingest` (lib) generated 3 warnings (run `cargo fix --lib -p ingest` to apply 2 suggestions)
+warning	warning: LF will be replaced by CRLF in docs/setup.md.
+warning	app/controllers/orders_controller.rb:31:5: C: Style/GuardClause: Use a guard clause (return unless order) instead of wrapping the code inside a conditional expression.
+none	ok      github.com/example/billing/internal/invoice    0.182s
+error	npm error code ELIFECYCLE
+none	--- PASS: TestErrorWrapping (0.00s)
+crash	RangeError: Maximum call stack size exceeded
+none	#12 exporting to image
+error	src/api/client.ts(34,7): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+warning	internal/cache/lru.go:22:2: SA4006: this value of `err` is never used (staticcheck)
+none	> Task :app:test UP-TO-DATE
+crash	thread 'main' panicked at src/bin/ingest.rs:57:34:
+crash	thread 'main' panicked at library/core/src/panicking.rs:221:5:
+none	# ./spec/models/invoice_spec.rb:37:in `block (3 levels) in <top (required)>'
+warning	(node:5120) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+none	[INFO] Total time:  18.402 s
+error	Command PhaseScriptExecution failed with a nonzero exit code
+warning	/Users/dev/proj/.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:291: PydanticDeprecatedSince20: Support for class-based `config` is deprecated
+none	note: Building targets in dependency order
+error	Error: Unable to resolve action `example/deploy-action@v2`, repository not found
+test-failure	1) test creates a post (App.PostTest)
+none	remote: Resolving deltas: 100% (48/48), done.
+none	CompileSwift normal arm64 /Users/dev/src/NotesApp/Notes/NoteStore.swift (in target 'Notes' from project 'Notes')
+none	✓ built in 3.82s
+error	src/report/render.py:42: error: Argument 1 to "format_row" has incompatible type "int"; expected "str"  [arg-type]
+none	[INFO] Building svc 1.8.0-SNAPSHOT
+crash	Program received signal SIGSEGV, Segmentation fault.
+error	vet: internal/ledger/post.go:33:2: unreachable code
+none	[INFO] BUILD SUCCESS
+crash	json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+test-failure	✘ Test "migration adds column" recorded an issue: Expectation failed: columns.contains("archived_at")
+none	Test Case '-[NotesTests.SyncTests testUpload]' skipped (0.001 seconds).
+warning	(node:48213) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+test-failure	expect(received).toBe(expected) // Object.is equality
+none	✓ retries failed requests twice (3 ms)
+test-failure	[ERROR] Tests run: 14, Failures: 2, Errors: 0, Skipped: 1, Time elapsed: 0.482 s <<< FAILURE! -- in com.example.svc.OrderServiceTest
+none	=> [internal] load build definition from Dockerfile
+error	gpg: signing failed: Inappropriate ioctl for device
+crash	Uncaught ReferenceError: process is not defined
+none	3 files changed, 41 insertions(+), 12 deletions(-)
+warning	warning: use of deprecated function `chrono::NaiveDateTime::from_timestamp`: use `DateTime::from_timestamp` instead
+test-failure	tests/test_api.py ..F..s.E                                                [ 64%]
+none	✔ Suite ErrorMappingTests passed after 0.041 seconds.
+warning	/Users/dev/src/NotesApp/Notes.xcodeproj: warning: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported deployment target versions is 12.0 to 27.0.
+error	> Could not find com.example:analytics:3.2.1.
+none	Plan: 3 to add, 1 to change, 0 to destroy.
+crash	==51230==ERROR: LeakSanitizer: detected memory leaks
+error	[!] CocoaPods could not find compatible versions for pod "Firebase/Analytics":
+crash	terminate called after throwing an instance of 'std::bad_alloc'
+none	Cloning into 'kit'...
+test-failure	OrderServiceTest > refundsPartialOrder() FAILED
+error	swift-format: /Users/dev/src/kit/Sources/Kit/Box.swift: error: expected '}' in struct
+none	BUILD SUCCESSFUL in 41s
+error	error: No profiles for 'com.example.notes' were found: Xcode couldn't find any iOS App Development provisioning profiles matching 'com.example.notes'.
+none	cc -O2 -Wall -c src/codec.c -o build/codec.o
+crash	FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+test-failure	✕ rejects an expired coupon (7 ms)
+error	error: Signing for "NotesWidget" requires a development team. Select a development team in the Signing & Capabilities editor.
+none	Updating crates.io index
+none	Build succeeded    9/14/26, 9:18 AM    12.4 seconds
 error	CMake Error: The source directory "/Users/dev/src/engine/build" does not appear to contain CMakeLists.txt.
-none	[fix/error-toast 4c1d2e9] Handle upload errors in the retry path
-warning	tests/test_http.py::test_redirects: PytestUnraisableExceptionWarning: Exception ignored in: <socket.socket fd=12>
-error	bundler: failed to load command: rake (/Users/dev/.gem/bin/rake)
-crash	TypeError: Cannot read properties of undefined (reading 'map')
-none	Expected: 0
-none	expected: 108.0
-test-failure	assertion `left == right` failed
+crash	# A fatal error has been detected by the Java Runtime Environment:
+error	Done linting! Found 2 violations, 2 serious in 64 files.
+none	Done linting! Found 0 violations, 0 serious in 64 files.
+crash	AddressSanitizer:DEADLYSIGNAL
+warning	warning: variable does not need to be mutable
+test-failure	_______________________________ test_refund_math _______________________________
+none	Build complete! (14.21s)
+test-failure	--- FAIL: TestInvoiceTotals/zero_quantity (0.00s)
+test-failure	--- FAIL: TestMigrateUp/add_index (0.03s)
+error	Sources/Parser/Lexer.swift:59:14: error: switch must be exhaustive
+none	3 files reformatted, 41 files left unchanged
+warning	warning: redundant clone
 error	xcodebuild: error: Unable to find a destination matching the provided destination specifier:
-warning	CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
-crash	The command '/bin/sh -c ./configure && make' returned a non-zero code: 139
-none	tests/test_io.py ........s......                                         [ 55%]
-none	[88/88] Linking wisp
-none	tests/test_codec.py::test_decode SKIPPED (requires network)                [ 40%]
-warning	FutureWarning: The default value of numeric_only in DataFrameGroupBy.mean is deprecated.
-error	Sources/App/Router.swift:9:1: error: Line Length Violation: Line should be 160 characters or less; currently it has 187 characters (line_length)
-none	test result: ok. 64 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.52s
-error	Error: Invalid reference
+none	14 passing (212ms)
+crash	[signal SIGSEGV: segmentation violation code=0x2 addr=0x18 pc=0x1045a3c]
+test-failure	42 tests completed, 3 failed
+none	Inspecting 64 files
+crash	Aborted (core dumped)
+test-failure	✘ Test run with 212 tests in 31 suites failed after 8.402 seconds with 4 issues.
+error	Could not resolve all files for configuration ':app:debugRuntimeClasspath'.
+warning	FLAKY 2/3 [   1.204s] net::tests::reconnects

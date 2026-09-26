@@ -1,83 +1,82 @@
-# The dev part of log-flat.tsv, split by family with seed 1
+# The dev part of log-severity-all.tsv, split by family with seed 1
 # (wisp classifier split); see training/README.md for the labels and rules.
-info	crash reporter enabled; uploads go to https://crash.example.com/submit
-info	cache miss for key user:9031:prefs, loading from db
-fault	2026/09/26 11:03:14 http: panic serving 198.51.100.12:51422: runtime error: index out of range [3] with length 3
-info	role "billing-admin" granted to u_7731 by u_1002
-info	level=debug role "billing-admin" granted to u_7731 by u_1002
-error	S3 PutObject for logs/2026/09/26/app.log.gz returned 500 InternalError; upload not retried
-info	Lint complete: no errors found in 312 files
-error	Deployment "checkout-web" exceeded its progress deadline
-info	webpack 5.94.0 compiled successfully in 2231 ms
+info	containerd: shim reaped, container 5f2a9c exited with status 0
+error	level=info msg="payment capture failed" order=A-1043 status=declined_by_gateway
+info	signup completed for tenant northwind-demo (plan: team)
+info	Finished: SUCCESS
+info	experiment pricing-b assignment: variant=control reason=hash(u_881)=0.72
+error	2026/09/26 11:04:02 failed to start server: listen tcp :8443: bind: permission denied
+info	Connected to MongoDB at mongodb://db.internal:27017/app
+info	SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2  [["id", 7208], ["LIMIT", 1]]
+info	level=info msg="error budget at 98% remaining" service=checkout
 fault	2026-09-26 09:51:03.114 ReportCrash[1432]: Saved crash report for Notes[1411] version 4.11 to Notes-2026-09-26-095103.ips
 fault	[crit] 2026-09-26 09:51:03.114 ReportCrash[1432]: Saved crash report for Notes[1411] version 4.11 to Notes-2026-09-26-095103.ips
-info	Hibernate: select p1_0.id,p1_0.name from product p1_0 where p1_0.sku=?
-info	dockerd[1022]: API listen on /run/docker.sock
-info	Tomcat started on port 8080 (http) with context path '/'
-info	deployment "api" successfully rolled out
-info	2026-09-26 09:31:12.004 softwareupdated[488]: Found 0 available updates
-info	StoreKit: fetched 4 products in 212ms
-error	Internal Server Error: /api/invoices/2231/pdf
-fault	Fatal error: Unexpectedly found nil while unwrapping an Optional value
-info	--> resolveTenant(host="acme.example.com")
-error	uncaught exception in worker: RangeError: Maximum call stack size exceeded
-info	certificate for shop.example.com renewed, valid until 2026-12-25
-warning	certificate for api.example.com expires in 9 days (2026-10-05T00:00:00Z)
-error	198.51.100.7 - - [26/Sep/2026:10:15:44 +0000] "GET /checkout HTTP/2.0" 502 552 "https://shop.example.com/cart" "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6)"
-info	198.51.100.7 - - [26/Sep/2026:10:15:44 +0000] "GET /favicon.ico HTTP/2.0" 404 153 "https://shop.example.com/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6)"
-info	Sending build context to Docker daemon  24.58MB
-warning	Sep 26 10:05:51 web-03 systemd-journald[412]: Journal file /var/log/journal/a1b2/system.journal is truncated, ignoring file.
-info	entering OrderService.place(cartId=77, userId=4412)
-info	sandbox profile generated: 14 rules, allow-read /usr, allow-write /tmp/job-7712
-warning	sshd[9214]: Invalid user admin from 203.0.113.99 port 51432
-info	[core] [Channel #1 SubChannel #2] Subchannel picks a new address "10.0.3.14:9090" to connect
-info	grpc: Server.processUnaryRPC: /inventory.v1.Inventory/Reserve received message size 88
-error	Liveness probe failed 3 consecutive times; container api killed and will be restarted
-info	job retry-failed-payments completed: 12 payments retried, 12 succeeded
-info	Sep 26 10:02:30 web-03 sshd[9112]: Accepted publickey for deploy from 192.0.2.10 port 50122 ssh2: ED25519 SHA256:ptB3Fne4d4UtuFleMl0oys+/o1Q3+737sNtoadef0YQ
-warning	dockerd[1022]: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
-warning	request GET /dashboard took 7.4s (threshold 3s)
-warning	replica lag is 47s behind primary db-primary.internal (threshold 30s)
+error	django.db.utils.IntegrityError: duplicate key value violates unique constraint "accounts_user_email_key"
+error	Sep 26 10:15:21 worker-2 systemd[1]: nginx.service: Control process exited, code=exited, status=1/FAILURE
+info	set-output name=version::1.14.2
+info	[info] health check passed; 0 failures in the last 300 requests
+warning	Detected 4 goroutines blocked on channel send for over 60s
+error	terraform apply failed after 12 of 18 resources changed; state lock held by run 4471
+info	Uploading artifact "coverage.xml" (412 KB) done
 error	OOMKilled  pod/ingest-worker-6b7c9-hx2lm  Container ingest was OOMKilled (exit code 137)
-info	Initializing Spring DispatcherServlet 'dispatcherServlet'
-info	docker build: step 7/12 : RUN npm ci --omit=dev  ---> Using cache
-warning	jwt verification skipped for /internal/metrics because AUTH_DISABLED=true
-info	Apply complete! Resources: 2 added, 1 changed, 0 destroyed.
-error	Traceback (most recent call last):
-info	CoreData: sql: SELECT 0, t0.Z_PK FROM ZNOTE t0 WHERE t0.ZFOLDER = ? ORDER BY t0.ZMODIFIED DESC
-error	Sep 26 10:15:21 worker-2 systemd[1]: Failed to start PostgreSQL 16 database server.
-error	Background saving terminated with success=0 (error saving)
-info	Sep 26 10:00:01 web-03 CRON[4411]: (root) CMD (/usr/lib/php/sessionclean)
+info	Resolving dependencies for target api (412 packages, lockfile hit)
+info	Sent 200 in 1ms
+warning	Sep 26 09:40:22 mbp-dev com.apple.xpc.launchd[1] (com.example.helper): This service is defined to be constantly running and is inherently inefficient.
+warning	sshd[9214]: Invalid user admin from 203.0.113.99 port 51432
+error	Process completed with exit code 1.
+info	Sep 26 10:00:05 web-03 systemd[1]: Starting Cleanup of Temporary Directories...
+info	All checks have passed
+info	Scheduled  pod/api-5d8f7b-q2x9z  Successfully assigned default/api-5d8f7b-q2x9z to node-4
+warning	Event loop blocked for 812ms
+info	StoreKit: fetched 4 products in 212ms
+error	cannot allocate memory for shared buffers (requested 8589934592 bytes)
+warning	Test run took 14m02s, 6 minutes longer than the 7-day median
+warning	parse error in optional file ~/.apprc line 12; ignoring it and using defaults
+error	{"t":{"$date":"2026-09-26T10:40:01.002Z"},"c":"STORAGE","id":22435,"ctx":"conn18","msg":"WiredTiger error message","attr":{"error":-31802,"message":"WT_ERROR: non-specific WiredTiger error"}}
+warning	Readiness probe failed: Get "http://10.244.1.7:8080/ready": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+info	Hibernate: select p1_0.id,p1_0.name from product p1_0 where p1_0.sku=?
+info	2026/09/26 11:15:02 received SIGTERM, shutting down gracefully (drain 30s)
+fault	fatal error: all goroutines are asleep - deadlock!
+error	Can't save in background: fork: Cannot allocate memory
+info	serialising response with schema v3 (12 fields, 2 omitted as null)
 warning	sentry DSN not configured; exceptions will not be reported
-error	rsync error: error in rsync protocol data stream (code 12) at io.c(228) [sender=3.2.7]
-warning	SMTP_HOST not set, emails will be written to the console instead of sent
-info	URLSession task <7F3A9C21-1B2C-4D5E-8F90-A1B2C3D4E5F6>.<3> resumed
+info	CoreData: sql: SELECT 0, t0.Z_PK FROM ZNOTE t0 WHERE t0.ZFOLDER = ? ORDER BY t0.ZMODIFIED DESC
+info	<-- resolveTenant 0.3ms
+error	Traceback (most recent call last):
+warning	FailedScheduling  pod/batch-7x  0/6 nodes are available: 6 Insufficient memory. preemption: 0/6 nodes are available
+info	Request headers: {"accept":"application/json","user-agent":"okhttp/4.12.0","x-request-id":"7f3a9c21"}
+warning	[Sat Sep 26 10:42:30.551020 2026] [pid 1990:tid 140102] AH00484: server reached MaxRequestWorkers setting, consider raising the MaxRequestWorkers setting
+info	next retry would be at 10:22:31.440 if needed
+info	health check passed: db=ok cache=ok queue=ok (12ms)
+info	Deployed api@a91f3c2 to production (4/4 instances healthy) in 3m02s
+info	config reloaded from /etc/app/config.yaml (3 keys changed)
+error	** (exit) exited in: GenServer.call(MyApp.Cache, {:get, "user:9"}, 5000)
+info	shell: /usr/bin/bash -e {0}
+info	192.0.2.140 - - [26/Sep/2026:10:17:52 +0000] "PATCH /v2/projects/12 HTTP/1.1" 409 71 "-" "axios/1.7.7"
+warning	upstream response time 2.8s exceeded SLO of 1s for 4% of requests in the last 5m
+info	payload = {'sku': 'SKU-2231', 'qty': 2, 'coupon': None}
 warning	[Sat Sep 26 10:43:12.000431 2026] [pid 1990:tid 140102] AH01909: www.example.com:443:0 server certificate does NOT include an ID which matches the server name
 warning	W0926 15:05:10.588 [Sat Sep 26 10:43:12.000431 2026] [pid 1990:tid 140102] AH01909: www.example.com:443:0 server certificate does NOT include an ID which matches the server name
-info	Sep 26 10:15:31 web-03 systemd[1]: Stopped api.service - Example API.
-error	2026/09/26 10:30:12 open() "/var/www/static/app.js" failed (13: Permission denied), client: 192.0.2.5, server: static.example.com
-error	[error] 2026/09/26 10:30:12 open() "/var/www/static/app.js" failed (13: Permission denied), client: 192.0.2.5, server: static.example.com
-info	Started GET "/users/sign_in" for 198.51.100.4 at 2026-09-26 10:20:11 +0000
-warning	heap usage 88% of 4096MB after full GC; consider increasing -Xmx
-info	<-- resolveTenant 0.3ms
-info	2026-09-26 09:31:40.622 backupd[4012]: Backup completed successfully.
-info	Ecto.Adapters.SQL: QUERY OK source="users" db=0.4ms idle=812.3ms SELECT u0."id" FROM "users" AS u0 WHERE (u0."id" = $1) [4412]
-error	[2026-09-26T10:47:30,118][o.e.b.ElasticsearchUncaughtExceptionHandler] [node-es-2] uncaught exception in thread [main]
-error	err: [2026-09-26T10:47:30,118][o.e.b.ElasticsearchUncaughtExceptionHandler] [node-es-2] uncaught exception in thread [main]
-info	Stopped Vite dev server
-info	committed offset 88412831 for clickstream-3
-warning	Session cookie set without the Secure flag because the request was not HTTPS
-info	Retry policy loaded: 5 attempts, exponential backoff 200ms-10s
-info	2026/09/26 11:15:07 all connections drained, bye
-info	Cache not found for input keys: npm-Linux-4f1c2e; building without cache
-warning	BackOff  pod/api-5d8f7b-q2x9z  Back-off restarting failed container api in pod api-5d8f7b-q2x9z
-warning	TLS certificate for mail.example.com will expire in 72 hours; renewal has not succeeded yet
-error	[MY-012592] [InnoDB] Operating system error number 28 in a file operation.
+info	Leader elected: node-2 (term 41)
+error	Sep 26 10:12:05 web-03 systemd[1]: api.service: Main process exited, code=killed, status=9/KILL
+info	> GET /v1/prices HTTP/1.1
+info	2026/09/26 11:00:00 listening on :8080
+error	Caused by: java.net.ConnectException: Connection refused
+warning	Permission change: bucket assets-staging made publicly readable by ci-bot
+info	[2026-09-26T10:47:00,013][o.e.c.r.a.AllocationService] [node-es-1] Cluster health status changed from [YELLOW] to [GREEN] (reason: [shards started [[logs-2026.09.26][1]]]).
+fault	Server shutting down after an unrecoverable error: NIOPosix.NIOConnectionError(host: "db.internal", port: 5432, dnsAError: nil)
 info	* Listening on http://0.0.0.0:3000
-info	INFO retrying upload after transient error: attempt 2 of 5 succeeded
-info	span started name=db.query trace=4bf92f3577b34da6 span=00f067aa0ba902b7
-warning	transient error from payments-api (502), retrying in 2s (attempt 1 of 4)
-info	diff of computed plan: +2 ~1 -0 resources
-info	binding parameter [1] as [VARCHAR] - [SKU-2231]
-error	[Sat Sep 26 10:41:59.004120 2026] [pid 2230:tid 140288] [client 192.0.2.61:50990] PHP: Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes) in /srv/app/vendor/lib/Parser.php on line 311
-error	err: [Sat Sep 26 10:41:59.004120 2026] [pid 2230:tid 140288] [client 192.0.2.61:50990] PHP: Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes) in /srv/app/vendor/lib/Parser.php on line 311
+info	Completed 404 Not Found in 6ms (ActiveRecord: 0.9ms)
+info	registered error middleware at position 7
+info	policy check: rule allow-read matched /usr/lib/libSystem.B.dylib (rule 3 of 14)
+info	cache warmed: 12,402 product pages in 44s
+error	Evicted  pod/cache-0  The node was low on resource: ephemeral-storage. Container redis was using 12Gi, which exceeds its request of 0.
+info	Vapor server started on http://0.0.0.0:8080
+warning	DEBUG deprecated config key 'timeout_ms' used; will be removed in 3.0
+info	Listening for transport dt_socket at address: 5005
+warning	DNS lookup for search.internal took 4.2s
+info	Kafka consumer fetched 500 records from clickstream-3 offset 88412331
+info	bundler: using rack 3.1.7
+info	INFO bundler: using rack 3.1.7
+error	sync with upstream failed after 6 attempts (last: dial tcp 192.0.2.40:443: i/o timeout); aborting run
+error	E0926 01:42:04.207 sync with upstream failed after 6 attempts (last: dial tcp 192.0.2.40:443: i/o timeout); aborting run

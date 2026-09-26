@@ -1233,6 +1233,10 @@ struct ClassifierCommand: AsyncParsableCommand {
 
         func run() async throws {
             var examples = TrainingSplit.parse(try String(contentsOfFile: input, encoding: .utf8))
+            var seen = Set<String>()
+            let before = examples.count
+            examples = examples.filter { seen.insert(TrainingSplit.canonical($0.text)).inserted }
+            if examples.count < before { print("dropped \(before - examples.count) repeated examples") }
             if let exclude {
                 let fixed = TrainingSplit.parse(try String(contentsOfFile: exclude, encoding: .utf8))
                 let clashing = Set(TrainingSplit.overlaps(fixed, examples).map(\.second))

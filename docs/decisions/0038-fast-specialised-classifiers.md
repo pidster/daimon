@@ -167,3 +167,14 @@ package.json` beside `cat README.md`, two force-push forms, a password lookup); 
 shipped default retrained without them. It also found near-copies inside the log set, made when written
 levels were added, which the split now keeps on one side.
 
+An adversarial review of the checks on 2026-09-26 found leak shapes they missed, all present in the
+data: redirections and wrappers (`2>&1`, `VAR=$(…)`, `-q`, `git -C`), numbers glued to letters
+(`v26.10.0`, `0.00s`), hash-suffixed names, extensionless paths, and lines under three words; and
+merges they made wrongly: lowercasing (`git branch -D` against `-d`), every quoted string as one
+placeholder, and flag digits as numbers (`kill -9` against `kill -0`). The checks now compare a
+canonical form without that plumbing, keep case and quoted code, and treat the rest as the family's
+placeholders; `parse` keeps leading indentation; and the tests fail on malformed lines, unknown labels,
+repeats within a part, and overlap between the shipped examples and the test set. Re-split under them,
+the parts lost a few examples each, and eight more bundled examples joined dev families and were
+removed, with the shipped default retrained.
+

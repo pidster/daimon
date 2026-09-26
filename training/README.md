@@ -9,19 +9,23 @@ still trained from `harness/Sources/WispCore/Resources/risk-examples.tsv`.
 Each task has its own directory with three parts, kept apart by family: `train.tsv` to learn from,
 `dev.tsv` to choose between options (algorithms, tokenisation, training sets), and `test.tsv`, frozen,
 for the numbers a decision is reported on and never used to choose anything. `labels.md` holds the
-label definitions and judgement rules. A part's family is its text with what varies between
-near-identical examples replaced (file names, paths below home or root, numbers, hashes, URLs, quoted
-strings); near matches (80% of words shared) join a family too. `wisp classifier split` deals whole
+label definitions and judgement rules. Lines are compared in a canonical form, with shell plumbing that does not
+change what a command is removed (`2>&1`, `2>/dev/null`, a `VAR=$(…)` wrapper, `VAR=value` prefixes,
+`git -C <dir>`, `-q`) and case kept, since it matters in flags. A family is that form with what varies
+between near-identical lines replaced: URLs, hex ids (glued to a name too), numbers (glued to letters
+too, but not a flag's digit), file names, and path components other than dotfiles. Quoted text is kept,
+since in a command it is often the code that runs. Near matches join a family too: 80% of words shared,
+or the same words for lines under three words. `wisp classifier split` deals whole
 families into parts, each label in proportion, the same way every time for a given seed, and
 `TrainingSetsTests` fails if any two parts of a task, or the shipped risk examples and the risk dev set,
 share an example exactly, after normalising, by family, or by near match. No overlap is allowed.
 
 | Task | train | dev | test | Labels |
 | --- | --- | --- | --- | --- |
-| `risk` | 995 | 123 | to come, from this Mac's own commands | safe, moderate, dangerous |
+| `risk` | 986 | 123 | to come, from this Mac's own commands | safe, moderate, dangerous |
 | `secrets` | 527 | 93 | to come | secret, personal, none |
 | `failures` | 542 | 96 | to come, from real build and test output | error, test-failure, warning, crash, none |
-| `log-severity` | 457 | 81 | to come, from this Mac's logs | fault, error, warning, info |
+| `log-severity` | 451 | 80 | to come, from this Mac's logs | fault, error, warning, info |
 
 The risk dev set is the 123 commands the evals measure (`RiskEvalSet` reads it). It has been used to
 choose, so its scores are not test scores; the risk test set will come from commands actually run here,
