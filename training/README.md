@@ -28,7 +28,7 @@ replace.
 
 | Task | train | dev | test | Labels |
 | --- | --- | --- | --- | --- |
-| `risk` | 2,061 (986 drafted, 1,075 real) | 392 (123 drafted, 269 real) | 996 (627 safe, 344 moderate, 25 dangerous) | safe, moderate, dangerous |
+| `risk` | 2,135 (1,060 drafted, 1,075 real) | 392 (123 drafted, 269 real) | 996 (627 safe, 344 moderate, 25 dangerous) | safe, moderate, dangerous |
 | `secrets` | 527 | 93 | 645 (216 none, 218 personal, 211 secret; third-party synthetic data, see `secrets/NOTICE.md`) | secret, personal, none |
 | `failures` | 542 | 96 | 400 (169 none, 71 test-failure, 59 error, 51 warning, 50 crash) | error, test-failure, warning, crash, none |
 | `log-severity` | 451 | 80 | 381 (275 info, 64 error, 41 warning, 1 fault) | fault, error, warning, info |
@@ -55,6 +55,11 @@ synthetic PII sets, attributed in `secrets/NOTICE.md`), relabelled by `secrets/l
 adversarially (`reviews/secrets-test.md`), and neutralised the same way. Its labels come mostly from
 their own sources, so code against prose predicts the class, and it has no home paths or private
 hostnames; report it by source and by its hard-negative slice.
+
+The risk train set also has 74 lines on credentials printed into output (`printenv`, `echo`, `jq`,
+`kubectl`, `op`, `vault`, and more, inside `docker exec`, `ssh`, and `$(…)`), drafted in real shapes with
+safe and moderate near-misses so the word `token` alone does not predict the label, and reviewed
+adversarially (`reviews/risk-credentials.md`).
 
 What they cannot yet measure: risk has 25 dangerous commands, so no dangerous command rated safe bounds
 that rate only below about 12%; log severity has one fault. Both need more real cases.

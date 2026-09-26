@@ -147,7 +147,7 @@ not an audit log is attached, and the refusals `respond` reports are those of th
 | `threshold` | `moderate` | Ask at this level and above: `safe`, `moderate`, `dangerous`, or `never`. |
 | `classifier` | `system-model` | What runs beside the rules: `rules` (nothing; fast and deterministic), `system-model` (Apple's on-device model, about 2.3 s a command), or `coreml` (a Core ML text classifier, below, such as one `wisp classifier train` makes, about 0.05 ms a command). Independent of `model`. |
 | `useModel` | `true` | The pre-0.2 switch; `false` means `classifier: rules`. Read only when `classifier` is absent. |
-| `coremlModel` | none | For `coreml`: the `.mlmodel` or `.mlmodelc`, absolute, `~`, or under `<home>/models/coreml`. |
+| `coremlModel` | the shipped default, `risk@X.Y.Z-default` | For `coreml`: a version, `risk@<version>`, from `~/.wisp/classifiers/risk`, or the `.mlmodel` or `.mlmodelc`, absolute, `~`, or under `<home>/models/coreml`. |
 | `coremlMinimumConfidence` | `0.6` | For `coreml`: below this top-label probability the verdict is raised to at least `moderate`. |
 | `timeoutSeconds` | `600` | How long an approval may go unanswered before it counts as declined; `0` waits forever. |
 | `persistDays` | `30` | Lifetime of `project` and `always` approvals. |
@@ -203,7 +203,7 @@ is used, so a fast classifier needs no training at all. A path or a file name un
 `~/.wisp/models/coreml` still works for a model made elsewhere. `--examples` gives your own
 labelled commands, one per line as `level<TAB>command`, `#` for comments; every level needs some. The
 bundled examples are `harness/Sources/WispCore/Resources/risk-examples.tsv`, a copy of
-`training/risk/train.tsv` (drafted and real commands, 2,061 in all), and none of them is in the eval
+`training/risk/train.tsv` (drafted and real commands, 2,135 in all), and none of them is in the eval
 set.
 
 `--from-audit` also learns from this Mac's audit log: the on-device model's verdicts on the commands
