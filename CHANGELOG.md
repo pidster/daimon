@@ -26,6 +26,10 @@ Added:
 - The shipped risk classifier is trained from 2,061 examples, 1,075 of them real commands from
   development sessions, instead of 292 drafted ones. On a frozen set of 996 real commands, beside
   the rules, it rates 817 exactly, where the previous default rated 376.
+- The risk rules rate printing a credential dangerous: `printenv` or `echo` of a variable named for a
+  password, token, secret, or key, `env | grep` for them, `gh auth token`, `op read`, `aws configure get`
+  of a secret, and `kubectl get secret -o yaml|json|jsonpath`. Checking whether one is set
+  (`${TOKEN:+yes}`) or its length is not.
 - The risk rules know a short list of read-only commands (`ls`, `cat`, `grep`, `git status`, `git log`,
   `git diff`, `--version`, and the like). For those the verdict is `safe` without asking a model
   classifier, so they cost no model call and never prompt. A command that writes, runs something

@@ -69,6 +69,11 @@ public struct RuleRiskClassifier: RiskClassifier {
         self.compiled = compiled
     }
 
+    /// A variable name that holds a credential: it contains PASSWORD, TOKEN, SECRET, CREDENTIAL, an API or
+    /// access key, or ends in `_KEY`, in any case.
+    private static let credentialName =
+        #"(?i:[A-Za-z0-9_]*(PASSWORD|PASSWD|PASSPHRASE|TOKEN|SECRET|CREDENTIAL|API_?KEY|ACCESS_KEY|PRIVATE_KEY)[A-Za-z0-9_]*|[A-Za-z0-9_]+_KEY)"#
+
     /// A word boundary at the start of a simple command in a pipeline or list.
     private static let start = #"(^|[\s;&|(`]|\$\()"#
 
@@ -95,6 +100,19 @@ public struct RuleRiskClassifier: RiskClassifier {
             start + #"security\s+(find-(generic|internet)-password\b.*\s-w\b|dump-keychain\b|export\b)"#,
             .dangerous, "prints stored passwords or keys"),
         Rule(start + #"(chmod|chown)\s+(-R|--recursive)"#, .dangerous, "recursive permission change"),
+        // A credential printed goes into the model's context and the audit log, sent or not. A variable
+        // named for one, printed by value; `${X:+set}` and `${#X}` show only whether it is set or its length.
+        Rule(start + #"printenv\s+(-\S+\s+)*"# + credentialName + #"\b"#, .dangerous, "prints a credential"),
+        Rule(
+            start + #"(echo|printf)\b[^;&|]*?\$\{?"# + credentialName + #"\b(?!:[+?-])"#, .dangerous,
+            "prints a credential"),
+        Rule(
+            start + #"env\b[^;&]*\|\s*grep\b.*(?i:token|secret|passw|credential|api_?key|private_key)"#,
+            .dangerous, "prints credentials from the environment"),
+        Rule(
+            start
+                + #"(gh\s+auth\s+token\b|op\s+read\b|op\s+item\s+get\b.*--reveal|aws\s+configure\s+get\s+\S*(?i:secret|token)|kubectl\s+get\s+secrets?\b.*\s-o\s*=?\s*(yaml|json|jsonpath|go-template))"#,
+            .dangerous, "prints a stored credential"),
         Rule(
             start + #"(mkfs|diskutil\s+(erase|partition)|newfs_|dd\s.*\bof=/dev/)"#, .dangerous,
             "destroys a disk or volume"),

@@ -169,6 +169,29 @@ import WispTestSupport
         }
     }
 
+    @Test func rulesCatchCredentialsPrintedIntoTheOutput() async {
+        for command in [
+            "printenv GITHUB_TOKEN", "PGP=\"$(docker exec db printenv POSTGRES_PASSWORD 2>/dev/null)\"",
+            "echo $AWS_SECRET_ACCESS_KEY", "echo \"key: ${STRIPE_API_KEY}\"", "printf '%s' \"$db_password\"",
+            "echo $DEPLOY_KEY", "env | grep -i token", "env | sort | grep SECRET", "gh auth token",
+            "op read op://Private/GitHub/token", "op item get db --reveal",
+            "aws configure get aws_secret_access_key", "kubectl get secret db -o jsonpath='{.data.password}'",
+            "kubectl get secrets -A -o yaml",
+        ] {
+            let verdict = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp")
+            #expect(verdict.level == .dangerous, "\(command): \(verdict.reasons)")
+        }
+        // Whether one is set, how long it is, a word in a message, or a variable that is not a credential.
+        for command in [
+            "printenv PATH", "echo $HOME", "echo \"token set: ${GITHUB_TOKEN:+yes}\"", "echo ${#API_TOKEN}",
+            "echo \"set your API token first\"", "env | grep -i proxy", "echo $KEYBOARD_LAYOUT", "gh auth status",
+            "aws configure list",
+        ] {
+            let verdict = await RuleRiskClassifier.standard.classify(command: command, workingDirectory: "/tmp")
+            #expect(verdict.level < .dangerous, "\(command): \(verdict.reasons)")
+        }
+    }
+
     @Test func rulesDoNotMistakeLookalikesForTheCommandsTheyMatch() async {
         // A verb glued to more letters or a hyphen is another verb, a tag listing changes nothing, and a
         // function called open is not the open command.

@@ -307,3 +307,15 @@ dangerous commands safe:
 The previous default avoided them only by rating most commands moderate or dangerous. Four in 25 is
 an upper bound of about 35% at 95% confidence. The test set has too few dangerous commands to
 measure this rate closely.
+
+A rule now covers credentials printed into the output. It catches:
+- `printenv` of a credential-named variable;
+- `echo` or `printf` of one by value (`${X:+set}` and `${#X}` excepted);
+- `env | grep` for tokens, secrets or keys;
+- `gh auth token`, `op read`, `op item get --reveal`, and `aws configure get` of a secret;
+- `kubectl get secret -o yaml|json|jsonpath`.
+
+The test set revealed this gap, so from here on its figure for `printenv POSTGRES_PASSWORD` is not
+independent. Across all three risk parts the rule fires on 14 commands, and all 14 are labelled
+dangerous. Real-shaped training examples of the same class, with safe near-misses, are added to train
+so the classifier learns the shapes a regex misses.
