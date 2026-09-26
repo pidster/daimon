@@ -149,6 +149,12 @@ public struct WispServer: Sendable {
             case ToolCatalog.jsonShape.name:
                 let request = try JSONShapeRequest(arguments: params.arguments)
                 result = await jsonShape(request)
+            case ToolCatalog.dependencyAudit.name:
+                result = await dependencyAudit(try CondensingRequest(arguments: params.arguments).source)
+            case ToolCatalog.flakyTests.name:
+                result = await flakyTests(try FlakyTestsRequest(arguments: params.arguments))
+            case ToolCatalog.hotPaths.name:
+                result = await hotPaths(try CondensingRequest(arguments: params.arguments).source)
             case ToolCatalog.closeThread.name:
                 let request = try CloseThreadRequest(arguments: params.arguments)
                 result = await closeThread(request)
@@ -429,11 +435,65 @@ public struct WispServer: Sendable {
         }
     }
 
+    /// A dependency audit reduced without a model. The audit's own non-zero exit is how it says it found
+    /// something, so it is not flagged as a failed command.
+    private func dependencyAudit(_ source: Triage.Source) async -> CallTool.Result {
+        await condense(
+            prefix: "deps", source: source, model: nil, maxBytes: JSONShapeRequest.maxBytes, flagFailure: false
+        ) { _, captured in
+            guard !captured.truncated else {
+                throw DependencyAudit.Failure.unrecognised("larger than \(JSONShapeRequest.maxBytes) bytes")
+            }
+            let report = try DependencyAudit().run(captured.text)
+            return (report.rendered, report.json)
+        }
+    }
+
+    /// A profile's folded stacks reduced to hot paths without a model.
+    private func hotPaths(_ source: Triage.Source) async -> CallTool.Result {
+        await condense(prefix: "profile", source: source, model: nil, maxBytes: CondenseLogRequest.maxBytes) {
+            _, captured in
+            let report = try HotPaths().run(captured.text)
+            return (report.rendered, report.json)
+        }
+    }
+
+    /// Test runs compared for flaky tests without a model: saved runs read through the gate, or a command
+    /// run several times in one conversation, so an approval given for the first run covers the rest.
+    private func flakyTests(_ request: FlakyTestsRequest) async -> CallTool.Result {
+        do {
+            let conversation = try session.conversation(id: "flaky-" + ShortID.make(), approver: approver, tools: .none)
+            defer { conversation.audit.record(.sessionEnd, details: AuditEvent.Details.sessionEnd(reason: "closed")) }
+            let runner = CommandRunner(
+                options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
+            let sources: [Triage.Source]
+            switch request.runs {
+            case .paths(let paths): sources = paths.map { .path($0) }
+            case .command(let source, let count): sources = Array(repeating: source, count: count)
+            }
+            var outputs: [String] = []
+            for source in sources {
+                let captured = try await Triage.capture(
+                    source, runner: runner, gate: conversation.gate, maxOutputBytes: CondenseLogRequest.maxBytes)
+                outputs.append(captured.text)
+            }
+            let report = try FlakyTests().run(outputs)
+            let structured: Value? = Value(json: report.json)
+            return .init(
+                content: [.text(text: report.rendered, annotations: nil, _meta: nil)], structuredContent: structured,
+                isError: false)
+        } catch {
+            return failure(String(describing: error))
+        }
+    }
+
     /// Opens a conversation `<prefix>-<id>` with no tools, captures `source` through its runner and gate,
     /// and hands the capture to `body`, which returns the text and structured content of the result.
+    /// The result always carries the command's exit status; with `flagFailure`, a command that exits
+    /// non-zero also gets a warning ahead of the result.
     private func condense(
         prefix: String, source: Triage.Source, model: ModelSelection?,
-        maxBytes: Int = Triage.Options().maxOutputBytes,
+        maxBytes: Int = Triage.Options().maxOutputBytes, flagFailure: Bool = true,
         _ body: (Conversation, Triage.Captured) async throws -> (text: String, json: JSONValue)
     ) async -> CallTool.Result {
         do {
@@ -444,7 +504,7 @@ public struct WispServer: Sendable {
                 options: session.config.runner, audit: conversation.audit, approval: conversation.gate)
             let captured = try await Triage.capture(
                 source, runner: runner, gate: conversation.gate, maxOutputBytes: maxBytes)
-            let result = Self.withExitStatus(try await body(conversation, captured), of: captured)
+            let result = Self.withExitStatus(try await body(conversation, captured), of: captured, warn: flagFailure)
             let structured: Value? = Value(json: result.json)
             return .init(
                 content: [.text(text: result.text, annotations: nil, _meta: nil)], structuredContent: structured,
@@ -458,13 +518,13 @@ public struct WispServer: Sendable {
     /// text when the command failed: a failing command's output is usually its error message, which a
     /// condenser would otherwise report as an empty diff or a one-line log.
     static func withExitStatus(
-        _ result: (text: String, json: JSONValue), of captured: Triage.Captured
+        _ result: (text: String, json: JSONValue), of captured: Triage.Captured, warn: Bool = true
     ) -> (text: String, json: JSONValue) {
         guard let status = captured.exitStatus else { return result }
         var fields = result.json.objectValue ?? [:]
         fields["exitStatus"] = .int(Int(status))
         fields["timedOut"] = .bool(captured.timedOut)
-        guard status != 0 || captured.timedOut else { return (result.text, .object(fields)) }
+        guard warn, status != 0 || captured.timedOut else { return (result.text, .object(fields)) }
         let why = captured.timedOut ? "timed out" : "exited \(status)"
         let head = captured.text.split(separator: "\n").first.map { ": \($0.prefix(200))" } ?? ""
         return (

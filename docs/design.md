@@ -188,7 +188,7 @@ than thrown. See [ADR 0009](decisions/0009-command-policy-and-sandbox.md).
 
 `WispMCP.WispServer` serves stdio MCP (`wisp mcp`) through `CompatibilityTransport`, which
 normalises messages the SDK cannot decode although the protocol allows them (see `docs/mcp.md`). It advertises `respond`, the condensing tools (`triage`,
-`summarise_diff`, `draft_change`, `scan_secrets`, `redact`, `condense_log`, `json_shape`), and `close_thread` from `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; wisp's own tools
+`summarise_diff`, `draft_change`, `scan_secrets`, `redact`, `condense_log`, `json_shape`, `dependency_audit`, `flaky_tests`, `hot_paths`), and `close_thread` from `ToolCatalog`, whose JSON Schemas and descriptions are the contract other harnesses see; wisp's own tools
 are reachable only through `respond`, and are described to clients by the `wisp://tools` resources,
 generated from `ToolRegistry.descriptions` (schema from each tool's `GenerationSchema`, limits and example
 prompt from the tool's own `WispTool` conformance, so a changed default shows up in the catalogue).
@@ -209,8 +209,11 @@ declares it, and the reply's JSON is parsed into `structuredContent.output`
 with `wisp scan` and `wisp redact` ([ADR 0031](decisions/0031-secret-scanning-and-redaction.md)).
 `condense_log` (`LogDigest`, `CrashReport`) and `json_shape` (`JSONShape`) are deterministic: templates
 and ranking for logs, a parsed `.ips` for crashes, a merged outline for JSON
-([ADR 0032](decisions/0032-log-and-json-condensers.md)). The server's `condense` helper gives every
-condensing tool its conversation, runner, gate, and capture.
+([ADR 0032](decisions/0032-log-and-json-condensers.md)). `dependency_audit` (`DependencyAudit`),
+`flaky_tests` (`FlakyTests`), and `hot_paths` (`HotPaths`) are deterministic too, and `Triage` runs
+`KnownFailures` on each chunk before the model, which sees only what those patterns do not explain
+([ADR 0039](decisions/0039-exact-condensers.md)). The server's `condense` helper gives every condensing
+tool its conversation, runner, gate, and capture.
 `ModelRouting` chooses a model by input size from `Measurements.embedded` and the config's ladder, before
 anything runs; `ChangeDraft.route` applies it, honouring an explicit model and passing over a rung that
 cannot open ([ADR 0037](decisions/0037-routing-by-input-size.md)).

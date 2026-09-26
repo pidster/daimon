@@ -333,6 +333,82 @@ public enum ToolCatalog {
         annotations: .init(title: "Outline JSON", readOnlyHint: false, openWorldHint: false)
     )
 
+    /// The `command` and `working_directory` or `path` properties every capturing condenser shares.
+    static func sourceProperties(example: String) -> [String: Value] {
+        [
+            "command": .object([
+                "type": .string("string"),
+                "description": .string(
+                    "Shell command line whose output to read, run with /bin/sh -c under wisp's policy, sandbox, "
+                        + "and approval, such as: \(example)"),
+            ]),
+            "working_directory": .object([
+                "type": .string("string"),
+                "description": .string("Absolute directory to run the command in. Default: wisp's."),
+            ]),
+            "path": .object([
+                "type": .string("string"),
+                "description": .string("Absolute path of a file on this Mac to read instead."),
+            ]),
+        ]
+    }
+
+    /// Reduces a dependency audit to what needs action.
+    public static let dependencyAudit = Tool(
+        name: "dependency_audit",
+        description:
+            "Reduce a dependency audit on this Mac to what needs action: npm audit --json, cargo audit --json, or "
+            + "pip-audit -f json, as one line per advisory with package, version, severity, id, title, and the fix, "
+            + "most severe and fixable first, plus cargo's unmaintained and yanked crates. No model. Give exactly one "
+            + "of command or path; the audit exiting non-zero because it found something is expected.",
+        inputSchema: .object([
+            "type": .string("object"), "properties": .object(sourceProperties(example: "npm audit --json")),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Condense a dependency audit", readOnlyHint: false, openWorldHint: false)
+    )
+
+    /// Finds flaky tests by comparing runs.
+    public static let flakyTests = Tool(
+        name: "flaky_tests",
+        description:
+            "Find flaky tests by comparing two or more runs of a test suite on this Mac: tests that passed in some "
+            + "runs and failed in others, and tests that failed in every run. Reads swift test, XCTest, cargo test, "
+            + "pytest -rA, and go test -v output. No model. Give paths of saved runs, or a command and how many "
+            + "times to run it.",
+        inputSchema: .object([
+            "type": .string("object"),
+            "properties": .object(
+                sourceProperties(example: "swift test --filter ParserTests").filter { $0.key != "path" }.merging([
+                    "paths": .object([
+                        "type": .string("array"), "items": .object(["type": .string("string")]),
+                        "description": .string("Absolute paths of two or more saved runs' output."),
+                    ]),
+                    "runs": .object([
+                        "type": .string("integer"),
+                        "description": .string("With command: times to run it, 2 to 10 (default 3)."),
+                    ]),
+                ]) { $1 }),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Find flaky tests", readOnlyHint: false, openWorldHint: false)
+    )
+
+    /// Reduces a profile to its hot paths.
+    public static let hotPaths = Tool(
+        name: "hot_paths",
+        description:
+            "Reduce a profile on this Mac to where the time goes: folded stacks (frame;frame;frame count, from "
+            + "stackcollapse-perf, py-spy record -f raw, cargo flamegraph, or pprof -raw) read into the functions "
+            + "with the most self time and the heaviest call paths, as shares of all samples. No model. Give exactly "
+            + "one of command or path.",
+        inputSchema: .object([
+            "type": .string("object"), "properties": .object(sourceProperties(example: "cat profile.folded")),
+            "required": .array([]),
+        ]),
+        annotations: .init(title: "Find hot paths", readOnlyHint: false, openWorldHint: false)
+    )
+
     /// Drafts a commit message, a pull request description, or a changelog line from a diff.
     public static let draftChange = Tool(
         name: "draft_change",
@@ -392,7 +468,10 @@ public enum ToolCatalog {
 
     /// Every tool, in the order clients see them.
     public static var all: [Tool] {
-        [respond, triage, summariseDiff, draftChange, scanSecrets, redact, condenseLog, jsonShape, closeThread]
+        [
+            respond, triage, summariseDiff, draftChange, scanSecrets, redact, condenseLog, jsonShape, dependencyAudit,
+            flakyTests, hotPaths, closeThread,
+        ]
     }
 
     /// URI of the JSON resource describing the model's tools.
@@ -745,6 +824,45 @@ public struct JSONShapeRequest: Equatable, Sendable {
         options = JSONShape.Options(
             maxDepth: try CondensingRequest.count(arguments, "max_depth", fallback: JSONShape.Options().maxDepth),
             examples: try CondensingRequest.flag(arguments, "examples", fallback: true))
+    }
+}
+
+/// Decoded arguments for the `flaky_tests` tool: saved runs, or a command to run several times.
+public struct FlakyTestsRequest: Equatable, Sendable {
+    /// Where the runs come from.
+    public enum Runs: Equatable, Sendable {
+        /// Files, one per run.
+        case paths([String])
+        /// A command, run `count` times.
+        case command(Triage.Source, count: Int)
+    }
+
+    /// Runs allowed from one command.
+    static let maxRuns = 10
+    /// The runs to compare.
+    public var runs: Runs
+
+    /// Decodes and validates MCP call arguments.
+    ///
+    /// - Parameter arguments: The raw `tools/call` arguments.
+    /// - Throws: `MCPError.invalidParams` unless exactly one of `paths` (two or more) and `command` is given,
+    ///   with `runs` from 2 to 10.
+    public init(arguments: [String: Value]?) throws {
+        switch (arguments?["paths"], arguments?["command"]) {
+        case (let paths?, nil):
+            guard let list = paths.arrayValue?.compactMap(\.stringValue), list.count >= 2,
+                list.count == paths.arrayValue?.count
+            else { throw MCPError.invalidParams("'paths' must list two or more file paths") }
+            runs = .paths(list)
+        case (nil, .some):
+            let count = try CondensingRequest.count(arguments, "runs", fallback: 3)
+            guard (2...Self.maxRuns).contains(count) else {
+                throw MCPError.invalidParams("'runs' must be from 2 to \(Self.maxRuns)")
+            }
+            runs = .command(try CondensingRequest(arguments: arguments).source, count: count)
+        default:
+            throw MCPError.invalidParams("give exactly one of 'paths' and 'command'")
+        }
     }
 }
 

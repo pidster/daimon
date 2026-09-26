@@ -101,12 +101,14 @@ public struct Triage: Sendable {
         public var source: Source
         /// How the output was captured.
         public var captured: Captured
-        /// How many chunks the model judged.
+        /// How many chunks the output was cut into.
         public var chunks: Int
         /// The failures, deduplicated, in the order first seen.
         public var findings: [Finding]
         /// Whether findings beyond `maxFindings` were dropped.
         public var more: Bool
+        /// Chunks whose failures `KnownFailures` read exactly, needing no model turn.
+        public var exactChunks = 0
 
         /// The report as JSON, the shape the MCP tool returns (`docs/mcp.md`).
         public var json: JSONValue {
@@ -122,7 +124,8 @@ public struct Triage: Sendable {
             source["truncated"] = .bool(captured.truncated)
             source["bytes"] = .int(captured.text.utf8.count)
             return .object([
-                "source": .object(source), "chunks": .int(chunks), "more": .bool(more),
+                "source": .object(source), "chunks": .int(chunks), "exactChunks": .int(exactChunks),
+                "more": .bool(more),
                 "findings": .array(
                     findings.map {
                         .object([
@@ -140,6 +143,7 @@ public struct Triage: Sendable {
             if captured.timedOut { head.append("timed out") }
             head.append("\(findings.count)\(more ? "+" : "") finding\(findings.count == 1 ? "" : "s")")
             head.append("\(captured.text.utf8.count) bytes in \(chunks) chunk\(chunks == 1 ? "" : "s")")
+            if exactChunks > 0 { head.append("\(exactChunks) read exactly") }
             if captured.truncated { head.append("output truncated to its tail") }
             var lines = [head.joined(separator: "; ")]
             for finding in findings {
@@ -262,7 +266,9 @@ public struct Triage: Sendable {
         return (merged, dropped)
     }
 
-    /// Judges every chunk of `captured` and merges the answers.
+    /// Reads every chunk of `captured` and merges the findings. `KnownFailures` reads each chunk first;
+    /// a chunk it explains completely needs no model turn, and any other goes to the judge, whose
+    /// findings follow the exact ones.
     ///
     /// - Parameters:
     ///   - captured: The output, however it was obtained.
@@ -272,14 +278,24 @@ public struct Triage: Sendable {
     public func run(_ captured: Captured, from source: Source) async throws -> Report {
         let pieces = Self.chunks(captured.text, maxBytes: options.chunkBytes)
         var lists: [[Finding]] = []
+        var exact = 0
         for (index, piece) in pieces.enumerated() {
+            let known = KnownFailures.scan(piece)
+            lists.append(known.findings)
+            if known.explainsEverything {
+                exact += 1
+                continue
+            }
             let answer = try await judge(
                 Self.prompt(chunk: piece, index: index + 1, count: pieces.count, label: source.label))
-            lists.append(Self.findings(in: answer))
+            // The model rewords what the rules already read exactly; keep the exact finding for a place.
+            let located = Set(known.findings.compactMap { $0.location?.lowercased() })
+            lists.append(Self.findings(in: answer).filter { !located.contains($0.location?.lowercased() ?? "") })
         }
         let merged = Self.merge(lists, max: options.maxFindings)
         return Report(
-            source: source, captured: captured, chunks: pieces.count, findings: merged.findings, more: merged.more)
+            source: source, captured: captured, chunks: pieces.count, findings: merged.findings, more: merged.more,
+            exactChunks: exact)
     }
 
     /// Obtains the output for `source`: runs the command through `runner` (its policy, gate, sandbox,

@@ -68,7 +68,9 @@ It exposes `respond` (run a task on the on-device model, with wisp's tools; pass
 the failures), `summarise_diff` (a diff as per-file lines and review flags), `draft_change` (a commit
 message, PR description, or changelog line from a diff), `scan_secrets` (credentials
 and personal data found, masked), `redact` (text with them replaced), `condense_log` (a log as its distinct messages, or a crash report as
-what explains it), `json_shape` (a JSON file's structure without its data), and `close_thread`. The raw output
+what explains it), `json_shape` (a JSON file's structure without its data), `dependency_audit` (an npm,
+cargo, or pip audit as what needs action), `flaky_tests` (tests that pass and fail across runs),
+`hot_paths` (a profile's folded stacks as where the time goes), and `close_thread`. The raw output
 behind the condensing tools never leaves the Mac. wisp's own tools are used by the
 model, not called directly.
 

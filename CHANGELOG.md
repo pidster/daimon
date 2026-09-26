@@ -26,6 +26,14 @@ Added:
 - `wisp classifier train --from-audit` also learns from this Mac's audit log: the on-device model's
   verdicts on the commands you have run, secrets redacted, a refused command at least `moderate`.
 
+- `triage` reads failures in the formats compilers and test runners print (Swift, clang, XCTest,
+  rustc, swift-testing, cargo test, pytest, go test) exactly, and asks the model only about output those
+  do not explain, so build and test output in a known format is triaged at once.
+- MCP tools `dependency_audit` (npm, cargo, or pip audit JSON reduced to one line per advisory with its
+  fix, most severe first), `flaky_tests` (two or more test runs, or one command run several times,
+  compared for tests that pass and fail), and `hot_paths` (folded stacks reduced to self time and the
+  heaviest paths). None uses a model.
+
 Removed:
 
 - `scripts/train-risk-classifier` and `docs/examples/risk-labels.csv`, which trained on the eval set;

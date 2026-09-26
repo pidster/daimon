@@ -1,9 +1,9 @@
 # wisp as an MCP server
 
 `wisp mcp` speaks the Model Context Protocol over stdio, so other agent harnesses can delegate work to the
-on-device model. It advertises `respond`; seven condensing tools that keep raw material on the Mac and
+on-device model. It advertises `respond`; ten condensing tools that keep raw material on the Mac and
 return a small result (`triage`, `summarise_diff`, `draft_change`, `scan_secrets`, `redact`,
-`condense_log`, `json_shape`); and `close_thread`. wisp's own tools (`run_command`, `read_file`, `system_info`, and the
+`condense_log`, `json_shape`, `dependency_audit`, `flaky_tests`, `hot_paths`); and `close_thread`. wisp's own tools (`run_command`, `read_file`, `system_info`, and the
 rest) are not exposed directly; they are reachable only by asking `respond` to use them, so every command runs under the model's policy, sandbox, and approval with the audit trail of a
 turn ([ADR 0006](decisions/0006-mcp-server-over-stdio.md), amended). Stdout is the protocol channel; diagnostics go to stderr. The
 server runs until the client closes stdin.
@@ -194,9 +194,14 @@ or start wisp with `--yes`. See [approval.md](approval.md).
 
 Run a build or test command on this Mac, or read an output file already here, and get back only the
 failures. The raw output stays on the Mac: wisp captures it whole (up to 1 MiB, the tail beyond),
-cuts it into 4 KiB chunks at line ends, and judges each chunk in a fresh, tool-less model turn with a
-schema, then merges the lists, drops duplicates, and caps the result
-([ADR 0023](decisions/0023-condensing-tools.md)).
+cuts it into 4 KiB chunks at line ends, reads each chunk's failures in known formats exactly, and
+judges any chunk those do not fully explain in a fresh, tool-less model turn with a schema, then merges
+the lists, drops duplicates, and caps the result ([ADR 0023](decisions/0023-condensing-tools.md),
+[ADR 0039](decisions/0039-exact-condensers.md)). The exact formats: `file:line:col: error:` and
+`warning:` (Swift, clang, XCTest), rustc's `error[E…]` and `warning:` with their `-->` line,
+swift-testing's `✘ Test … recorded an issue at`, cargo test's `test … FAILED` and `panicked at`,
+pytest's `FAILED` and `ERROR` lines, and go test's `--- FAIL:`. A chunk whose every line that looks like
+a failure is one of those, or a tool's own tally, needs no model turn.
 
 | Argument | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -212,7 +217,7 @@ Result content is a headline and one finding per line; `structuredContent`:
 {
   "source": { "command": "swift test 2>&1", "workingDirectory": "/repo", "exitStatus": 1,
               "timedOut": false, "truncated": false, "bytes": 18234 },
-  "chunks": 5, "more": false,
+  "chunks": 5, "exactChunks": 3, "more": false,
   "findings": [
     { "kind": "error", "location": "Sources/A.swift:42:13", "message": "cannot find 'fooBar' in scope" },
     { "kind": "test-failure", "location": "CommandRunnerTests.swift:88:9", "message": "Expectation failed: …" }
@@ -230,7 +235,8 @@ Measured with `scripts/check eval` on this Mac on 2026-09-20 with the system mod
 fixtures (a `swift build` with two errors and a warning, a `swift test` with two failing tests, a
 `cargo test` with two compile errors, a `pytest` with one failure) every expected failure was found,
 7 of 7, with no spurious findings; the model reports a failing test by its assertion's `file:line` rather
-than its name. Output shapes not in the fixtures are not measured.
+than its name. Output shapes not in the fixtures are not measured. On 2026-09-26, with the exact pass,
+recall stayed 7 of 7 and all four fixtures were read without a model turn (`exactChunks` 4 of 4).
 
 ### `summarise_diff`
 
@@ -427,6 +433,65 @@ The start of the outline of 1,000 events of wisp's own audit log (471 KB), on 20
   details: object
     command?: string e.g. "git merge --ff-only main"
 ```
+
+### `dependency_audit`
+
+Reduce a dependency audit on this Mac to what needs action, without a model
+([ADR 0039](decisions/0039-exact-condensers.md)): `npm audit --json` (npm 7 and later), `cargo audit --json`,
+or `pip-audit -f json`, recognised by shape. One line per advisory, most severe first and fixable before
+unfixable within a severity, up to 40.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | The audit command line, run as for `triage`, such as `npm audit --json`. Its non-zero exit when it finds something is expected and not flagged. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+| `path` | string | one of | Absolute path of saved audit JSON, up to 16 MiB; larger is refused, since cut JSON does not parse. |
+
+`structuredContent` is `{ "tool": "npm" | "cargo" | "pip-audit", "counts": { "high": 1, … }, "more",
+"warnings": [ … ], "advisories": [ { "package", "version", "severity", "id", "title", "fix", "direct" } ],
+"exitStatus", "timedOut" }`. `fix` is `upgrade <package> to <version>` (with `(breaking)` for a semver
+major), `npm audit fix`, `upgrade to <versions>`, or `none available`. npm's `version` is the vulnerable
+range, since its audit gives no installed version; npm entries that only point at another vulnerable
+package are left out, as that package has its own line. `cargo audit` gives a CVSS vector rather than
+a severity, so its severity is estimated from the vector; `pip-audit` gives none, so its severity is
+`unknown`. `warnings` carries `cargo audit`'s unmaintained, yanked, and unsound crates.
+
+### `flaky_tests`
+
+Find flaky tests by comparing runs, without a model ([ADR 0039](decisions/0039-exact-condensers.md)).
+Each run is read into a pass or fail per test name from swift-testing (`✔`/`✘ Test … passed|failed
+after`), XCTest (`Test Case '…' passed|failed`), cargo test (`test … ok|FAILED`), pytest with `-rA` or
+`-v`, or go test with `-v`; a run in which no outcome can be read is refused.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `paths` | array of strings | one of | Absolute paths of two or more saved runs' output. |
+| `command` | string | one of | A test command to run several times, as for `triage`; one approval covers every run. |
+| `runs` | integer | no | With `command`: how many times, 2 to 10 (default 3). |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+
+The result lists `flaky` tests, which passed in some runs and failed in others, most often failing
+first, and `alwaysFailing` tests, up to 40 in all, each with `passes`, `failures`, and its `outcomes` per
+run (`pass`, `fail`, or null where a run did not report it). The text shows the outcomes as a row of `P`,
+`F`, and `-`.
+
+### `hot_paths`
+
+Reduce a profile to where the time goes, without a model ([ADR 0039](decisions/0039-exact-condensers.md)).
+The input is folded stacks, one `frame;frame;frame count` per line: what `stackcollapse-perf.pl`,
+`py-spy record -f raw`, `cargo flamegraph`, and pprof's raw output reduce to. Other lines are skipped
+and counted.
+
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `command` | string | one of | A command that prints folded stacks, run as for `triage`. |
+| `working_directory` | string | no | Absolute directory for the command. Default: wisp's. |
+| `path` | string | one of | Absolute path of a folded-stacks file (up to 8 MiB, the tail beyond). |
+
+`structuredContent` is `{ "samples", "stacks", "skipped", "topSelf": [ { "name", "self", "total" } ],
+"topPaths": [ { "frames", "samples" } ] }`: the 15 functions with the most self time (samples in which
+they were the innermost frame) with their total time (samples in which they were on the stack), and the
+8 heaviest stacks, each shortened to its 6 innermost frames. The text gives both as shares of all samples.
 
 ### `close_thread`
 

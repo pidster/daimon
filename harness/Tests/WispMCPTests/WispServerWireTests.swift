@@ -61,8 +61,7 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
         #expect(
             tools.map(\.name) == [
                 "respond", "triage", "summarise_diff", "draft_change", "scan_secrets", "redact", "condense_log",
-                "json_shape",
-                "close_thread",
+                "json_shape", "dependency_audit", "flaky_tests", "hot_paths", "close_thread",
             ])
         #expect(tools.first?.inputSchema.objectValue?["required"] == .array([.string("prompt")]))
         let resources = try await pair.client.listResources().resources
@@ -368,6 +367,47 @@ func call(_ client: Client, _ name: String, _ arguments: [String: Value]? = nil)
             events.first { $0.kind == .redaction }?.details["replaced"] == ["email": 1, "github-token": 1, "name": 1])
         #expect(!events.contains { $0.kind != .commandOutcome && "\($0.details)".contains(token) })
         await #expect(throws: MCPError.self) { _ = try await call(pair.client, "redact", [:]) }
+        await pair.client.disconnect()
+        await pair.server.stop()
+    }
+
+    @Test func dependencyAuditFlakyTestsAndHotPathsWorkWithoutAModelOverTheProtocol() async throws {
+        let pair = try await connected()
+        let dir = FileManager.default.temporaryDirectory.appending(path: "wisp-wire-exact-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let audit = dir.appending(path: "audit.json")
+        try Data(
+            #"{"auditReportVersion":2,"vulnerabilities":{"lodash":{"severity":"high","isDirect":true,"range":"<4.17.21","via":[{"title":"Prototype Pollution","url":"https://github.com/advisories/GHSA-p6mc-m468-83gw","severity":"high"}],"fixAvailable":{"name":"lodash","version":"4.17.21"}}}}"#
+                .utf8
+        ).write(to: audit)
+        // An audit exits non-zero when it finds something; that is its answer, not a failed command.
+        let deps = try await call(
+            pair.client, "dependency_audit",
+            ["command": .string("cat \(audit.path); exit 1"), "working_directory": .string(dir.path)])
+        #expect(deps.isError == false, "\(deps)")
+        #expect(deps.structuredContent?.objectValue?["exitStatus"] == .int(1))
+        guard case .text(let text, _, _)? = deps.content.first else { Issue.record("no text"); return }
+        #expect(text.hasPrefix("npm audit: 1 advisory (1 high), 1 with a fix"), "\(text)")
+        let first = dir.appending(path: "run1.txt")
+        let second = dir.appending(path: "run2.txt")
+        try Data("test a ... ok\ntest b ... FAILED\n".utf8).write(to: first)
+        try Data("test a ... ok\ntest b ... ok\n".utf8).write(to: second)
+        let flaky = try await call(
+            pair.client, "flaky_tests", ["paths": .array([.string(first.path), .string(second.path)])])
+        #expect(flaky.structuredContent?.objectValue?["flaky"]?.arrayValue?.count == 1, "\(flaky)")
+        let repeated = try await call(
+            pair.client, "flaky_tests",
+            ["command": .string("printf 'test a ... ok\\n'"), "runs": .int(2), "working_directory": .string(dir.path)])
+        #expect(repeated.structuredContent?.objectValue?["runs"] == .int(2), "\(repeated)")
+        await #expect(throws: MCPError.self) {
+            _ = try await call(pair.client, "flaky_tests", ["paths": .array([.string(first.path)])])
+        }
+        let folded = dir.appending(path: "profile.folded")
+        try Data("main;work 90\nmain;idle 10\n".utf8).write(to: folded)
+        let hot = try await call(pair.client, "hot_paths", ["path": .string(folded.path)])
+        #expect(hot.structuredContent?.objectValue?["samples"] == .int(100), "\(hot)")
+        #expect(pair.sink.events.contains { $0.session.hasPrefix("flaky-") && $0.kind == .sessionStart })
         await pair.client.disconnect()
         await pair.server.stop()
     }

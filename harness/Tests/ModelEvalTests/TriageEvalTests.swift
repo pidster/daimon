@@ -106,6 +106,8 @@ struct TriageEvalTests {
         }
         var hits = 0
         var wanted = 0
+        var exact = 0
+        var chunks = 0
         for fixture in Self.fixtures {
             let report = try await triage.run(.init(text: fixture.output), from: .path(fixture.name))
             let haystack = report.findings.map { "\($0.location ?? "") \($0.message)" }
@@ -115,11 +117,13 @@ struct TriageEvalTests {
             hits += found.count
             wanted += fixture.expected.count
             let spurious = report.findings.count - found.count
+            exact += report.exactChunks
+            chunks += report.chunks
             print(
                 "triage eval: \(fixture.name): \(found.count)/\(fixture.expected.count) expected found, "
                     + "\(spurious) other findings\n" + report.rendered)
         }
-        print("triage eval: recall \(hits)/\(wanted)")
+        print("triage eval: recall \(hits)/\(wanted); \(exact) of \(chunks) chunks read exactly, without the model")
         #expect(hits * 4 >= wanted * 3, "recall \(hits)/\(wanted) is below three quarters")
         try? Measurements.report(
             Measurement(

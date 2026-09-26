@@ -10,8 +10,7 @@ import WispCore
         #expect(
             ToolCatalog.all.map(\.name) == [
                 "respond", "triage", "summarise_diff", "draft_change", "scan_secrets", "redact", "condense_log",
-                "json_shape",
-                "close_thread",
+                "json_shape", "dependency_audit", "flaky_tests", "hot_paths", "close_thread",
             ])
     }
 
@@ -181,5 +180,19 @@ import WispCore
         #expect(file.source == .path("/x.diff"))
         #expect(throws: MCPError.self) { try DraftChangeRequest(arguments: ["kind": .string("poem")]) }
         #expect(throws: MCPError.self) { try DraftChangeRequest(arguments: [:]) }
+    }
+
+    @Test func flakyTestsTakesPathsOrACommandWithABoundedRunCount() throws {
+        let paths = try FlakyTestsRequest(arguments: ["paths": .array([.string("/a"), .string("/b")])])
+        #expect(paths.runs == .paths(["/a", "/b"]))
+        let command = try FlakyTestsRequest(arguments: ["command": .string("swift test")])
+        #expect(command.runs == .command(.command("swift test", workingDirectory: nil), count: 3))
+        for bad: [String: Value] in [
+            [:], ["paths": .array([.string("/a")])], ["paths": .array([.string("/a"), .int(1)])],
+            ["command": .string("x"), "runs": .int(1)], ["command": .string("x"), "runs": .int(11)],
+            ["command": .string("x"), "paths": .array([.string("/a"), .string("/b")])],
+        ] {
+            #expect(throws: MCPError.self) { try FlakyTestsRequest(arguments: bad) }
+        }
     }
 }
