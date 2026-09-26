@@ -31,6 +31,9 @@ Removed:
 
 Fixed:
 
+- A message that asks for nothing, such as `test` or `hello`, gets a short question back. The
+  on-device model used to take it as output to quote, sometimes running a command to produce it
+  ("Test output: \"test\"."), and kept the pattern for the rest of the conversation.
 - The rules rate deletion through `find … -delete`, `find … -exec rm`, and `xargs rm` as dangerous;
   they called it safe.
 - `wisp-tui` no longer redraws its band while idle, which could make the cursor flicker or restart its

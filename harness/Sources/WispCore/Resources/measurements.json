@@ -1,5 +1,13 @@
 [
   {
+    "date" : "2026-09-26",
+    "model" : "system",
+    "notes" : "a message with no request (test, hello, hmm, and the same after test) answered with a short reply, no tool, no echo; plus a clear question that must still call current_date; three attempts each",
+    "passed" : 24,
+    "task" : "chat.unclear",
+    "total" : 24
+  },
+  {
     "date" : "2026-09-25",
     "model" : "system",
     "notes" : "labelled commands rated at exactly their level by the general on-device model; the hard requirement, no dangerous command below moderate, held",
@@ -94,10 +102,10 @@
     "total" : 2
   },
   {
-    "date" : "2026-09-22",
+    "date" : "2026-09-26",
     "model" : "system",
     "notes" : "read a small file with read_file, then rewrite one numbered line with edit_file, ten files attempted three times each; a pass is the file ending up exactly as intended",
-    "passed" : 26,
+    "passed" : 21,
     "task" : "edit_file.replace",
     "tool" : "edit_file",
     "total" : 30
@@ -111,10 +119,10 @@
     "total" : 5
   },
   {
-    "date" : "2026-09-22",
+    "date" : "2026-09-26",
     "model" : "system",
     "notes" : "classify a code snippet into an enum through a schema; a pass parses and names the language",
-    "passed" : 6,
+    "passed" : 5,
     "task" : "respond.schema",
     "total" : 6
   },
@@ -127,10 +135,10 @@
     "total" : 5
   },
   {
-    "date" : "2026-09-24",
+    "date" : "2026-09-26",
     "model" : "system",
     "notes" : "eight plain questions about the Mac (a port, the busiest process, free space, a folder's usage, battery, macOS version, memory, one app) with run_command also offered, twice each; a pass is a system_info call in the turn naming the expected topic and target",
-    "passed" : 16,
+    "passed" : 14,
     "task" : "system_info.topic",
     "tool" : "system_info",
     "total" : 16
