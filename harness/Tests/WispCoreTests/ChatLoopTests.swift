@@ -245,6 +245,42 @@ import WispTestSupport
         #expect(capture.noted.contains { $0.hasPrefix("error: no setting 'nosuch'") })
     }
 
+    @Test func getStatusApprovalsAndAuditAreTheirOwnCommands() async throws {
+        let dir = try scratch()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appending(path: "config.json")
+        try Data(#"{"approval": {"classifier": "rules"}}"#.utf8).write(to: file)
+        let store = ApprovalStore(url: dir.appending(path: "approvals.json"))
+        let entry = try await store.grant(
+            pattern: "git push *", directory: "/repo", scope: .project, level: .moderate, source: "test")
+        let agent = Agent(
+            instructions: "x", tools: [], model: ResolvedModel(selection: .system, custom: ScriptedModel()))
+        var context = Self.context
+        context.configFile = file
+        context.approvalStore = store
+        context.inspect = { what in what == "audit" ? "one event" : #"{"view": "\#(what)", "ok": true}"# }
+        let capture = Capture(lines: [
+            "/config get approval.classifier", "/config get approval.threshold", "/config get nosuch", "/status",
+            "/audit", "/approvals", "/inspect config", "/approvals revoke", "1", "/approvals revoke gone",
+            "/approvals frob",
+        ])
+        var loop = ChatLoop(
+            agent: agent, store: TranscriptStore(directory: dir), saveName: nil, context: context, io: capture.io)
+        try await loop.run()
+        let out = capture.output
+        #expect(out.contains("approval.classifier: rules  (set in config.json)"))
+        #expect(out.contains("approval.threshold: moderate  (the default)"))
+        #expect(
+            out.contains("ok: true\nview: status") && out.contains("view: approvals") && out.contains("view: config"))
+        #expect(out.contains("one event"))
+        #expect(out.contains("Which approval goes?") && out.contains("git push *"))
+        #expect(capture.noted.contains("revoked \(entry.id); it no longer applies, in this session or any other"))
+        #expect(await store.all.isEmpty)
+        #expect(capture.noted.contains("no standing approvals"), "the second revoke finds none")
+        #expect(capture.noted.contains { $0.hasPrefix("error: no setting 'nosuch'") })
+        #expect(capture.noted.contains { $0.hasPrefix("unknown /approvals frob") })
+    }
+
     @Test func historyKeepsTheLatestLinesAndNumbersThemToAlign() async throws {
         let dir = try scratch()
         defer { try? FileManager.default.removeItem(at: dir) }

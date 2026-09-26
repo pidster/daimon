@@ -358,7 +358,7 @@ struct Chat: AsyncParsableCommand {
                         approver: TerminalApprover(style: style), transcript: transcript, observer: tap,
                         model: selection)
                 }, stats: session.stats, configFile: Wisp.home.configFile,
-                configOptions: Chat.configOptions(session: session)),
+                configOptions: Chat.configOptions(session: session), approvalStore: session.store),
             style: style,
             io: .init(
                 readLine: { readLine() },
@@ -393,7 +393,9 @@ struct Chat: AsyncParsableCommand {
         router.onComplete { id, text, cursor in
             Task {
                 let known = await options.all()
-                let result = ChatCompletion.complete(text, cursor: cursor) { known[$0.path] ?? [] }
+                let ids = await session.store.all.map(\.id)
+                let result = ChatCompletion.complete(
+                    text, cursor: cursor, options: { known[$0.path] ?? [] }, approvalIDs: ids)
                 send(ChatProtocol.encode("completions", ChatProtocol.completions(id: id, result)))
             }
         }
@@ -426,7 +428,7 @@ struct Chat: AsyncParsableCommand {
                 openModel: { selection, transcript in
                     try session.openAgent(approver: approver, transcript: transcript, observer: tap, model: selection)
                 }, stats: session.stats, configFile: Wisp.home.configFile,
-                configOptions: Chat.configOptions(session: session)),
+                configOptions: Chat.configOptions(session: session), approvalStore: session.store),
             io: .init(
                 readLine: { router.nextMessage() },
                 print: { send(ChatProtocol.encode("output", ["text": .string($0)])) },
@@ -542,7 +544,28 @@ struct ConfigCommand: ParsableCommand {
         discussion:
             "config.json lives in ~/.wisp. 'set' and 'unset' change the settings 'list' shows, checking that the "
             + "file still loads; the rest of the file is kept as it is. Changes apply from the next session.",
-        subcommands: [Show.self, List.self, SetValue.self, Unset.self], defaultSubcommand: Show.self)
+        subcommands: [Show.self, List.self, Get.self, SetValue.self, Unset.self], defaultSubcommand: Show.self)
+
+    /// Prints one setting's effective value.
+    struct Get: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Print one setting's value, and whether it is set or the default.")
+
+        @Argument(help: "The setting, as 'wisp config list' names it.")
+        var path: String
+
+        func run() throws {
+            guard ConfigSettings.setting(path) != nil else {
+                throw ValidationError("\(ConfigEdit.Failure.unknownSetting(path))")
+            }
+            let data = try? Data(contentsOf: Wisp.home.configFile)
+            if let set = (try? ConfigEdit.current(path, in: data)) ?? nil {
+                print("\(ChatLoop.shown(set))\tset in config.json")
+            } else {
+                print("\(ConfigSettings.defaultValue(path).map(ChatLoop.shown) ?? "")\tthe default")
+            }
+        }
+    }
 
     /// Prints the effective configuration.
     struct Show: ParsableCommand {

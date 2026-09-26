@@ -79,6 +79,31 @@ public enum ConfigSettings {
     public static func setting(_ path: String) -> Setting? {
         all.first { $0.path == path }
     }
+
+    /// What a setting is when `config.json` does not set it, from `Config().resolved`; nil where the
+    /// default is nothing at all (no extension to the system prompt).
+    public static func defaultValue(_ path: String) -> JSONValue? {
+        let d = Config().resolved
+        switch path {
+        case "model": return .string(d.model.description)
+        case "approval.threshold": return .string(d.approvalThreshold.rawValue)
+        case "approval.classifier": return .string(d.approvalClassifier.rawValue)
+        case "approval.coremlModel": return .string(ClassifierStore.reference(ClassifierStore.defaultVersion()))
+        case "approval.coremlMinimumConfidence": return .double(d.coremlMinimumConfidence)
+        case "approval.timeoutSeconds": return .int(Int(d.approvalTimeout?.components.seconds ?? 0))
+        case "approval.persistDays": return .int(Int(d.approvalLifetime.components.seconds / 86_400))
+        case "routing.ladder": return .array(d.routingLadder.map { .string($0.description) })
+        case "commandTimeoutSeconds": return .int(Int(d.runner.timeout.components.seconds))
+        case "commandMaxOutputBytes": return .int(d.runner.maxOutputBytes)
+        case "tools.disabled": return .array(d.disabledTools.sorted().map { .string($0) })
+        case "notifications.enabled": return .bool(d.notificationsEnabled)
+        case "notifications.perMinute": return .int(d.notificationsPerMinute)
+        case "audit.enabled": return .bool(d.auditEnabled)
+        case "ollama.baseURL": return .string(d.ollama.baseURL.absoluteString)
+        case "ollama.contextLength": return .int(d.ollama.contextLength)
+        default: return nil
+        }
+    }
 }
 
 /// A change to `config.json`, checked before it is written: the file must still load exactly as it

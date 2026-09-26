@@ -7,14 +7,24 @@ extension ChatLoop {
     mutating func config(_ request: ConfigRequest) async {
         switch request {
         case .show:
-            guard let inspect = context.inspect else {
-                io.note("the configuration is not shown here")
+            await view("config")
+        case .get(let path?):
+            guard ConfigSettings.setting(path) != nil else {
+                io.note(style.ember("error: \(ConfigEdit.Failure.unknownSetting(path))"))
                 return
             }
-            // The inspect view is JSON, for the model and for scripts; a person reads it as YAML.
-            let json = await inspect("config")
-            let value = try? JSONDecoder().decode(JSONValue.self, from: Data(json.utf8))
-            io.print(value.map(YAMLText.render) ?? json)
+            let set: JSONValue? = (try? ConfigEdit.current(path, in: configData)) ?? nil
+            if let set {
+                io.print("\(path): \(Self.shown(set))  (set in config.json)")
+            } else {
+                let fallback = ConfigSettings.defaultValue(path).map(Self.shown) ?? "nothing"
+                io.print("\(path): \(fallback)  (the default)")
+            }
+        case .get(nil):
+            guard let path = await ask(settingChoice(title: "Which setting?", onlySet: false)) else {
+                return io.note("left as it was")
+            }
+            await config(.get(path))
         case .list:
             for line in configList() { io.print(line) }
         case .set(let path?, let value?):
@@ -40,6 +50,51 @@ extension ChatLoop {
             change(path) { try ConfigEdit.unset(path, in: $0) }
         case .unknown(let word):
             io.note("unknown /config \(word); use /config, /config list, /config set KEY VALUE, or /config unset KEY")
+        }
+    }
+
+    /// One of wisp's own views, as the model's `inspect` tool gives it: JSON for the model and scripts,
+    /// shown to a person as YAML; the audit view is text already.
+    func view(_ what: String) async {
+        guard let inspect = context.inspect else {
+            io.note("wisp's own state is not shown here")
+            return
+        }
+        let text = await inspect(what)
+        let value = try? JSONDecoder().decode(JSONValue.self, from: Data(text.utf8))
+        io.print(value.map(YAMLText.render) ?? text)
+    }
+
+    /// `/approvals`: the standing approvals, or revoking one.
+    func approvals(_ request: ApprovalsRequest) async {
+        switch request {
+        case .list:
+            await view("approvals")
+        case .revoke(let id):
+            guard let store = context.approvalStore else { return io.note("approvals cannot be revoked here") }
+            let entries = await store.all
+            guard !entries.isEmpty else { return io.note("no standing approvals") }
+            var chosen = id
+            if chosen == nil {
+                let options = entries.map { entry in
+                    ChatChoice.Option(
+                        value: entry.id, label: entry.pattern,
+                        detail: "\(entry.scope.rawValue), \(entry.workingDirectory ?? "any directory")")
+                }
+                chosen = await ask(ChatChoice(title: "Which approval goes?", options: options))
+            }
+            guard let chosen else { return io.note("left as it was") }
+            do {
+                let removed = try await store.revoke(id: chosen)
+                io.note(
+                    removed
+                        ? "revoked \(chosen); it no longer applies, in this session or any other"
+                        : "no approval \(chosen)")
+            } catch {
+                io.note(style.ember("error: \(error)"))
+            }
+        case .unknown(let word):
+            io.note("unknown /approvals \(word); use /approvals or /approvals revoke [ID]")
         }
     }
 

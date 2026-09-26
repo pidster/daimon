@@ -27,6 +27,14 @@ import Testing
         #expect(complete("/config set model ollama:g").candidates == ["ollama:granite4.1:8b"])
         #expect(complete("/model ollama:q") == .init(from: 7, candidates: ["ollama:qwen3.8:27b"]))
         #expect(complete("/inspect ap").candidates == ["approvals"])
+        #expect(complete("/config g").candidates == ["get"])
+        #expect(complete("/config get audit.").candidates == ["audit.enabled"])
+        #expect(complete("/app").candidates == ["/approvals"] && complete("/au").candidates == ["/audit"])
+        #expect(!ChatCompletion.commands.contains("/inspect"), "the alias is not offered")
+        #expect(complete("/approvals r").candidates == ["revoke"])
+        #expect(
+            ChatCompletion.complete("/approvals revoke a", approvalIDs: ["ab12", "cd34", "a9"]).candidates
+                == ["a9", "ab12"])
     }
 
     @Test func nothingCompletesOutsideASlashCommandOrPastItsWords() {

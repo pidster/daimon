@@ -73,6 +73,9 @@ public struct ChatLoop {
         public var stats: CallStats?
         /// The `config.json` that `/config set` and `unset` change; nil makes them unavailable.
         public var configFile: URL?
+        /// The session's standing approvals, for `/approvals revoke`; nil makes it unavailable. The
+        /// session's own store, so a revocation takes effect in this session at once.
+        public var approvalStore: ApprovalStore?
         /// The answers a setting offers beyond its kind's own (the models this Mac can run, the Core ML
         /// models on disk); nil offers only those.
         public var configOptions: (@Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option])?
@@ -85,8 +88,10 @@ public struct ChatLoop {
             models: (@Sendable (ModelSelection, [any Tool]) async -> [String])? = nil,
             openModel: (@Sendable (ModelSelection, Transcript) throws -> Agent)? = nil, stats: CallStats? = nil,
             configFile: URL? = nil,
-            configOptions: (@Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option])? = nil
+            configOptions: (@Sendable (ConfigSettings.Setting) async -> [ChatChoice.Option])? = nil,
+            approvalStore: ApprovalStore? = nil
         ) {
+            self.approvalStore = approvalStore
             self.configFile = configFile
             self.configOptions = configOptions
             self.directory = directory
@@ -187,11 +192,9 @@ public struct ChatLoop {
                     io.print("\(style.bold(name))  \(ChatEvents.firstSentence(of: tool.description))")
                 }
             case .inspect(let what):
-                guard let inspect = context.inspect else {
-                    io.note("inspect is not available here")
-                    continue
-                }
-                io.print(await inspect(what))
+                await view(what)
+            case .approvals(let request):
+                await approvals(request)
             case .last:
                 io.print(tap.lastToolOutput ?? "no tool has run yet")
             case .models:

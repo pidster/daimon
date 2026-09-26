@@ -26,6 +26,8 @@ public enum ChatInput: Equatable, Sendable {
     case history
     /// Show or change `config.json`.
     case config(ConfigRequest)
+    /// List standing approvals, or revoke one.
+    case approvals(ApprovalsRequest)
     /// A message for the model.
     case message(String)
     /// A slash command that does not exist.
@@ -58,7 +60,10 @@ public enum ChatInput: Equatable, Sendable {
         case "save": self = .save(argument)
         case "new": self = .new
         case "tokens": self = .tokens
-        case "inspect", "status": self = .inspect(argument ?? (command == "status" ? "status" : "status"))
+        case "inspect": self = .inspect(argument ?? "status")
+        case "status": self = .inspect("status")
+        case "audit": self = .inspect("audit")
+        case "approvals": self = .approvals(ApprovalsRequest(argument))
         case "last": self = .last
         case "models": self = .models
         case "model": self = .model(argument)
@@ -74,13 +79,16 @@ public enum ChatInput: Equatable, Sendable {
         /help            show this list
         /tools           list the tools the model can call
         /tokens          show how much of the context window the conversation uses
-        /inspect [what]  show wisp's own config, status (default), approvals, or audit
+        /status          show wisp's own state: model, tools, policy, session
+        /approvals       list standing approvals; /approvals revoke [ID] removes one
+        /audit           show the latest audit events of this session
         /last            show the last tool result in full
         /models          list the models this Mac can run for this conversation
         /model [name]    switch the conversation to a model, keeping the transcript; no name shows the current one
         /stats           show timings of recent model turns and classifier calls
         /history         list what you have typed this session (Up and Down recall it in wisp-tui)
         /config          show the config; /config list shows the settings you can change
+        /config get KEY  show one setting's value and whether it is set or the default
         /config set KEY VALUE, /config unset KEY   change ~/.wisp/config.json; leave out a part to choose it
         /save [name]     save the transcript to ~/.wisp/transcripts
         /new             start a fresh conversation with the same instructions and tools
@@ -94,6 +102,8 @@ public enum ConfigRequest: Equatable, Sendable {
     case show
     /// The settings that can be changed, with their values.
     case list
+    /// One setting's effective value; a missing path is chosen interactively.
+    case get(String?)
     /// Set a setting; a missing path or value is chosen interactively.
     case set(path: String?, value: String?)
     /// Remove a setting so its default applies; a missing path is chosen interactively.
@@ -108,8 +118,29 @@ public enum ConfigRequest: Equatable, Sendable {
         switch parts.first {
         case nil, "show": self = .show
         case "list": self = .list
+        case "get": self = .get(parts.count > 1 ? parts[1] : nil)
         case "set": self = .set(path: parts.count > 1 ? parts[1] : nil, value: parts.count > 2 ? parts[2] : nil)
         case "unset": self = .unset(parts.count > 1 ? parts[1] : nil)
+        case let word?: self = .unknown(word)
+        }
+    }
+}
+
+/// What `/approvals` asks for.
+public enum ApprovalsRequest: Equatable, Sendable {
+    /// The standing approvals.
+    case list
+    /// Revoke one by id; a missing id is chosen interactively.
+    case revoke(String?)
+    /// Anything else, with the word that was not understood.
+    case unknown(String)
+
+    /// Parses what follows `/approvals`.
+    public init(_ argument: String?) {
+        let parts = (argument ?? "").split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        switch parts.first {
+        case nil, "list": self = .list
+        case "revoke": self = .revoke(parts.count > 1 ? parts[1] : nil)
         case let word?: self = .unknown(word)
         }
     }

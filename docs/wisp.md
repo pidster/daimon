@@ -125,13 +125,16 @@ What a session shows, and where it goes:
 | `/help` | List commands. |
 | `/tools` | List the tools the model can call. |
 | `/tokens` | Tokens used by the transcript, turns, and how often older turns were dropped. |
-| `/inspect [what]`, `/status` | wisp's own `config`, `status` (default), `approvals`, or `audit`, as the model's `inspect` tool shows them. |
+| `/status` | wisp's own state, as the model's `inspect` tool shows it, in YAML: the model, tools, policy, and session. |
+| `/approvals`, `/approvals revoke [ID]` | The standing approvals, in YAML; `revoke` removes one at once, in this session and later ones, and without an ID offers them to choose from. |
+| `/audit` | The latest audit events of this session, one line each. |
 | `/last` | The last tool result in full; the live line shows only its first line. |
 | `/models` | The models this conversation could switch to: those that resolve and declare what its tools need, as `wisp models` decides. A table with a header (model, details, capabilities) and the current one marked `*`; `wisp models` keeps its tab-separated lines for scripts. |
 | `/model [name]` | Switch the conversation to `name` (`system`, `private-cloud`, `ollama:<name>`, `<backend>:<name>`), resuming the transcript on it; the status line shows the change. No name shows the current model and its capabilities. A model that cannot serve the conversation's tools is refused with the usual hint and nothing changes. |
 | `/stats` | Timings of this session's recent model turns and classifier calls: per kind and model, the count, failures, mean, P50, P95, and maximum seconds, and the mean prompt tokens where the runtime reports them (Ollama); then the latest eight calls by start time. Kept in memory only, the latest 256 calls; see below. |
 | `/history` | The lines typed this session, numbered, oldest first: the latest 100, blank lines and a line repeating the one before it left out. |
-| `/config`, `/config list` | The effective configuration as YAML (`/inspect config` and `wisp config` give the same as JSON); `list` shows the settings that can be changed here, each with its value in `config.json` (or `(default)`) and what it does. |
+| `/config`, `/config list` | The effective configuration as YAML (`wisp config` gives the same as JSON); `list` shows the settings that can be changed here, each with its value in `config.json` (or `(default)`) and what it does. |
+| `/config get KEY` | One setting's effective value, and whether `config.json` sets it or it is the default; without a key, offers the settings. |
 | `/config set KEY VALUE`, `/config unset KEY` | Change `~/.wisp/config.json`, as `wisp config set` does (below). Leave out the value and chat offers the setting's choices; leave out the key too and it offers the settings first. `unset` without a key offers the settings set in the file. |
 | `/save [name]` | Save now; the name is remembered for exit. |
 | `/new` | Start over with the same instructions and tools. |
@@ -254,6 +257,7 @@ default applied, the model, the `run_command` policy, and the paths under `~/.wi
 `config.json` exists. The same view the model's [`inspect`](tools/inspect.md) tool and the
 `wisp://config` resource give.
 
+`wisp config get KEY` prints one setting's effective value and `set in config.json` or `the default`.
 `wisp config list` prints the settings that can be changed without editing the file, one per line:
 the setting, its value in `config.json` or `(default)`, and what it does. `wisp config set KEY VALUE`
 sets one and `wisp config unset KEY` removes one so its default applies

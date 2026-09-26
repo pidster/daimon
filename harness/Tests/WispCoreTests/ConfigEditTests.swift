@@ -125,4 +125,16 @@ import WispTestSupport
         #expect(both.answer(typed: "/quit") == nil, "a slash command is not an answer")
         #expect(both.numbered.last == "type a number or a value, or press Enter to leave it")
     }
+
+    @Test func everySettingHasADefaultOrSaysItHasNone() {
+        for setting in ConfigSettings.all where setting.path != "systemPromptExtension" {
+            #expect(ConfigSettings.defaultValue(setting.path) != nil, "\(setting.path)")
+        }
+        #expect(ConfigSettings.defaultValue("systemPromptExtension") == nil)
+        #expect(ConfigSettings.defaultValue("approval.timeoutSeconds") == 600)
+        #expect(ConfigSettings.defaultValue("approval.coremlModel") == .string("risk@\(WispVersion.current)-default"))
+        #expect(ChatInput(line: "/config get model") == .config(.get("model")))
+        #expect(ChatInput(line: "/approvals revoke ab12") == .approvals(.revoke("ab12")))
+        #expect(ChatInput(line: "/approvals") == .approvals(.list) && ChatInput(line: "/audit") == .inspect("audit"))
+    }
 }

@@ -14,11 +14,11 @@ public enum ChatCompletion {
 
     /// The slash commands, as typed.
     public static let commands = [
-        "/help", "/tools", "/tokens", "/inspect", "/status", "/last", "/models", "/model", "/stats", "/history",
-        "/config", "/save", "/new", "/quit", "/exit",
+        "/help", "/tools", "/tokens", "/status", "/approvals", "/audit", "/last", "/models", "/model", "/stats",
+        "/history", "/config", "/save", "/new", "/quit", "/exit",
     ]
 
-    /// What `/inspect` shows.
+    /// What `/inspect`, kept as an alias, shows.
     static let views = ["config", "status", "approvals", "audit"]
 
     /// The candidates for the word at `cursor` (a character index, the end by default) in `text`.
@@ -27,9 +27,11 @@ public enum ChatCompletion {
     ///   - text: The input line.
     ///   - cursor: Where the cursor is, in characters; nil is the end.
     ///   - options: The values a setting offers beyond its kind's own, such as the models for `model`.
+    ///   - approvalIDs: The standing approvals' ids, for `/approvals revoke`.
     /// - Returns: Where the word starts and what may replace it; no candidates outside a slash command.
     public static func complete(
-        _ text: String, cursor: Int? = nil, options: (ConfigSettings.Setting) -> [String] = { _ in [] }
+        _ text: String, cursor: Int? = nil, options: (ConfigSettings.Setting) -> [String] = { _ in [] },
+        approvalIDs: [String] = []
     ) -> Result {
         let head = String(text.prefix(cursor ?? text.count))
         let from = head.lastIndex(of: " ").map { head.distance(from: head.startIndex, to: $0) + 1 } ?? 0
@@ -39,8 +41,10 @@ public enum ChatCompletion {
         let pool: [String]
         switch before {
         case []: pool = commands
-        case ["/config"]: pool = ["show", "list", "set", "unset"]
-        case ["/config", "set"], ["/config", "unset"]: pool = ConfigSettings.all.map(\.path)
+        case ["/config"]: pool = ["show", "list", "get", "set", "unset"]
+        case ["/config", "get"], ["/config", "set"], ["/config", "unset"]: pool = ConfigSettings.all.map(\.path)
+        case ["/approvals"]: pool = ["list", "revoke"]
+        case ["/approvals", "revoke"]: pool = approvalIDs
         case let words where words.count == 3 && words[0] == "/config" && words[1] == "set":
             pool = ConfigSettings.setting(words[2]).map { values($0, options: options) } ?? []
         case ["/model"]: pool = ConfigSettings.setting("model").map(options) ?? []

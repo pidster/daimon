@@ -15,7 +15,11 @@ Added:
   result in the version's manifest. Versions live in `~/.wisp/classifiers/risk`.
 - `wisp classifier train` leaves out every example that overlaps `~/.wisp/classifiers/risk/held-out.tsv`
   or a file given with `--exclude`, so a test set of commands run on this Mac is never trained on.
-- `/config` in chat shows the configuration as YAML; `wisp config` and `/inspect config` stay JSON.
+- `/config` in chat shows the configuration as YAML; `wisp config` stays JSON.
+- Chat's commands follow the CLI's nouns: `/config get KEY` (and `wisp config get KEY`) shows one
+  setting and whether it is set or the default; `/status`, `/approvals`, and `/audit` replace
+  `/inspect status|approvals|audit`, `/approvals revoke [ID]` removes a standing approval at once, and
+  `/inspect` stays as an alias. Tab completes the new words and approval ids.
 
 Fixed:
 
